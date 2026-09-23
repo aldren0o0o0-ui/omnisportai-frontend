@@ -1,0 +1,319 @@
+.landing-shell {
+  --landing-bg: #f4efe6;
+  --landing-surface: rgba(255, 251, 245, 0.82);
+  --landing-surface-muted: rgba(255, 248, 239, 0.92);
+  --landing-border: rgba(134, 88, 42, 0.16);
+  --landing-text: #142033;
+  --landing-muted: #5c6678;
+  --landing-soft: #8892a4;
+  --landing-accent: #c96a2b;
+  --landing-accent-soft: rgba(201, 106, 43, 0.14);
+  --landing-secondary: #0f766e;
+  --landing-track: rgba(20, 32, 51, 0.08);
+  --landing-shadow: 0 22px 60px rgba(79, 56, 28, 0.12);
+}
+
+.dark .landing-shell {
+  --landing-bg: #07111f;
+  --landing-surface: rgba(13, 24, 39, 0.84);
+  --landing-surface-muted: rgba(18, 31, 50, 0.92);
+  --landing-border: rgba(154, 176, 201, 0.14);
+  --landing-text: #f2f5f9;
+  --landing-muted: #afbccd;
+  --landing-soft: #7f8da1;
+  --landing-accent: #f0a13b;
+  --landing-accent-soft: rgba(240, 161, 59, 0.14);
+  --landing-secondary: #34d3c8;
+  --landing-track: rgba(242, 245, 249, 0.08);
+  --landing-shadow: 0 30px 70px rgba(0, 0, 0, 0.35);
+}
+
+.landing-shell {
+  font-family: "Aptos", "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+.landing-display,
+.landing-brand-title,
+.landing-section-title {
+  font-family: "Trebuchet MS", "Aptos Display", "Segoe UI", sans-serif;
+}
+
+.landing-display {
+  letter-spacing: -0.05em;
+  text-wrap: balance;
+}
+
+.landing-eyebrow,
+.landing-section-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--landing-accent);
+}
+
+.landing-brand-title {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--landing-text);
+}
+
+.landing-nav-link {
+  color: var(--landing-muted);
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+
+.landing-nav-link:hover {
+  color: var(--landing-text);
+}
+
+.landing-brand-mark,
+.landing-icon-button,
+.landing-primary-button,
+.landing-secondary-button,
+.landing-pill,
+.landing-chip,
+.landing-stat-card,
+.landing-preview-shell,
+.landing-preview-card,
+.landing-feature-card,
+.landing-workflow-card,
+.landing-role-card,
+.landing-time-pill,
+.landing-status-badge {
+  backdrop-filter: blur(16px);
+}
+
+.landing-brand-mark {
+  display: grid;
+  height: 3rem;
+  width: 3rem;
+  place-items: center;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, var(--landing-accent), var(--landing-secondary));
+  color: #fff;
+  box-shadow: 0 16px 30px rgba(15, 118, 110, 0.2);
+}
+
+.landing-grid-overlay {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.28), transparent 78%);
+}
+
+.landing-orb {
+  pointer-events: none;
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(40px);
+  opacity: 0.6;
+}
+
+.landing-orb-primary {
+  top: 4rem;
+  left: -6rem;
+  height: 22rem;
+  width: 22rem;
+  background: color-mix(in srgb, var(--landing-accent) 26%, transparent);
+}
+
+.landing-orb-secondary {
+  top: 7rem;
+  right: -5rem;
+  height: 20rem;
+  width: 20rem;
+  background: color-mix(in srgb, var(--landing-secondary) 22%, transparent);
+}
+
+.landing-pill,
+.landing-chip,
+.landing-icon-button,
+.landing-secondary-button,
+.landing-stat-card,
+.landing-preview-shell,
+.landing-preview-card,
+.landing-feature-card,
+.landing-workflow-card,
+.landing-role-card,
+.landing-time-pill,
+.landing-status-badge {
+  border: 1px solid var(--landing-border);
+  background: var(--landing-surface);
+  box-shadow: var(--landing-shadow);
+}
+
+.landing-pill,
+.landing-chip,
+.landing-time-pill,
+.landing-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.72rem 1rem;
+}
+
+.landing-chip {
+  background: var(--landing-surface-muted);
+  color: var(--landing-text);
+}
+
+.landing-primary-button,
+.landing-secondary-button,
+.landing-icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 1rem;
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.landing-primary-button {
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, var(--landing-accent), var(--landing-secondary));
+  color: #fff;
+  box-shadow: 0 16px 36px rgba(15, 118, 110, 0.22);
+}
+
+.landing-primary-button:hover,
+.landing-secondary-button:hover,
+.landing-icon-button:hover {
+  transform: translateY(-1px);
+}
+
+.landing-secondary-button,
+.landing-icon-button {
+  background: var(--landing-surface);
+  color: var(--landing-text);
+  border: 1px solid var(--landing-border);
+}
+
+.landing-icon-button {
+  justify-content: center;
+  height: 3rem;
+  width: 3rem;
+}
+
+.landing-stat-card,
+.landing-preview-shell,
+.landing-preview-card,
+.landing-feature-card,
+.landing-workflow-card,
+.landing-role-card {
+  border-radius: 1.6rem;
+}
+
+.landing-stat-card,
+.landing-feature-card,
+.landing-workflow-card,
+.landing-role-card,
+.landing-preview-card {
+  padding: 1.25rem;
+}
+
+.landing-preview-shell {
+  padding: 1.25rem;
+}
+
+.landing-preview-top {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.landing-status-badge {
+  width: fit-content;
+  background: color-mix(in srgb, var(--landing-accent-soft) 70%, var(--landing-surface) 30%);
+  color: var(--landing-text);
+}
+
+.landing-preview-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--landing-soft);
+}
+
+.landing-workflow-card,
+.landing-role-card,
+.landing-feature-card {
+  height: 100%;
+}
+
+.landing-feature-icon {
+  display: grid;
+  height: 3.2rem;
+  width: 3.2rem;
+  place-items: center;
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--landing-accent-soft) 72%, var(--landing-surface) 28%);
+  color: var(--landing-accent);
+}
+
+.landing-step-number,
+.landing-time-pill {
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.landing-time-pill {
+  padding: 0.5rem 0.8rem;
+  white-space: nowrap;
+}
+
+.landing-step-number {
+  color: var(--landing-accent);
+}
+
+.landing-section-title {
+  font-size: clamp(2rem, 1.5rem + 1.4vw, 3.4rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+@media (min-width: 640px) {
+  .landing-preview-shell {
+    padding: 1.5rem;
+  }
+
+  .landing-stat-card,
+  .landing-feature-card,
+  .landing-workflow-card,
+  .landing-role-card,
+  .landing-preview-card {
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .landing-preview-top {
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-direction: row;
+  }
+}
+
+@media (max-width: 639px) {
+  .landing-brand-title {
+    font-size: 0.92rem;
+  }
+
+  .landing-pill,
+  .landing-chip {
+    width: 100%;
+    justify-content: center;
+  }
+}
