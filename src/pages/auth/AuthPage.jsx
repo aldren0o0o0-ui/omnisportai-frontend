@@ -5,6 +5,7 @@ import {
   Activity,
   ArrowLeft,
   ArrowRight,
+  ChevronDown,
   Eye,
   EyeOff,
   KeyRound,
@@ -172,33 +173,34 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="auth-shell relative min-h-screen overflow-x-clip bg-[var(--auth-bg)] text-[var(--auth-text)]">
+    <div className="auth-shell relative min-h-screen min-h-[100dvh] w-full overflow-x-hidden bg-[var(--auth-bg)] text-[var(--auth-text)]">
       <div className="auth-orb auth-orb-primary" />
       <div className="auth-orb auth-orb-secondary" />
       <div className="auth-grid-overlay" />
 
       <nav className="fixed inset-x-0 top-0 z-50 border-b border-[var(--auth-border)] bg-[color-mix(in_srgb,var(--auth-surface)_82%,transparent)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3.5 py-3 sm:px-6 sm:py-4 lg:px-8">
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="flex items-center gap-3 text-left"
+            className="flex min-w-0 items-center gap-2.5 sm:gap-3 text-left focus:outline-none"
             aria-label="Go to OmniSport AI home"
           >
-            <span className="auth-brand-mark">
-              <Activity size={22} />
+            <span className="auth-brand-mark flex-shrink-0">
+              <Activity size={20} className="sm:h-[22px] sm:w-[22px]" />
             </span>
-            <span>
-              <span className="auth-eyebrow">OmniSport AI</span>
-              <span className="auth-brand-title">Tournament access</span>
+            <span className="min-w-0">
+              <span className="auth-eyebrow block">OmniSport AI</span>
+              <span className="auth-brand-title truncate">Tournament access</span>
             </span>
           </button>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="auth-secondary-button px-4 py-3 text-sm"
+              className="auth-secondary-button"
+              aria-label="Back to home"
             >
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Back to home</span>
@@ -210,33 +212,33 @@ const AuthPage = () => {
               aria-pressed={isDark}
               className="auth-icon-button"
             >
-              {isDark ? <Sun size={18} /> : <Moon size={18} />}
+              {isDark ? <Sun size={17} /> : <Moon size={17} />}
             </button>
           </div>
         </div>
       </nav>
-      <main className="flex z-10 px-4 pb-10 pt-28 sm:px-6 lg:px-8 lg:pt-32">
-        <div className="mx-auto flex min-h-[calc(100vh-9rem)] max-w-7xl items-center gap-8">
+      <main className="relative z-10 flex min-h-[100dvh] w-full items-center justify-center px-4 pt-20 pb-8 sm:px-6 sm:pt-24 sm:pb-12 lg:px-8">
+        <div className="flex w-full justify-center">
           <MotionSection
             initial="hidden"
             animate="show"
             variants={stagger}
-            className="auth-panel order-1 lg:order-2"
+            className="auth-panel"
           >
             <MotionDiv variants={fadeUp} className="auth-panel-inner">
-              <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-4 sm:gap-5">
                 <div className="flex items-center gap-3">
                   <div className="auth-panel-mark">
-                    <Activity size={24} />
+                    <Activity size={22} className="sm:h-6 sm:w-6" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-semibold tracking-tight text-[var(--auth-text)]">
+                    <h2 className="text-xl font-semibold tracking-tight text-[var(--auth-text)] sm:text-2xl">
                       {isLogin ? 'Welcome back' : 'Create your account'}
                     </h2>
                   </div>
                 </div>
 
-                <p className="text-sm leading-7 text-[var(--auth-muted)]">
+                <p className="text-xs leading-relaxed text-[var(--auth-muted)] sm:text-sm sm:leading-6">
                   {isLogin
                     ? 'Sign in to continue to your role-based dashboard.'
                     : 'Register your account and connect it to the right department.'}
@@ -271,7 +273,7 @@ const AuthPage = () => {
                 ) : null}
               </div>
 
-              <form onSubmit={handleAuth} className="mt-6 space-y-4">
+              <form onSubmit={handleAuth} className="mt-5 space-y-3.5 sm:mt-6 sm:space-y-4">
                 {!isLogin ? (
                   <AuthInput
                     label="Name"
@@ -301,8 +303,8 @@ const AuthPage = () => {
                 />
 
                 {!isLogin ? (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
+                  <div className="space-y-3.5 sm:space-y-4">
+                    <div className="space-y-1.5 sm:space-y-2">
                       <label className="auth-field-label">Department</label>
                       <div className="auth-input-shell">
                         <div className="auth-input-icon">
@@ -325,6 +327,9 @@ const AuthPage = () => {
                             </option>
                           ))}
                         </select>
+                        <div className="auth-select-arrow" aria-hidden="true">
+                          <ChevronDown size={18} />
+                        </div>
                       </div>
                       <p className="auth-helper-text">
                         Pick the department your role belongs to before you continue.
@@ -332,7 +337,7 @@ const AuthPage = () => {
                     </div>
 
                     {requiresInvite ? (
-                      <div className="space-y-2">
+                      <div className="space-y-1.5 sm:space-y-2">
                         <AuthInput
                           label="Sports Office Invite Code"
                           type="text"
@@ -351,18 +356,22 @@ const AuthPage = () => {
                   </div>
                 ) : null}
 
-                <button disabled={loading} className="auth-primary-button w-full justify-center py-4">
-                  {loading ? 'Processing...' : isLogin ? 'Continue to dashboard' : 'Create account'}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="auth-primary-button w-full"
+                >
+                  <span>{loading ? 'Processing...' : isLogin ? 'Continue to dashboard' : 'Create account'}</span>
                   <ArrowRight size={18} />
                 </button>
               </form>
 
-              <p className="mt-6 text-center text-sm text-[var(--auth-muted)]">
+              <p className="mt-5 text-center text-xs text-[var(--auth-muted)] sm:mt-6 sm:text-sm">
                 {isLogin ? 'Need an account?' : 'Already registered?'}{' '}
                 <button
                   type="button"
                   onClick={() => switchMode(!isLogin)}
-                  className="font-semibold text-[var(--auth-accent)] transition-opacity hover:opacity-80"
+                  className="font-semibold text-[var(--auth-accent)] transition-opacity hover:opacity-80 underline-offset-4 hover:underline"
                 >
                   {isLogin ? 'Create one here' : 'Sign in here'}
                 </button>
@@ -392,7 +401,7 @@ const AuthInputInner = ({ label, type = 'text', icon, placeholder, onChange, val
   const inputType = isPasswordField && isVisible ? 'text' : type;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5 sm:space-y-2">
       <label className="auth-field-label">{label}</label>
       <div className="auth-input-shell">
         <div className="auth-input-icon">{icon}</div>
@@ -401,7 +410,7 @@ const AuthInputInner = ({ label, type = 'text', icon, placeholder, onChange, val
           value={value}
           placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}
-          className={`auth-input ${isPasswordField ? 'pr-12' : ''}`}
+          className={`auth-input ${isPasswordField ? 'pr-10 sm:pr-12' : ''}`}
         />
         {isPasswordField ? (
           <button
