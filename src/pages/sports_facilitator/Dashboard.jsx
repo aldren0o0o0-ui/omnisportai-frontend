@@ -17,6 +17,15 @@ const FacilitatorDashboard = () => {
   const tournamentAccess = useTournamentAccess(selectedTournamentId);
   const [sportsList, setSportsList] = useState([]);
 
+  useEffect(() => {
+    let active = true;
+    getSports().then((rows) => active && setSportsList(Array.isArray(rows) ? rows : [])).catch((apiError) => {
+      console.error(apiError);
+      if (active) setSportsList([]);
+    });
+    return () => { active = false; };
+  }, []);
+
   const isViewer =
     (tournamentAccess.hasSelectedTournament &&
       !tournamentAccess.loading &&
@@ -26,15 +35,6 @@ const FacilitatorDashboard = () => {
   if (isViewer) {
     return <Navigate to="/viewer/dashboard" replace />;
   }
-
-  useEffect(() => {
-    let active = true;
-    getSports().then((rows) => active && setSportsList(Array.isArray(rows) ? rows : [])).catch((apiError) => {
-      console.error(apiError);
-      if (active) setSportsList([]);
-    });
-    return () => { active = false; };
-  }, []);
 
   const tournamentObj =
     (Array.isArray(tournaments)

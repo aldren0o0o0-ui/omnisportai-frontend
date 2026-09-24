@@ -153,8 +153,10 @@ const Dashboard = () => {
   const displayedWorkspaceId = displayedIntramural?.id ? Number(displayedIntramural.id) : null;
   const selectedTournamentNumericId = Number(selectedTournamentId || selectedDashboardTournament?.id || 0);
   const assignmentSetupTo = displayedWorkspaceId
-    ? `/coordinator/intramurals?workspace_id=${displayedWorkspaceId}&section=assignments`
-    : "/coordinator/intramurals?section=assignments";
+    ? `/coordinator/intramurals?workspace_id=${displayedWorkspaceId}${selectedTournamentNumericId ? `&tournament_id=${selectedTournamentNumericId}` : ""}&section=assignments`
+    : selectedTournamentNumericId
+      ? `/coordinator/intramurals?tournament_id=${selectedTournamentNumericId}&section=assignments`
+      : "/coordinator/intramurals?section=assignments";
   const [bracketCount, setBracketCount] = useState(0);
   const [bracketRows, setBracketRows] = useState([]);
   const [lockedModalMatch, setLockedModalMatch] = useState(null);

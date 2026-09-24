@@ -236,16 +236,6 @@ const DepartmentDashboard = () => {
   const tournamentAccess = useTournamentAccess(selectedTournamentId);
   const [sportsList, setSportsList] = useState([]);
 
-  const isViewer =
-    (tournamentAccess.hasSelectedTournament &&
-      !tournamentAccess.loading &&
-      tournamentAccess.effectiveMode === "viewer") ||
-    dashboard?.dashboard_type === "VIEWER";
-
-  if (isViewer) {
-    return <Navigate to="/viewer/dashboard" replace />;
-  }
-
   useEffect(() => {
     let active = true;
     getSports()
@@ -260,6 +250,16 @@ const DepartmentDashboard = () => {
       active = false;
     };
   }, []);
+
+  const isViewer =
+    (tournamentAccess.hasSelectedTournament &&
+      !tournamentAccess.loading &&
+      tournamentAccess.effectiveMode === "viewer") ||
+    dashboard?.dashboard_type === "VIEWER";
+
+  if (isViewer) {
+    return <Navigate to="/viewer/dashboard" replace />;
+  }
 
   const tournamentObj =
     (Array.isArray(tournaments)

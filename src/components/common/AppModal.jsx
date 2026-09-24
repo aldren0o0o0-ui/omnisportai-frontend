@@ -164,7 +164,7 @@ const AppModal = ({
     : "items-center justify-center bg-slate-950/50 p-3 sm:p-4 md:p-6";
   const panelClasses = isDrawer
     ? `h-[100dvh] w-full max-w-full rounded-none border-l border-[var(--border-soft)] sm:rounded-l-[var(--radius-lg)] sm:rounded-r-none ${drawerResizable ? "sm:w-[min(90vw,var(--drawer-width))]" : "sm:w-[min(90vw,720px)] lg:w-[min(560px,100vw)]"}`
-    : `max-h-[calc(100dvh-1.5rem)] sm:max-h-[92vh] w-full max-w-[calc(100vw-1.5rem)] sm:max-w-none overflow-hidden rounded-[var(--radius-lg)] ${maxWidthClass}`;
+    : `max-h-[calc(100dvh-1.5rem)] sm:max-h-[92vh] w-full overflow-hidden rounded-[var(--radius-lg)] ${maxWidthClass}`;
   const bodyClasses = isDrawer
     ? `h-[calc(100dvh-73px)] overflow-y-auto overscroll-contain pb-[max(1rem,env(safe-area-inset-bottom))] ${bodyClassName}`
     : `max-h-[calc(100dvh-7.5rem)] sm:max-h-[calc(92vh-84px)] overflow-y-auto p-4 sm:p-5 md:p-6 ${bodyClassName}`;

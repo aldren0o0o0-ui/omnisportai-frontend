@@ -3,6 +3,7 @@ import api from "../api/axios";
 export const getTournaments = async (options = {}) => {
   const params = {};
   if (options.includeArchived) params.include_archived = true;
+  if (options.allWorkspaces) params.all_workspaces = true;
   // When provided, scope to a specific intramural (workspace). Omitted → the
   // backend defaults to the currently ACTIVE workspace (unchanged behavior).
   if (options.workspaceId != null && options.workspaceId !== "") {

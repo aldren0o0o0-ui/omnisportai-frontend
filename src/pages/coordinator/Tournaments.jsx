@@ -189,6 +189,7 @@ const Tournaments = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedWorkspaceId = Number(searchParams.get("workspace_id") || 0);
+  const requestedTournamentId = Number(searchParams.get("tournament_id") || 0);
   const requestedSection = searchParams.get("section");
   const setupSection = requestedSection === "assignments" ? requestedSection : "overview";
   const {
@@ -315,7 +316,7 @@ const Tournaments = () => {
     try {
       const [seasonData, tournamentData] = await Promise.all([
         getWorkspaces({ includeArchived: true }),
-        getTournaments({ includeArchived: true }).catch(() => []),
+        getTournaments({ includeArchived: true, allWorkspaces: true }).catch(() => []),
       ]);
       const seasonList = Array.isArray(seasonData?.workspaces)
         ? seasonData.workspaces
@@ -365,12 +366,46 @@ const Tournaments = () => {
   }, [requestedWorkspaceId]);
 
   useEffect(() => {
-    if (!requestedWorkspaceId || !tournamentsByWorkspace[requestedWorkspaceId]) return;
-    const resolved = tournamentsByWorkspace[requestedWorkspaceId];
-    if (Number(selectedTournament?.id) !== Number(resolved.id)) setSelectedTournament(resolved);
-    const season = seasons.find((row) => Number(row.id) === Number(requestedWorkspaceId));
-    if (season) selectIntramural(season);
-  }, [requestedWorkspaceId, seasons, selectIntramural, selectedTournament?.id, tournamentsByWorkspace]);
+    if (!requestedWorkspaceId && !requestedTournamentId) return;
+
+    if (requestedWorkspaceId && tournamentsByWorkspace[requestedWorkspaceId]) {
+      const resolved = tournamentsByWorkspace[requestedWorkspaceId];
+      if (Number(selectedTournament?.id) !== Number(resolved.id)) setSelectedTournament(resolved);
+      const season = seasons.find((row) => Number(row.id) === Number(requestedWorkspaceId));
+      if (season) selectIntramural(season);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchTargetTournament = async () => {
+      try {
+        const queryParams = { includeArchived: true };
+        if (requestedWorkspaceId) queryParams.workspaceId = requestedWorkspaceId;
+        const res = await getTournaments(queryParams);
+        if (cancelled) return;
+        const list = Array.isArray(res) ? res : Array.isArray(res?.items) ? res.items : [];
+        let matched = null;
+        if (requestedTournamentId) {
+          matched = list.find((t) => Number(t.id) === requestedTournamentId);
+        }
+        if (!matched && requestedWorkspaceId) {
+          matched = list.find((t) => Number(t.workspace_id) === requestedWorkspaceId) || list[0];
+        }
+        if (!matched && list.length > 0) {
+          matched = list[0];
+        }
+        if (matched && Number(selectedTournament?.id) !== Number(matched.id)) {
+          setSelectedTournament(matched);
+        }
+      } catch (err) {
+        console.error("Could not fetch target tournament", err);
+      }
+    };
+    fetchTargetTournament();
+    return () => {
+      cancelled = true;
+    };
+  }, [requestedWorkspaceId, requestedTournamentId, seasons, selectIntramural, selectedTournament?.id, tournamentsByWorkspace]);
 
   const handleSeasonLifecycle = useCallback(
     async (action, season) => {
@@ -794,25 +829,33 @@ const Tournaments = () => {
     ? HISTORICAL_STATUSES.has(String(openedSeason.status || "").toUpperCase())
     : false;
 
+  if (!selectedTournament && setupSection === "assignments" && (isLoadingSeasons || requestedWorkspaceId > 0 || requestedTournamentId > 0)) {
+    return (
+      <div className="os-page-shell os-themed-page flex min-h-[400px] items-center justify-center">
+        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Loading assignments setup...</p>
+      </div>
+    );
+  }
+
   if (selectedTournament && setupSection === "assignments") {
     return (
-      <div className="os-page-shell os-themed-page space-y-6">
+      <div className="os-page-shell os-themed-page space-y-4 sm:space-y-6">
         {isHistoricalView ? <HistoricalBanner intramural={openedSeason} /> : null}
         <header className="os-page-header-card">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Intramural Setup</p>
-              <h1 className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{selectedTournament.tournament_name}</h1>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Review staffing for this Intramural and open the responsible workflow when action is needed.</p>
+              <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 truncate">{selectedTournament.tournament_name}</h1>
+              <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">Review staffing for this Intramural and open the responsible workflow when action is needed.</p>
             </div>
-            <button type="button" onClick={handleBackToList} className="os-btn-ghost-soft inline-flex min-h-10 items-center gap-1"><ArrowLeft size={14} /> All Intramurals</button>
+            <button type="button" onClick={handleBackToList} className="os-btn-ghost-soft inline-flex min-h-9 sm:min-h-10 items-center justify-center gap-1.5 self-start sm:self-auto shrink-0 text-xs sm:text-sm"><ArrowLeft size={14} /> All Intramurals</button>
           </div>
-          <nav className="mt-4 flex gap-1 overflow-x-auto border-t border-slate-200 pt-3 dark:border-slate-700" aria-label="Intramural setup sections">
-            <button type="button" onClick={() => navigate("/coordinator/dashboard")} className="min-h-10 whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Dashboard</button>
-            <button type="button" aria-current="page" className="min-h-10 whitespace-nowrap rounded-lg bg-blue-50 px-3 text-sm font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">Assignments</button>
-            <button type="button" onClick={() => navigate(`/coordinator/brackets?tournament_id=${selectedTournament.id}`)} className="min-h-10 whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Competition Setup</button>
-            <button type="button" onClick={() => navigate(`/coordinator/intramurals/${selectedTournament.id}/settings/venues`)} className="min-h-10 whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Venues</button>
-            <button type="button" onClick={() => navigate("/coordinator/teams")} className="min-h-10 whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Registration</button>
+          <nav className="mt-3 sm:mt-4 -mx-1 px-1 sm:mx-0 sm:px-0 flex items-center gap-1.5 overflow-x-auto border-t border-slate-200 pt-2.5 sm:pt-3 dark:border-slate-700 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Intramural setup sections">
+            <button type="button" onClick={() => navigate("/coordinator/dashboard")} className="shrink-0 min-h-8 sm:min-h-10 whitespace-nowrap rounded-lg px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Dashboard</button>
+            <button type="button" aria-current="page" className="shrink-0 min-h-8 sm:min-h-10 whitespace-nowrap rounded-lg bg-blue-50 px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">Assignments</button>
+            <button type="button" onClick={() => navigate(`/coordinator/brackets?tournament_id=${selectedTournament.id}`)} className="shrink-0 min-h-8 sm:min-h-10 whitespace-nowrap rounded-lg px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Competition Setup</button>
+            <button type="button" onClick={() => navigate(`/coordinator/intramurals/${selectedTournament.id}/settings/venues`)} className="shrink-0 min-h-8 sm:min-h-10 whitespace-nowrap rounded-lg px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Venues</button>
+            <button type="button" onClick={() => navigate("/coordinator/teams")} className="shrink-0 min-h-8 sm:min-h-10 whitespace-nowrap rounded-lg px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Registration</button>
           </nav>
         </header>
         <AssignmentReadinessPanel workspaceId={selectedTournament.workspace_id} expandedByDefault />

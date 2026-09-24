@@ -12,10 +12,10 @@ export default function RaceFacilitatorConsolePage() {
       <div className="flex items-center gap-3">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-2 px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-lg text-sm font-medium border border-zinc-700 transition cursor-pointer"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Stage Progression
+          <ArrowLeft className="w-4 h-4 text-slate-500" />
+          <span>Back to Stage Progression</span>
         </button>
       </div>
       <RaceTimingConsole

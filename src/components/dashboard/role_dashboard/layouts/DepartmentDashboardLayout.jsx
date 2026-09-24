@@ -437,11 +437,10 @@ const DepartmentDashboardLayout = ({
                             </button>
                           ) : <p className="text-[10px] text-[var(--text-muted)]">No coach assigned</p>}
                         </div>
-                        <span className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                          hasCoach
+                        <span className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold ${hasCoach
                             ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                             : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                        }`}>
+                          }`}>
                           {hasCoach ? "Assigned" : "Missing Coach"}
                         </span>
                       </div>
@@ -475,7 +474,7 @@ const DepartmentDashboardLayout = ({
                 </p>
               </div>
               <Link
-                to="/department/teams"
+                to="/department/coach-assignments"
                 className="os-btn-primary-soft inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold"
               >
                 <span>Manage Department Teams</span>

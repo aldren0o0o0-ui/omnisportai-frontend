@@ -156,10 +156,10 @@ const SwitchToggle = ({
   onLabel = "On",
   offLabel = "Off",
 }) => (
-  <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900">
+  <div className="flex items-center justify-between gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
     <div className="min-w-0">
-      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</p>
-      <p className="text-xs text-slate-500 dark:text-slate-400">
+      <p className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</p>
+      <p className="text-[11px] text-slate-500 dark:text-slate-400">
         {hint ? hint : checked ? onLabel : offLabel}
       </p>
     </div>
@@ -170,7 +170,7 @@ const SwitchToggle = ({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${
+      className={`relative inline-flex h-5 w-9 sm:h-6 sm:w-11 shrink-0 items-center rounded-full transition ${
         disabled
           ? "cursor-not-allowed bg-slate-200 dark:bg-slate-700"
           : checked
@@ -179,8 +179,8 @@ const SwitchToggle = ({
       }`}
     >
       <span
-        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
-          checked ? "translate-x-5" : "translate-x-0.5"
+        className={`inline-block h-4 w-4 sm:h-5 sm:w-5 transform rounded-full bg-white shadow transition ${
+          checked ? "translate-x-4 sm:translate-x-5" : "translate-x-0.5"
         }`}
       />
     </button>
@@ -387,42 +387,40 @@ const TournamentCoachAssignments = () => {
     setSetupModal((prev) => ({ ...prev, saving: true, error: "" }));
 
     try {
-        if (isTeamSlot) {
-          if (!targetName) {
-            throw new Error("Team name is required.");
-          }
-          if (!target.team_id) {
-            throw new Error("The team identity is not available for this assignment target.");
-          }
-          await updateTeam(Number(target.team_id), { team_name: targetName });
-          const poolPayload = {
-            applications_open: coachId ? Boolean(setupModal.applicationsOpen) : false,
-            visibility_ready: coachId ? Boolean(setupModal.visibilityEnabled) : false,
-          };
-          try {
-            await assignDepartmentCoach(Number(selectedTournamentId), target.target_type, target.target_id, coachId, poolPayload);
-          } catch {
-            throw new Error("Unable to assign coach for this team slot.");
-          }
-        } else {
-          const poolPayload = {
-            pool_name: targetName,
-            applications_open: coachId ? Boolean(setupModal.applicationsOpen) : false,
-            is_visible_to_players: coachId ? Boolean(setupModal.visibilityEnabled) : false,
-          };
-  
-          try {
-            if (coachId == null) {
-              await updateEntryPoolState(target.target_id, poolPayload);
-              await assignDepartmentCoach(Number(selectedTournamentId), target.target_type, target.target_id, null);
-            } else {
-              await assignDepartmentCoach(Number(selectedTournamentId), target.target_type, target.target_id, coachId);
-              await updateEntryPoolState(target.target_id, poolPayload);
-            }
-          } catch {
-            throw new Error("Coach assignment was saved, but entry pool settings could not be updated. Please retry.");
-          }
+      if (isTeamSlot) {
+        if (!targetName) {
+          throw new Error("Team name is required.");
         }
+        if (!target.team_id) {
+          throw new Error("The team identity is not available for this assignment target.");
+        }
+        const poolPayload = {
+          team_name: targetName,
+          applications_open: coachId ? Boolean(setupModal.applicationsOpen) : false,
+          visibility_ready: coachId ? Boolean(setupModal.visibilityEnabled) : false,
+        };
+        await assignDepartmentCoach(
+          Number(selectedTournamentId),
+          target.target_type,
+          target.target_id,
+          coachId,
+          poolPayload
+        );
+      } else {
+        const poolPayload = {
+          pool_name: targetName,
+          applications_open: coachId ? Boolean(setupModal.applicationsOpen) : false,
+          is_visible_to_players: coachId ? Boolean(setupModal.visibilityEnabled) : false,
+        };
+
+        if (coachId == null) {
+          await updateEntryPoolState(target.target_id, poolPayload);
+          await assignDepartmentCoach(Number(selectedTournamentId), target.target_type, target.target_id, null);
+        } else {
+          await assignDepartmentCoach(Number(selectedTournamentId), target.target_type, target.target_id, coachId);
+          await updateEntryPoolState(target.target_id, poolPayload);
+        }
+      }
 
       closeSetupModal(true);
       await loadAssignments();
@@ -430,7 +428,7 @@ const TournamentCoachAssignments = () => {
       setSetupModal((prev) => ({
         ...prev,
         saving: false,
-        error: err.message || getErrorMessage(err, "Failed to save setup."),
+        error: getErrorMessage(err, "Failed to save setup."),
       }));
     }
   };
@@ -466,7 +464,7 @@ const TournamentCoachAssignments = () => {
         subtitle="Prepare your department's tournament teams, entry pools, and coach assignments."
       />
 
-      <DashboardCard>
+      {/* <DashboardCard>
         <div className="flex flex-wrap items-center gap-4">
           <div className="min-w-[200px] flex-1 space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -529,7 +527,7 @@ const TournamentCoachAssignments = () => {
             </div>
           ) : null}
         </div>
-      </DashboardCard>
+      </DashboardCard> */}
 
       {pageError ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
@@ -565,87 +563,168 @@ const TournamentCoachAssignments = () => {
       ) : null}
 
       {selectedTournamentId && !loading && filteredTargets.length > 0 ? (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-900/80">
-              <tr className="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                <th className="px-4 py-3">Sport</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Entry</th>
-                <th className="px-4 py-3">Assigned Coach</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTargets.map((target) => {
-                const hasTarget = target.target_id != null;
-                const assignedCoach = target.current_coach;
-                const suggestedCoach =
-                  target.suggested_coach && target.suggestion_source !== "NONE" ? target.suggested_coach : null;
-                const eventName = getEventDisplayName(target, "");
-                const sportName = getSportDisplayName(target);
-                const showEventName =
-                  eventName &&
-                  eventName !== "Default" &&
-                  eventName.toLowerCase() !== sportName.toLowerCase();
+        <>
+          {/* Mobile Card List (< sm) */}
+          <div className="space-y-2.5 sm:hidden">
+            {filteredTargets.map((target) => {
+              const hasTarget = target.target_id != null;
+              const assignedCoach = target.current_coach;
+              const suggestedCoach =
+                target.suggested_coach && target.suggestion_source !== "NONE" ? target.suggested_coach : null;
+              const eventName = getEventDisplayName(target, "");
+              const sportName = getSportDisplayName(target);
+              const showEventName =
+                eventName &&
+                eventName !== "Default" &&
+                eventName.toLowerCase() !== sportName.toLowerCase();
 
-                return (
-                  <tr
-                    key={`${target.target_type}-${target.target_id ?? target.sport_id}-${target.event_name}-${target.participant_shape}`}
-                    className="border-t border-slate-200 align-middle transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/40"
-                  >
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-900 dark:text-white">{sportName}</p>
+              return (
+                <div
+                  key={`mobile-${target.target_type}-${target.target_id ?? target.sport_id}-${target.event_name}-${target.participant_shape}`}
+                  className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ${SHAPE_COLORS[target.participant_shape] || "bg-slate-100 text-slate-600"}`}>
+                          {SHAPE_LABELS[target.participant_shape] || target.participant_shape}
+                        </span>
+                        <p className="font-semibold text-slate-900 dark:text-white text-sm">
+                          {sportName}
+                        </p>
+                      </div>
                       {showEventName ? (
                         <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{eventName}</p>
                       ) : null}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ${SHAPE_COLORS[target.participant_shape] || "bg-slate-100 text-slate-600"}`}>
-                        {SHAPE_LABELS[target.participant_shape] || target.participant_shape}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                      {target.target_name || "—"}
-                    </td>
-                    <td className="px-4 py-3">
+                      {target.target_name ? (
+                        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300 font-medium">
+                          Entry: <span className="font-semibold text-slate-800 dark:text-slate-100">{target.target_name}</span>
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <StatusBadge status={target.progress_status || "DRAFT"} />
+                      {target.registration_status ? <StatusBadge status={target.registration_status} /> : null}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                        Assigned Coach
+                      </p>
                       {assignedCoach ? (
-                        <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-700 dark:text-emerald-300">
-                          <User className="h-3.5 w-3.5" />
-                          <span className="truncate">{getCoachDisplayName(assignedCoach)}</span>
-                        </span>
+                        <p className="truncate text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                          {getCoachDisplayName(assignedCoach)}
+                        </p>
                       ) : suggestedCoach ? (
-                        <span className="text-slate-500 dark:text-slate-400">
+                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                           Suggested: {getCoachDisplayName(suggestedCoach)}
-                        </span>
+                        </p>
                       ) : (
-                        <span className="text-xs font-semibold text-amber-600 dark:text-amber-300">Not assigned</span>
+                        <p className="text-xs font-semibold text-amber-600 dark:text-amber-300">
+                          Not assigned
+                        </p>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <StatusBadge status={target.progress_status || "DRAFT"} />
-                        {target.registration_status ? <StatusBadge status={target.registration_status} /> : null}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        disabled={!hasTarget}
-                        title={hasTarget ? undefined : getMissingTargetMessage(target)}
-                        onClick={() => openSetupModal(target)}
-                        className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-300"
-                      >
-                        {assignedCoach ? "Manage" : "Assign"}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!hasTarget}
+                      title={hasTarget ? undefined : getMissingTargetMessage(target)}
+                      onClick={() => openSetupModal(target)}
+                      className="shrink-0 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-300"
+                    >
+                      {assignedCoach ? "Manage" : "Assign"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop & Tablet Table (>= sm) */}
+          <div className="hidden sm:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-900/80">
+                <tr className="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  <th className="px-4 py-3">Sport</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Entry</th>
+                  <th className="px-4 py-3">Assigned Coach</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTargets.map((target) => {
+                  const hasTarget = target.target_id != null;
+                  const assignedCoach = target.current_coach;
+                  const suggestedCoach =
+                    target.suggested_coach && target.suggestion_source !== "NONE" ? target.suggested_coach : null;
+                  const eventName = getEventDisplayName(target, "");
+                  const sportName = getSportDisplayName(target);
+                  const showEventName =
+                    eventName &&
+                    eventName !== "Default" &&
+                    eventName.toLowerCase() !== sportName.toLowerCase();
+
+                  return (
+                    <tr
+                      key={`${target.target_type}-${target.target_id ?? target.sport_id}-${target.event_name}-${target.participant_shape}`}
+                      className="border-t border-slate-200 align-middle transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/40"
+                    >
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-slate-900 dark:text-white">{sportName}</p>
+                        {showEventName ? (
+                          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{eventName}</p>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ${SHAPE_COLORS[target.participant_shape] || "bg-slate-100 text-slate-600"}`}>
+                          {SHAPE_LABELS[target.participant_shape] || target.participant_shape}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                        {target.target_name || "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        {assignedCoach ? (
+                          <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-700 dark:text-emerald-300">
+                            <User className="h-3.5 w-3.5" />
+                            <span className="truncate">{getCoachDisplayName(assignedCoach)}</span>
+                          </span>
+                        ) : suggestedCoach ? (
+                          <span className="text-slate-500 dark:text-slate-400">
+                            Suggested: {getCoachDisplayName(suggestedCoach)}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-semibold text-amber-600 dark:text-amber-300">Not assigned</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <StatusBadge status={target.progress_status || "DRAFT"} />
+                          {target.registration_status ? <StatusBadge status={target.registration_status} /> : null}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          disabled={!hasTarget}
+                          title={hasTarget ? undefined : getMissingTargetMessage(target)}
+                          onClick={() => openSetupModal(target)}
+                          className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-300"
+                        >
+                          {assignedCoach ? "Manage" : "Assign"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       ) : null}
 
       {selectedTournamentId && !loading && departmentTargets.length > 0 && filteredTargets.length === 0 ? (
@@ -658,20 +737,20 @@ const TournamentCoachAssignments = () => {
         open={setupModal.open}
         onClose={closeSetupModal}
         title={getSetupModalTitle(setupModal.target)}
-      
-        maxWidthClass="max-w-2xl"
+        maxWidthClass="max-w-lg sm:max-w-xl"
+        bodyClassName="max-h-[min(82vh,660px)] overflow-y-auto px-4 py-3.5 sm:px-5 sm:py-4"
       >
-        <div className="space-y-5">
+        <div className="space-y-3.5 sm:space-y-4">
           {setupModal.target?.target_id == null ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs sm:text-sm text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
               {getMissingTargetMessage(setupModal.target)}
             </div>
           ) : null}
 
-          <div className="space-y-6">
+          <div className="space-y-3.5 sm:space-y-4">
             {/* Event details */}
-            <div className="space-y-4">
-              <div className="space-y-1.5">
+            <div className="space-y-3">
+              <div className="space-y-1">
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   {getTargetNameLabel(setupModal.target)}
                 </label>
@@ -683,81 +762,52 @@ const TournamentCoachAssignments = () => {
                     setSetupModal((prev) => ({ ...prev, targetName: event.target.value }))
                   }
                   placeholder={getTargetNamePlaceholder(setupModal.target)}
-                  className="w-full rounded-xl border px-3 py-2.5 text-sm placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                  className="w-full rounded-lg border px-3 py-2 text-sm placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
                 />
               </div>
 
               {isTeamSlot && setupModal.target?.team_id ? (
-                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-                  <TeamLogo imageUrl={setupModal.target?.logo_url} label={setupModal.targetName || "Team"} scale="lg" />
+                <div className="flex flex-wrap items-center gap-2.5 rounded-lg border border-slate-200 p-2.5 dark:border-slate-700">
+                  <TeamLogo imageUrl={setupModal.target?.logo_url} label={setupModal.targetName || "Team"} scale="md" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Team logo</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Used across entries, brackets, schedules, and standings.</p>
+                    <p className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100">Team logo</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Used across entries, brackets, schedules, and standings.</p>
                   </div>
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 dark:border-blue-500/50 dark:text-blue-300">
-                    <ImagePlus className="h-4 w-4" aria-hidden="true" />
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-blue-300 px-2.5 py-1.5 text-xs font-semibold text-blue-700 dark:border-blue-500/50 dark:text-blue-300">
+                    <ImagePlus className="h-3.5 w-3.5" aria-hidden="true" />
                     <input type="file" accept=".jpg,.jpeg,.png,.webp" className="sr-only" disabled={setupModal.logoBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleTeamLogo(file); event.target.value = ""; }} />
                     {setupModal.logoBusy ? "Uploading..." : setupModal.target?.logo_url ? "Change logo" : "Upload logo"}
                   </label>
                   {setupModal.target?.logo_url ? (
-                    <button type="button" disabled={setupModal.logoBusy} onClick={() => void handleTeamLogo(null, true)} className="inline-flex items-center gap-2 rounded-lg border border-rose-300 px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-50">
-                      <Trash2 className="h-4 w-4" aria-hidden="true" /> Remove
+                    <button type="button" disabled={setupModal.logoBusy} onClick={() => void handleTeamLogo(null, true)} className="inline-flex items-center gap-1.5 rounded-md border border-rose-300 px-2.5 py-1.5 text-xs font-semibold text-rose-600 disabled:opacity-50">
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Remove
                     </button>
                   ) : null}
                 </div>
               ) : null}
-          
-
-              {/* <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-500 dark:text-slate-400">Entry type</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-100">
-                    {getTargetSetupSuffix(setupModal.target)}
-                  </span>
-                </div>
-                {String(setupModal.target?.target_type || "").toUpperCase() === "ENTRY_POOL" ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-500 dark:text-slate-400">Max entries</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-100">
-                      {setupModal.target?.max_entries_per_department != null
-                        ? `${setupModal.target.max_entries_per_department}`
-                        : "Not set"}
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-700/70 dark:text-slate-300">
-                      Read-only
-                    </span>
-                  </div>
-                ) : null}
-              </div> */}
             </div>
-            
 
             <div className="h-px bg-slate-200 dark:bg-slate-800" />
 
             {/* Coach assignment */}
             <div>
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-2">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   Coach Assignment
                 </h4>
-                {/* {selectedModalCoach ? (
-                  <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-200">
-                    Selected
-                  </span>
-                ) : null} */}
               </div>
 
               {modalAssignedCoach ? (
-                <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-200/50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
-                      <User className="h-4.5 w-4.5" />
+                <div className="mt-2 flex items-center justify-between gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-200/50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                      <User className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700/80 dark:text-emerald-300/80">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700/80 dark:text-emerald-300/80">
                         Assigned Coach
                       </p>
-                      <p className="truncate text-sm font-bold text-emerald-900 dark:text-emerald-100">
+                      <p className="truncate text-xs sm:text-sm font-bold text-emerald-900 dark:text-emerald-100">
                         {getCoachDisplayName(modalAssignedCoach)}
                       </p>
                     </div>
@@ -766,7 +816,7 @@ const TournamentCoachAssignments = () => {
                     <button
                       type="button"
                       onClick={() => setSetupModal((prev) => ({ ...prev, isEditingCoach: true }))}
-                      className="shrink-0 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-transparent dark:text-emerald-300 dark:hover:bg-emerald-500/20"
+                      className="shrink-0 rounded-md border border-emerald-200 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-transparent dark:text-emerald-300 dark:hover:bg-emerald-500/20"
                     >
                       Change
                     </button>
@@ -776,32 +826,8 @@ const TournamentCoachAssignments = () => {
 
               {(!modalAssignedCoach || setupModal.isEditingCoach) && (
                 <>
-                  {/* {modalSuggestedCoach && !modalSuggestionMatchesAssigned ? (
-                    <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-500/30 dark:bg-amber-500/10">
-                      <div className="flex min-w-0 items-center gap-2 text-sm">
-                        <Sparkles className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
-                        <span className="text-amber-700/80 dark:text-amber-200/80">Suggested</span>
-                        <span className="truncate font-semibold text-amber-800 dark:text-amber-100">
-                          {getCoachDisplayName(modalSuggestedCoach)}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSetupModal((prev) => ({
-                            ...prev,
-                            selectedCoachId: String(prev.target?.suggested_coach?.user_id || ""),
-                          }))
-                        }
-                        className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 dark:border-amber-500/40 dark:bg-transparent dark:text-amber-200 dark:hover:bg-amber-500/10"
-                      >
-                        Use
-                      </button>
-                    </div>
-                  ) : null} */}
-
-                  <div className="relative mt-3">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <div className="relative mt-2">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                     <input
                       ref={coachSearchInputRef}
                       type="search"
@@ -810,33 +836,16 @@ const TournamentCoachAssignments = () => {
                         setSetupModal((prev) => ({ ...prev, coachSearch: event.target.value }))
                       }
                       placeholder="Search coach by name or email"
-                      className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus-visible:border-blue-400 dark:focus-visible:ring-blue-400/30"
+                      className="w-full rounded-lg border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus-visible:border-blue-400 dark:focus-visible:ring-blue-400/30"
                     />
                   </div>
 
                   {setupModal.coachesLoading ? (
-                    <div className="mt-3 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                    <div className="mt-2 py-4 text-center text-xs text-slate-500 dark:text-slate-400">
                       Loading eligible coaches...
                     </div>
                   ) : (
-                    <div className="mt-3 max-h-[280px] space-y-2 overflow-y-auto pr-1">
-                      {/* <button
-                        type="button"
-                        onClick={() => setSetupModal((prev) => ({ ...prev, selectedCoachId: "" }))}
-                        className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition ${
-                          setupModal.selectedCoachId
-                            ? "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"
-                            : "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-200"
-                        }`}
-                      >
-                        <span className="text-sm font-semibold">Leave unassigned for now</span>
-                        {!setupModal.selectedCoachId ? (
-                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-200">
-                            Selected
-                          </span>
-                        ) : null}
-                      </button> */}
-
+                    <div className="mt-2 max-h-[160px] sm:max-h-[180px] space-y-1 overflow-y-auto pr-1">
                       {filteredModalCoaches.map((coach) => {
                         const isSelected = String(setupModal.selectedCoachId || "") === String(coach.user_id);
                         const isSuggested = setupModal.target?.suggested_coach?.user_id === coach.user_id;
@@ -851,25 +860,25 @@ const TournamentCoachAssignments = () => {
                                 selectedCoachId: String(coach.user_id),
                               }))
                             }
-                            className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
+                            className={`flex w-full items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-left transition ${
                               isSelected
                                 ? "border-blue-200 bg-blue-50 dark:border-blue-500/40 dark:bg-blue-500/10"
                                 : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"
                             }`}
                           >
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                              <p className="truncate text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100">
                                 {getCoachDisplayName(coach)}
                               </p>
                             </div>
-                            <div className="flex shrink-0 items-center gap-2">
+                            <div className="flex shrink-0 items-center gap-1.5">
                               {isSuggested ? (
-                                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
+                                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
                                   Suggested
                                 </span>
                               ) : null}
                               {isSelected ? (
-                                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-200">
+                                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-200">
                                   Selected
                                 </span>
                               ) : null}
@@ -879,7 +888,7 @@ const TournamentCoachAssignments = () => {
                       })}
 
                       {filteredModalCoaches.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-slate-300 px-3 py-5 text-center text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                        <div className="rounded-lg border border-dashed border-slate-300 px-3 py-3.5 text-center text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
                           {String(setupModal.coachSearch || "").trim()
                             ? "No coaches match this search."
                             : "Search by name or email to find another coach."}
@@ -891,57 +900,50 @@ const TournamentCoachAssignments = () => {
               )}
 
               {(!modalAssignedCoach || setupModal.isEditingCoach) && sortedModalCoaches.length === 0 && !setupModal.coachesLoading ? (
-                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+                <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
                   No eligible coaches were found for this department and sport.
                 </div>
               ) : null}
-
-              {/* {selectedModalCoach &&
-              String(selectedModalCoach.eligibility_scope || "").toUpperCase() === "NEW_ASSIGNMENT" ? (
-                <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-3 text-xs text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
-                  Saving will also grant coach access for this department and sport.
-                </div>
-              ) : null} */}
             </div>
           </div>
 
-            <div className="h-px bg-slate-200 dark:bg-slate-800" />
+          <div className="h-px bg-slate-200 dark:bg-slate-800" />
 
           {/* Status toggles */}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <SwitchToggle
-                label="Visibility"
-                checked={setupModal.visibilityEnabled}
-                onChange={(value) => setSetupModal((prev) => ({ ...prev, visibilityEnabled: value }))}
-                disabled={!canToggleStates}
-                hint={canToggleStates ? "" : "Assign a coach first"}
-                onLabel="Visible"
-                offLabel="Hidden"
-              />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <SwitchToggle
+              label="Visibility"
+              checked={setupModal.visibilityEnabled}
+              onChange={(value) => setSetupModal((prev) => ({ ...prev, visibilityEnabled: value }))}
+              disabled={!canToggleStates}
+              hint={canToggleStates ? "" : "Assign a coach first"}
+              onLabel="Visible"
+              offLabel="Hidden"
+            />
 
-              <SwitchToggle
-                label="Applications"
-                checked={setupModal.applicationsOpen}
-                onChange={(value) => setSetupModal((prev) => ({ ...prev, applicationsOpen: value }))}
-                disabled={!canToggleStates}
-                hint={canToggleStates ? "" : "Assign a coach first"}
-                onLabel="Open"
-                offLabel="Closed"
-              />
-            </div>
+            <SwitchToggle
+              label="Applications"
+              checked={setupModal.applicationsOpen}
+              onChange={(value) => setSetupModal((prev) => ({ ...prev, applicationsOpen: value }))}
+              disabled={!canToggleStates}
+              hint={canToggleStates ? "" : "Assign a coach first"}
+              onLabel="Open"
+              offLabel="Closed"
+            />
+          </div>
 
           {setupModal.error ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs sm:text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
               {setupModal.error}
             </div>
           ) : null}
 
-          <div className="flex justify-end gap-2 pt-1">
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
             <button
               type="button"
               onClick={closeSetupModal}
               disabled={setupModal.saving}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              className="rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             >
               Cancel
             </button>
@@ -949,7 +951,7 @@ const TournamentCoachAssignments = () => {
               type="button"
               onClick={handleSaveSetup}
               disabled={setupModal.saving || setupModal.target?.target_id == null}
-              className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs sm:text-sm font-semibold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {setupModal.saving
                 ? "Saving..."

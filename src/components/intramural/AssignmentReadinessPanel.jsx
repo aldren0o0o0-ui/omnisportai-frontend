@@ -55,17 +55,17 @@ const Metric = ({ label, value }) => {
   const draft = value?.target_draft ?? value?.draft ?? 0;
   const total = value?.target_total ?? value?.total ?? 0;
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-800/70">
-      <div className="flex items-center justify-between">
-        <p className="truncate text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 sm:px-3 sm:py-3 dark:border-slate-700 dark:bg-slate-800/70">
+      <div className="flex items-center justify-between gap-1">
+        <p className="truncate text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400" title={label}>{label}</p>
         {draft > 0 ? (
-          <span className="inline-flex rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
+          <span className="inline-flex shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
             {draft} draft
           </span>
         ) : null}
       </div>
-      <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">
-        {assigned} <span className="text-sm font-medium text-slate-400">/ {total}</span>
+      <p className="mt-0.5 sm:mt-1 text-base sm:text-xl font-bold text-slate-900 dark:text-slate-100">
+        {assigned} <span className="text-[11px] sm:text-sm font-medium text-slate-400">/ {total}</span>
       </p>
     </div>
   );
@@ -642,234 +642,489 @@ export default function AssignmentReadinessPanel({ workspaceId, expandedByDefaul
           requestTournamentAccessRefresh(data?.tournament_id);
         }}
       />
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100"><Users size={17} /> Assignment Readiness</h2>
-          <p className={`mt-1 flex items-center gap-1.5 text-sm ${complete ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>
-            {complete ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
-            {complete ? "Assignment setup complete" : state === "NOT_CONFIGURED" ? "Operational Tournament not configured" : state === "CONFLICT" ? "Assignment data needs safe review" : "Needs attention"}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
+            <Users size={18} className="shrink-0" /> Assignment Readiness
+          </h2>
+          <p className={`mt-1 flex items-center gap-1.5 text-xs sm:text-sm font-medium ${complete ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>
+            {complete ? <CheckCircle2 size={15} className="shrink-0" /> : <AlertTriangle size={15} className="shrink-0" />}
+            <span>{complete ? "Assignment setup complete" : state === "NOT_CONFIGURED" ? "Operational Tournament not configured" : state === "CONFLICT" ? "Assignment data needs safe review" : "Needs attention"}</span>
           </p>
         </div>
-        {!unavailable ? <button type="button" onClick={() => setExpanded((value) => !value)} className="os-btn-ghost-soft inline-flex min-h-10 items-center gap-1 text-xs">Review assignments {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button> : null}
+        {!unavailable ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            className="os-btn-ghost-soft inline-flex min-h-9 sm:min-h-10 items-center justify-center gap-1.5 text-xs font-semibold self-start sm:self-auto shrink-0"
+          >
+            Review assignments {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+        ) : null}
       </div>
-      {error ? <p className="mt-3 text-sm text-rose-700 dark:text-rose-300">{error}</p> : null}
-      {successMessage ? <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-300">{successMessage}</p> : null}
-      {!unavailable ? <div className="mt-4 grid gap-3 sm:grid-cols-3">{Object.entries(labels).map(([key, label]) => <Metric key={key} label={label} value={data?.summary?.[key]} />)}</div> : null}
-      {!unavailable && !complete ? <ul className="mt-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">{(data?.issues || []).slice(0, 3).map((issue, index) => <li key={`${issue.code}-${issue.entity_id}-${index}`}>• {issue.message}</li>)}</ul> : null}
-
-      {expanded ? <div className="mt-5 space-y-6 border-t border-slate-200 pt-5 dark:border-slate-700">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Missing and draft assignments are shown first.</p>
-          <div className="flex gap-1" aria-label="Coverage filter">
-            {[
-              ["ALL", "All"],
-              ...(hasDraftRoles ? [["DRAFT", `Drafts (${totalDrafts})`]] : []),
-              ["ATTENTION", "Needs attention"],
-              ["ASSIGNED", "Assigned"],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setCoverageFilter(value)}
-                className={`min-h-9 rounded-lg px-3 text-xs font-semibold ${
-                  coverageFilter === value
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+      {error ? <p className="mt-3 text-xs sm:text-sm text-rose-700 dark:text-rose-300">{error}</p> : null}
+      {successMessage ? <p className="mt-3 text-xs sm:text-sm text-emerald-700 dark:text-emerald-300">{successMessage}</p> : null}
+      {!unavailable ? (
+        <div className="mt-3.5 sm:mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+          {Object.entries(labels).map(([key, label]) => (
+            <Metric key={key} label={label} value={data?.summary?.[key]} />
+          ))}
         </div>
+      ) : null}
+      {!unavailable && !complete ? (
+        <ul className="mt-3 space-y-1 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
+          {(data?.issues || []).slice(0, 3).map((issue, index) => (
+            <li key={`${issue.code}-${issue.entity_id}-${index}`}>• {issue.message}</li>
+          ))}
+        </ul>
+      ) : null}
 
-        <section id="assignment-departments">
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Department managers</h3>
-          <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-            <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/70 dark:text-slate-400"><tr><th className="px-4 py-3">Department</th><th className="px-4 py-3">Manager</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Action</th></tr></thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">{filteredRows(data?.departments || []).map((row) => (
-                <tr key={`table-${row.department_id}`}>
-                  <th scope="row" className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
-                    {row.department_code || row.department_name}
-                  </th>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                    {row.manager_display_name || (row.coverage_status === "MULTIPLE_ACTIVE_MANAGERS" ? `${row.manager_candidates?.length || 0} active managers` : "Not assigned")}
-                  </td>
-                  <td className="px-4 py-3">
+      {expanded ? (
+        <div className="mt-5 space-y-5 sm:space-y-6 border-t border-slate-200 pt-5 dark:border-slate-700">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+              Missing and draft assignments are shown first.
+            </p>
+            <div className="flex flex-wrap gap-1.5 overflow-x-auto max-w-full pb-0.5" aria-label="Coverage filter">
+              {[
+                ["ALL", "All"],
+                ...(hasDraftRoles ? [["DRAFT", `Drafts (${totalDrafts})`]] : []),
+                ["ATTENTION", "Needs attention"],
+                ["ASSIGNED", "Assigned"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setCoverageFilter(value)}
+                  className={`min-h-8 sm:min-h-9 whitespace-nowrap rounded-lg px-2.5 sm:px-3 text-xs font-semibold transition ${
+                    coverageFilter === value
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <section id="assignment-departments">
+            <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100">
+              Department managers
+            </h3>
+
+            {/* Mobile Cards for Department Managers (< sm) */}
+            <div className="mt-2.5 space-y-2 sm:hidden">
+              {filteredRows(data?.departments || []).map((row) => (
+                <div
+                  key={`card-${row.department_id}`}
+                  className="rounded-xl border border-slate-200 bg-white p-3 sm:p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                        {row.department_code || row.department_name}
+                      </p>
+                      {row.department_name && row.department_code ? (
+                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                          {row.department_name}
+                        </p>
+                      ) : null}
+                    </div>
                     <CoverageBadge status={row.coverage_status} />
-                  </td>
-                  <td className="px-4 py-3 text-right">
+                  </div>
+                  <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                        Manager
+                      </p>
+                      <p className="truncate text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        {row.manager_display_name ||
+                          (row.coverage_status === "MULTIPLE_ACTIVE_MANAGERS"
+                            ? `${row.manager_candidates?.length || 0} active managers`
+                            : "Not assigned")}
+                      </p>
+                    </div>
                     <button
                       type="button"
                       onClick={() => openAssignManagerModal(row)}
-                      className="os-btn-primary-soft min-h-9 px-3 text-xs font-semibold"
+                      className="os-btn-primary-soft shrink-0 min-h-8 px-3 text-xs font-semibold"
                     >
                       {row.coverage_status === "ASSIGNED" ? "Reassign" : "Assign"}
                     </button>
-                  </td>
-                </tr>
-              ))}</tbody>
-            </table></div>
-          </div>
-          <div className="hidden">
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Departments</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Managers are inherited from each department’s active role.</p>
-          <div className="mt-2 divide-y divide-slate-100 dark:divide-slate-800">{filteredRows(data?.departments || []).map((row) => (
-            <div key={row.department_id} className="grid gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
-              <div><p className="font-semibold text-slate-800 dark:text-slate-200">{row.department_code || row.department_name}</p><p className="text-xs text-slate-500">Inherited Department Manager</p></div>
-              <div><p className="text-sm text-slate-700 dark:text-slate-300">{row.manager_display_name || (row.coverage_status === "MULTIPLE_ACTIVE_MANAGERS" ? `${row.manager_candidates?.length || 0} active managers` : "No active Department Manager")}</p><p className="text-xs text-slate-500">{humanize(row.coverage_status)}</p></div>
-              <button type="button" onClick={() => navigate(`${row.action_target || "/coordinator/management/departments"}${(row.action_target || "").includes("?") ? "&" : "?"}return_to=${encodeURIComponent(returnTo)}`)} className="os-btn-ghost-soft min-h-10 text-xs">{row.coverage_status === "ASSIGNED" ? "View user" : "Manage managers"}</button>
+                  </div>
+                </div>
+              ))}
+              {filteredRows(data?.departments || []).length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-slate-800">
+                  No departments match the current filter.
+                </div>
+              ) : null}
             </div>
-          ))}</div>
-          </div>
-        </section>
 
-        <section id="assignment-sports">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Sports facilitators</h3>
-            {draftFacilitatorsCount > 0 && (
-              <button
-                type="button"
-                disabled={Boolean(confirmingSection || confirmingRowId)}
-                onClick={handleConfirmAllFacilitators}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {confirmingSection === "FACILITATORS" ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                Confirm All Facilitators ({draftFacilitatorsCount})
-              </button>
-            )}
-          </div>
-          <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-            <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/70 dark:text-slate-400"><tr><th className="px-4 py-3">Sport</th><th className="px-4 py-3">Facilitator</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Action</th></tr></thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">{filteredRows(data?.sports || []).map((row) => {
+            {/* Desktop & Tablet Table for Department Managers (>= sm) */}
+            <div className="mt-2 hidden overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 sm:block">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[580px] text-left text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/70 dark:text-slate-400">
+                    <tr>
+                      <th className="px-4 py-3">Department</th>
+                      <th className="px-4 py-3">Manager</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {filteredRows(data?.departments || []).map((row) => (
+                      <tr key={`table-${row.department_id}`}>
+                        <th scope="row" className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
+                          {row.department_code || row.department_name}
+                        </th>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                          {row.manager_display_name ||
+                            (row.coverage_status === "MULTIPLE_ACTIVE_MANAGERS"
+                              ? `${row.manager_candidates?.length || 0} active managers`
+                              : "Not assigned")}
+                        </td>
+                        <td className="px-4 py-3">
+                          <CoverageBadge status={row.coverage_status} />
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => openAssignManagerModal(row)}
+                            className="os-btn-primary-soft min-h-8 px-3 text-xs font-semibold"
+                          >
+                            {row.coverage_status === "ASSIGNED" ? "Reassign" : "Assign"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="assignment-sports">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+              <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100">
+                Sports facilitators
+              </h3>
+              {draftFacilitatorsCount > 0 && (
+                <button
+                  type="button"
+                  disabled={Boolean(confirmingSection || confirmingRowId)}
+                  onClick={handleConfirmAllFacilitators}
+                  className="inline-flex min-h-8 sm:min-h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 self-start sm:self-auto"
+                >
+                  {confirmingSection === "FACILITATORS" ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                  Confirm All Facilitators ({draftFacilitatorsCount})
+                </button>
+              )}
+            </div>
+
+            {/* Mobile Cards for Facilitators (< sm) */}
+            <div className="mt-2.5 space-y-2 sm:hidden">
+              {filteredRows(data?.sports || []).map((row) => {
                 const isDraft = row.coverage_status === "DRAFT";
                 const rowKey = `fac-${row.sport_id}`;
                 const isBusy = confirmingRowId === rowKey || confirmingSection === "FACILITATORS";
+                const facilitatorNames =
+                  row.facilitators?.length > 0
+                    ? row.facilitators.map((item) => item.display_name).join(", ")
+                    : row.facilitator_display_name
+                    ? `${row.facilitator_display_name} ${isDraft ? "(Draft)" : ""}`
+                    : "Not assigned";
+
                 return (
-                  <tr key={`table-${row.sport_id}`}>
-                    <th scope="row" className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{getSportDisplayName(row)}</th>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                      {row.facilitators?.length > 0
-                        ? row.facilitators.map((item) => item.display_name).join(", ")
-                        : row.facilitator_display_name
-                        ? `${row.facilitator_display_name} ${isDraft ? "(Draft)" : ""}`
-                        : "Not assigned"}
-                    </td>
-                    <td className="px-4 py-3"><CoverageBadge status={row.coverage_status} /></td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                  <div
+                    key={`fac-card-${row.sport_id}`}
+                    className="rounded-xl border border-slate-200 bg-white p-3 sm:p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                        {getSportDisplayName(row)}
+                      </p>
+                      <CoverageBadge status={row.coverage_status} />
+                    </div>
+                    <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                          Facilitator
+                        </p>
+                        <p className="truncate text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          {facilitatorNames}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
                         {isDraft && (
                           <button
                             type="button"
                             disabled={isBusy}
                             onClick={() => handleConfirmFacilitator(row)}
-                            className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                            className="inline-flex min-h-8 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
                           >
-                            {confirmingRowId === rowKey ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                            {confirmingRowId === rowKey ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
                             Confirm
                           </button>
                         )}
-                        <button type="button" onClick={() => openFacilitators(row)} className="os-btn-primary-soft min-h-9 text-xs">Manage</button>
+                        <button
+                          type="button"
+                          onClick={() => openFacilitators(row)}
+                          className="os-btn-primary-soft min-h-8 px-2.5 text-xs font-semibold"
+                        >
+                          Manage
+                        </button>
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 );
-              })}</tbody>
-            </table></div>
-          </div>
-          <div className="hidden">
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Sports</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Eligibility is configured in User Management. Only exact Intramural assignments count as covered.</p>
-          <div className="mt-2 divide-y divide-slate-100 dark:divide-slate-800">{filteredRows(data?.sports || []).map((row) => (
-            <div key={row.sport_id} className="grid gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
-              <div><p className="font-semibold text-slate-800 dark:text-slate-200">{getSportDisplayName(row)}</p><p className="text-xs text-slate-500">{row.facilitators?.length > 1 ? `${row.facilitators.length} facilitators assigned` : humanize(row.coverage_status)}</p></div>
-              <p className="text-sm text-slate-700 dark:text-slate-300">{row.facilitators?.map((item) => item.display_name).join(", ") || "No facilitator assigned to this Intramural"}</p>
-              <button type="button" onClick={() => openFacilitators(row)} className="os-btn-primary-soft min-h-10 text-xs">Manage</button>
+              })}
+              {filteredRows(data?.sports || []).length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-slate-800">
+                  No sports match the current filter.
+                </div>
+              ) : null}
             </div>
-          ))}</div>
-          </div>
-        </section>
 
-        <section id="assignment-coaches">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Coaches</h3>
-            <div className="flex items-center gap-2">
-              {draftCoachesCount > 0 && (
-                <button
-                  type="button"
-                  disabled={Boolean(confirmingSection || confirmingRowId)}
-                  onClick={handleConfirmAllCoaches}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  {confirmingSection === "COACHES" ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                  Confirm All Coaches ({draftCoachesCount})
-                </button>
-              )}
-              {coachAssignmentsTo ? <button type="button" onClick={() => navigate(coachAssignmentsTo)} className="os-btn-ghost-soft min-h-10 text-xs">Manage coaches</button> : null}
+            {/* Desktop & Tablet Table for Facilitators (>= sm) */}
+            <div className="mt-2 hidden overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 sm:block">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[580px] text-left text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/70 dark:text-slate-400">
+                    <tr>
+                      <th className="px-4 py-3">Sport</th>
+                      <th className="px-4 py-3">Facilitator</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {filteredRows(data?.sports || []).map((row) => {
+                      const isDraft = row.coverage_status === "DRAFT";
+                      const rowKey = `fac-${row.sport_id}`;
+                      const isBusy = confirmingRowId === rowKey || confirmingSection === "FACILITATORS";
+                      return (
+                        <tr key={`table-${row.sport_id}`}>
+                          <th scope="row" className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
+                            {getSportDisplayName(row)}
+                          </th>
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                            {row.facilitators?.length > 0
+                              ? row.facilitators.map((item) => item.display_name).join(", ")
+                              : row.facilitator_display_name
+                              ? `${row.facilitator_display_name} ${isDraft ? "(Draft)" : ""}`
+                              : "Not assigned"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <CoverageBadge status={row.coverage_status} />
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {isDraft && (
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => handleConfirmFacilitator(row)}
+                                  className="inline-flex min-h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                  {confirmingRowId === rowKey ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                  Confirm
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => openFacilitators(row)}
+                                className="os-btn-primary-soft min-h-8 text-xs font-semibold"
+                              >
+                                Manage
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-          <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-            <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/70 dark:text-slate-400"><tr><th className="px-4 py-3">Department</th><th className="px-4 py-3">Sport / Event</th><th className="px-4 py-3">Coach</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Action</th></tr></thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">{coachRows.map((row, index) => {
-                const action = resolveOperationalDestination("coach_assignments", tournamentAccess, { workspace_id: workspaceId, tournament_id: data?.tournament_id, department_id: row.department_id, sport_id: row.sport_id, return_to: returnTo });
+          </section>
+
+          <section id="assignment-coaches">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+              <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100">Coaches</h3>
+              <div className="flex flex-wrap items-center gap-2">
+                {draftCoachesCount > 0 && (
+                  <button
+                    type="button"
+                    disabled={Boolean(confirmingSection || confirmingRowId)}
+                    onClick={handleConfirmAllCoaches}
+                    className="inline-flex min-h-8 sm:min-h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {confirmingSection === "COACHES" ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                    Confirm All Coaches ({draftCoachesCount})
+                  </button>
+                )}
+                {coachAssignmentsTo ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate(coachAssignmentsTo)}
+                    className="os-btn-ghost-soft min-h-8 sm:min-h-9 px-3 text-xs font-semibold"
+                  >
+                    Manage coaches
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Mobile Cards for Coaches (< sm) */}
+            <div className="mt-2.5 space-y-2 sm:hidden">
+              {coachRows.map((row, index) => {
+                const action = resolveOperationalDestination("coach_assignments", tournamentAccess, {
+                  workspace_id: workspaceId,
+                  tournament_id: data?.tournament_id,
+                  department_id: row.department_id,
+                  sport_id: row.sport_id,
+                  return_to: returnTo,
+                });
                 const isDraft = row.coverage_status === "DRAFT";
                 const rowKey = `coach-${row.target_type}-${row.target_id}`;
                 const isBusy = confirmingRowId === rowKey || confirmingSection === "COACHES";
+
                 return (
-                  <tr key={`coach-table-${row.target_type}-${row.target_id}-${index}`}>
-                    <th scope="row" className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{row.department_label}</th>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{assignmentCompetitionLabel(row)}</td>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                      {row.coach_display_name ? `${row.coach_display_name} ${isDraft ? "(Draft)" : ""}` : "Not assigned"}
-                    </td>
-                    <td className="px-4 py-3"><CoverageBadge status={row.coverage_status} /></td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                  <div
+                    key={`coach-card-${row.target_type}-${row.target_id}-${index}`}
+                    className="rounded-xl border border-slate-200 bg-white p-3 sm:p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                            {row.department_label}
+                          </span>
+                          <p className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 break-words">
+                            {assignmentCompetitionLabel(row)}
+                          </p>
+                        </div>
+                      </div>
+                      <CoverageBadge status={row.coverage_status} />
+                    </div>
+                    <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Coach</p>
+                        <p className="truncate text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          {row.coach_display_name ? `${row.coach_display_name} ${isDraft ? "(Draft)" : ""}` : "Not assigned"}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
                         {isDraft && (
                           <button
                             type="button"
                             disabled={isBusy}
                             onClick={() => handleConfirmCoach(row)}
-                            className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                            className="inline-flex min-h-8 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
                           >
-                            {confirmingRowId === rowKey ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                            {confirmingRowId === rowKey ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
                             Confirm
                           </button>
                         )}
-                        <button type="button" disabled={!action} onClick={() => action && navigate(action)} className="os-btn-ghost-soft min-h-9 text-xs disabled:opacity-50">
+                        <button
+                          type="button"
+                          disabled={!action}
+                          onClick={() => action && navigate(action)}
+                          className="os-btn-ghost-soft min-h-8 px-2.5 text-xs font-semibold disabled:opacity-50"
+                        >
                           {row.coverage_status === "ASSIGNED" ? "View" : "Assign"}
                         </button>
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 );
-              })}</tbody>
-            </table></div>
-          </div>
-          <div className="hidden">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div><h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Coach Coverage</h3><p className="text-xs text-slate-500 dark:text-slate-400">Assigned by a Department Manager or Coordinator through the existing coach workflow.</p></div>
-            {coachAssignmentsTo ? <button type="button" onClick={() => navigate(coachAssignmentsTo)} className="os-btn-ghost-soft min-h-10 text-xs">Open coach assignments</button> : !accessLoading ? <span className="text-xs text-slate-500">Coach assignment management is unavailable in this role.</span> : null}
-          </div>
-          <div className="mt-2 divide-y divide-slate-100 dark:divide-slate-800">{coachGroups
-            .filter((group) => coverageFilter === "ALL" || (coverageFilter === "ASSIGNED" ? group.assigned === group.total : group.assigned !== group.total))
-            .sort((left, right) => Number(left.assigned === left.total) - Number(right.assigned === right.total))
-            .map((group) => (
-              <div key={group.id}>
-                <button type="button" onClick={() => setCoachDepartment(coachDepartment === group.id ? null : group.id)} aria-expanded={coachDepartment === group.id} className="flex min-h-12 w-full items-center justify-between gap-3 py-3 text-left"><span className="font-semibold text-slate-800 dark:text-slate-200">{group.name}</span><span className="text-sm text-slate-500">{group.assigned} / {group.total} assigned</span></button>
-                {coachDepartment === group.id ? <div className="pb-3 pl-3">{group.targets.map((target) => <CoverageRow key={`${target.target_type}-${target.target_id}`} name={assignmentCompetitionLabel(target)} detail={target.coach_display_name} status={target.coverage_status} action={resolveOperationalDestination("coach_assignments", tournamentAccess, { workspace_id: workspaceId, tournament_id: data?.tournament_id, department_id: target.department_id, sport_id: target.sport_id, return_to: returnTo })} navigate={navigate} />)}</div> : null}
+              })}
+              {coachRows.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-slate-800">
+                  No coaches match the current filter.
+                </div>
+              ) : null}
+            </div>
+
+            {/* Desktop & Tablet Table for Coaches (>= sm) */}
+            <div className="mt-2 hidden overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 sm:block">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-left text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/70 dark:text-slate-400">
+                    <tr>
+                      <th className="px-4 py-3">Department</th>
+                      <th className="px-4 py-3">Sport / Event</th>
+                      <th className="px-4 py-3">Coach</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {coachRows.map((row, index) => {
+                      const action = resolveOperationalDestination("coach_assignments", tournamentAccess, {
+                        workspace_id: workspaceId,
+                        tournament_id: data?.tournament_id,
+                        department_id: row.department_id,
+                        sport_id: row.sport_id,
+                        return_to: returnTo,
+                      });
+                      const isDraft = row.coverage_status === "DRAFT";
+                      const rowKey = `coach-${row.target_type}-${row.target_id}`;
+                      const isBusy = confirmingRowId === rowKey || confirmingSection === "COACHES";
+                      return (
+                        <tr key={`coach-table-${row.target_type}-${row.target_id}-${index}`}>
+                          <th scope="row" className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
+                            {row.department_label}
+                          </th>
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                            {assignmentCompetitionLabel(row)}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                            {row.coach_display_name ? `${row.coach_display_name} ${isDraft ? "(Draft)" : ""}` : "Not assigned"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <CoverageBadge status={row.coverage_status} />
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {isDraft && (
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => handleConfirmCoach(row)}
+                                  className="inline-flex min-h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                  {confirmingRowId === rowKey ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                  Confirm
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                disabled={!action}
+                                onClick={() => action && navigate(action)}
+                                className="os-btn-ghost-soft min-h-8 text-xs font-semibold disabled:opacity-50"
+                              >
+                                {row.coverage_status === "ASSIGNED" ? "View" : "Assign"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            ))}</div>
-          </div>
-        </section>
-      </div> : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {facilitatorModal && typeof document !== "undefined" ? createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-md transition-all"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 p-3 sm:p-4 md:p-6 backdrop-blur-md transition-all"
           role="dialog"
           aria-modal="true"
           aria-labelledby="facilitator-dialog-title"
@@ -877,7 +1132,7 @@ export default function AssignmentReadinessPanel({ workspaceId, expandedByDefaul
             if (e.target === e.currentTarget) closeFacilitatorModal();
           }}
         >
-          <div className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+          <div className="relative max-h-[min(90vh,680px)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -1017,25 +1272,25 @@ export default function AssignmentReadinessPanel({ workspaceId, expandedByDefaul
             ) : null}
 
             {/* Modal Actions */}
-            <div className="mt-6 flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 dark:border-slate-800 sm:flex-row sm:justify-between">
+            <div className="mt-5 sm:mt-6 flex flex-col-reverse gap-2 border-t border-slate-100 pt-3.5 sm:pt-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 {originalFacilitators.length > 0 ? (
                   <button
                     type="button"
                     disabled={facilitatorBusy}
                     onClick={removeFacilitators}
-                    className="rounded-lg px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60 dark:text-rose-300 dark:hover:bg-rose-500/10 transition"
+                    className="w-full sm:w-auto rounded-lg px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60 dark:text-rose-300 dark:hover:bg-rose-500/10 transition"
                   >
                     Remove all assignments
                   </button>
                 ) : null}
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
                 <button
                   type="button"
                   disabled={facilitatorBusy}
                   onClick={closeFacilitatorModal}
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  className="w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
                   Cancel
                 </button>
@@ -1043,7 +1298,7 @@ export default function AssignmentReadinessPanel({ workspaceId, expandedByDefaul
                   type="button"
                   disabled={facilitatorBusy}
                   onClick={saveFacilitators}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-60"
+                  className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-60"
                 >
                   {facilitatorBusy ? (
                     <>
@@ -1064,7 +1319,7 @@ export default function AssignmentReadinessPanel({ workspaceId, expandedByDefaul
       {/* Direct Assign Department Manager Modal */}
       {managerModal && typeof document !== "undefined" ? createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-md transition-all"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 p-3 sm:p-4 md:p-6 backdrop-blur-md transition-all"
           role="dialog"
           aria-modal="true"
           aria-labelledby="manager-modal-title"
@@ -1072,11 +1327,11 @@ export default function AssignmentReadinessPanel({ workspaceId, expandedByDefaul
             if (e.target === e.currentTarget) closeAssignManagerModal();
           }}
         >
-          <div className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+          <div className="relative max-h-[min(90vh,680px)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 id="manager-modal-title" className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                <h3 id="manager-modal-title" className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
                   Assign Department Manager
                 </h3>
                 <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
@@ -1252,12 +1507,12 @@ export default function AssignmentReadinessPanel({ workspaceId, expandedByDefaul
             )}
 
             {/* Modal Actions */}
-            <div className="mt-6 flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-end">
+            <div className="mt-5 sm:mt-6 flex flex-col-reverse gap-2 border-t border-slate-100 pt-3.5 sm:pt-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-end">
               <button
                 type="button"
                 disabled={managerBusy}
                 onClick={closeAssignManagerModal}
-                className="min-h-10 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                className="w-full sm:w-auto min-h-10 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 Cancel
               </button>
@@ -1265,7 +1520,7 @@ export default function AssignmentReadinessPanel({ workspaceId, expandedByDefaul
                 type="button"
                 disabled={managerBusy || !selectedManagerUser || Boolean(getManagerIneligibilityReason(selectedManagerUser, managerModal.department_id, managerModal.department_name || managerModal.department_code))}
                 onClick={saveManagerAssignment}
-                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex w-full sm:w-auto min-h-10 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {managerBusy ? (
                   <>

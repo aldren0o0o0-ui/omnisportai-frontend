@@ -35,21 +35,6 @@ const CoachDashboard = () => {
     !isCoachManagementMode &&
     !isAssistantCoachMode;
 
-  const isViewer =
-    isTournamentViewerFallback ||
-    (tournamentAccess.hasSelectedTournament &&
-      !tournamentAccess.loading &&
-      tournamentAccess.effectiveMode === "viewer") ||
-    dashboard?.dashboard_type === "VIEWER";
-
-  if (isViewer) {
-    return <Navigate to="/viewer/dashboard" replace />;
-  }
-
-  const operationalMode = Boolean(
-    Array.isArray(dashboard?.schedule?.events) && dashboard.schedule.events.length > 0
-  );
-
   useEffect(() => {
     let active = true;
     getSports().then((rows) => active && setSportsList(Array.isArray(rows) ? rows : [])).catch((apiError) => {
@@ -73,6 +58,21 @@ const CoachDashboard = () => {
       .catch(() => active && setOwnedParticipantState({ tournamentId, rows: [] }));
     return () => { active = false; };
   }, [isCoachManagementMode, selectedIntramural?.id, selectedTournamentId, workspace?.id]);
+
+  const isViewer =
+    isTournamentViewerFallback ||
+    (tournamentAccess.hasSelectedTournament &&
+      !tournamentAccess.loading &&
+      tournamentAccess.effectiveMode === "viewer") ||
+    dashboard?.dashboard_type === "VIEWER";
+
+  if (isViewer) {
+    return <Navigate to="/viewer/dashboard" replace />;
+  }
+
+  const operationalMode = Boolean(
+    Array.isArray(dashboard?.schedule?.events) && dashboard.schedule.events.length > 0
+  );
 
   const ownedParticipants = ownedParticipantState.tournamentId === Number(selectedTournamentId || 0) ? ownedParticipantState.rows : [];
 

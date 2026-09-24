@@ -11,10 +11,12 @@ import {
   AlertCircle,
   ExternalLink,
   ChevronRight,
+  Maximize2,
 } from "lucide-react";
 import api from "../../api/axios";
 import DashboardCard from "../common/DashboardCard";
 import AppModal from "../common/AppModal";
+import RaceTimingConsole from "../../features/competitions/RaceTimingConsole";
 
 export default function RaceStageProgressionWorkspace({
   eventId,
@@ -43,6 +45,10 @@ export default function RaceStageProgressionWorkspace({
   const [placesPerContest, setPlacesPerContest] = useState(2);
   const [fastestTimesOverall, setFastestTimesOverall] = useState(2);
   const [modalError, setModalError] = useState("");
+
+  // Race Timing Console Modal
+  const [showTimingModal, setShowTimingModal] = useState(false);
+  const [timingModalContestId, setTimingModalContestId] = useState(null);
 
   useEffect(() => {
     if (openGenerateModalTrigger > 0) {
@@ -132,10 +138,17 @@ export default function RaceStageProgressionWorkspace({
     }
   };
 
-  const handleOpenTimingConsole = (contestId) => {
-    const isFacilitator = location.pathname.includes("/sport-facilitator") || location.pathname.includes("/facilitator");
-    const base = isFacilitator ? "/sport-facilitator" : "/coordinator";
-    navigate(`${base}/contests/${contestId || activeContestId}/timing`);
+  const handleOpenTimingConsole = (contestId, openInNewPage = false) => {
+    const targetId = contestId || activeContestId;
+    if (!targetId) return;
+    if (openInNewPage) {
+      const isFacilitator = location.pathname.includes("/sport-facilitator") || location.pathname.includes("/facilitator");
+      const base = isFacilitator ? "/sport-facilitator" : "/coordinator";
+      navigate(`${base}/contests/${targetId}/timing`);
+    } else {
+      setTimingModalContestId(targetId);
+      setShowTimingModal(true);
+    }
   };
 
   const stages = stageData?.stages || [];
@@ -724,6 +737,56 @@ export default function RaceStageProgressionWorkspace({
             />
           </div>
         </div>
+      </AppModal>
+
+      {/* Race Timing Modal */}
+      <AppModal
+        open={showTimingModal && !!timingModalContestId}
+        onClose={() => {
+          setShowTimingModal(false);
+          setTimingModalContestId(null);
+          fetchStages();
+          if (activeContestId) fetchContestLineup(activeContestId);
+        }}
+        title="Live Race Timing & Stopwatch Console"
+        maxWidthClass="max-w-5xl"
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <button
+              type="button"
+              onClick={() => handleOpenTimingConsole(timingModalContestId, true)}
+              className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-500 font-medium dark:text-indigo-400 cursor-pointer"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+              Open Dedicated Full Screen Page
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowTimingModal(false);
+                setTimingModalContestId(null);
+                fetchStages();
+                if (activeContestId) fetchContestLineup(activeContestId);
+              }}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
+            >
+              Close Console
+            </button>
+          </div>
+        }
+      >
+        {timingModalContestId && (
+          <div className="py-2">
+            <RaceTimingConsole
+              contestId={timingModalContestId}
+              apiBase="/api/v1"
+              onCertified={() => {
+                fetchStages();
+                if (activeContestId) fetchContestLineup(activeContestId);
+              }}
+            />
+          </div>
+        )}
       </AppModal>
     </div>
   );
