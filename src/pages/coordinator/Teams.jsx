@@ -53,10 +53,9 @@ const isSportsOfficeDepartment = (departmentName) =>
 
 // eslint-disable-next-line no-unused-vars
 const tabClass = (active) =>
-  `rounded-lg px-3 py-2 text-sm font-semibold transition ${
-    active
-      ? "bg-blue-600 text-white"
-      : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-[var(--surface)]"
+  `rounded-lg px-3 py-2 text-sm font-semibold transition ${active
+    ? "bg-blue-600 text-white"
+    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-[var(--surface)]"
   }`;
 
 const getErrorMessage = (error, fallback) => {
@@ -526,7 +525,7 @@ const Teams = ({ readOnly = false, departmentId = null, allowCoachAssignment = f
       const rowSportId = String(row.sport_id || "");
       const rowDepartmentId = String(row.department_id || "");
       const rowShape = String(row.participant_shape || "").trim().toUpperCase();
-      
+
       const statusMatch = registrationMonitorStatus === "ALL"
         || (registrationMonitorStatus === "PENDING_REVIEW" && (rowStatus === "SUBMITTED" || rowStatus === "UNDER_REVIEW" || rowStatus === "PENDING_REVIEW"))
         || rowStatus === registrationMonitorStatus;
@@ -536,7 +535,7 @@ const Teams = ({ readOnly = false, departmentId = null, allowCoachAssignment = f
       const sportMatch = !registrationMonitorSportId || rowSportId === String(registrationMonitorSportId);
       const departmentMatch = !effectiveDepartmentFilter || rowDepartmentId === effectiveDepartmentFilter;
       const shapeMatch = registrationMonitorParticipantShape === "ALL" || rowShape === registrationMonitorParticipantShape;
-      
+
       let searchMatch = true;
       if (registrationMonitorSearch.trim()) {
         const term = registrationMonitorSearch.toLowerCase();
@@ -968,8 +967,8 @@ const Teams = ({ readOnly = false, departmentId = null, allowCoachAssignment = f
     setShowAdvancedOverride(false);
     setApplications([]);
     setApplicationsError("");
-      await refreshTeamDetails(Number(team.id));
-      await loadApplicationsForTeam(Number(team.id));
+    await refreshTeamDetails(Number(team.id));
+    await loadApplicationsForTeam(Number(team.id));
   };
 
   const closeTeamDetails = () => {
@@ -1212,28 +1211,28 @@ const Teams = ({ readOnly = false, departmentId = null, allowCoachAssignment = f
       {isViewingHistorical && <HistoricalBanner />}
 
       {/* {showRegistrationMonitoring ? (
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-[var(--surface)]">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Submitted/Pending</p>
-          <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{registrationSummary.PENDING_REVIEW}</p>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-[var(--surface)]">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Submitted/Pending</p>
+            <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{registrationSummary.PENDING_REVIEW}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-[var(--surface)]">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Revision Requested</p>
+            <p className="text-xl font-bold text-amber-700 dark:text-amber-300">{registrationSummary.REVISION_REQUESTED}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-[var(--surface)]">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Approved</p>
+            <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">{registrationSummary.APPROVED}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-[var(--surface)]">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Rejected</p>
+            <p className="text-xl font-bold text-rose-700 dark:text-rose-300">{registrationSummary.REJECTED}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-[var(--surface)]">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Withdrawn</p>
+            <p className="text-xl font-bold text-slate-700 dark:text-slate-200">{registrationSummary.WITHDRAWN}</p>
+          </div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-[var(--surface)]">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Revision Requested</p>
-          <p className="text-xl font-bold text-amber-700 dark:text-amber-300">{registrationSummary.REVISION_REQUESTED}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-[var(--surface)]">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Approved</p>
-          <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">{registrationSummary.APPROVED}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-[var(--surface)]">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Rejected</p>
-          <p className="text-xl font-bold text-rose-700 dark:text-rose-300">{registrationSummary.REJECTED}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-[var(--surface)]">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Withdrawn</p>
-          <p className="text-xl font-bold text-slate-700 dark:text-slate-200">{registrationSummary.WITHDRAWN}</p>
-        </div>
-      </div>
       ) : null} */}
 
       {showRegistrationMonitoring ? (
@@ -1248,285 +1247,285 @@ const Teams = ({ readOnly = false, departmentId = null, allowCoachAssignment = f
       ) : null}
 
       {showRegistrationMonitoring && registrationMonitorMode === "ENTRY" ? (
-      <div className="rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-[var(--surface)]">
-        <CollapsibleFilterPanel
-          title="Registration Filters"
-          activeCount={registrationMonitorActiveFilterCount}
-          onClear={clearRegistrationMonitorFilters}
-          summaryText={
-            registrationMonitorActiveFilterCount > 0
-              ? `Filtered by: ${registrationMonitorFilterSummary.join(" · ")}`
-              : "No active filters"
-          }
-          compact
-          className="mb-1"
-        >
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-            <select
-              value={registrationMonitorStatus}
-              onChange={(event) => setRegistrationMonitorStatus(event.target.value)}
-              className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="PENDING_REVIEW">Pending Review</option>
-              <option value="REVISION_REQUESTED">Revision Requested</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="WITHDRAWN">Withdrawn</option>
-            </select>
-            <select
-              value={registrationMonitorSportId}
-              onChange={(event) => setRegistrationMonitorSportId(event.target.value)}
-              className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
-            >
-              <option value="">All Sports</option>
-              {intramuralSports.map((sport) => (
-                <option key={sport.id} value={String(sport.id)}>{getSportDisplayName(sport)}</option>
-              ))}
-            </select>
-            {!departmentId ? (
+        <div className="rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-[var(--surface)]">
+          <CollapsibleFilterPanel
+            title="Registration Filters"
+            activeCount={registrationMonitorActiveFilterCount}
+            onClear={clearRegistrationMonitorFilters}
+            summaryText={
+              registrationMonitorActiveFilterCount > 0
+                ? `Filtered by: ${registrationMonitorFilterSummary.join(" · ")}`
+                : "No active filters"
+            }
+            compact
+            className="mb-1"
+          >
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
               <select
-                value={registrationMonitorDepartmentId}
-                onChange={(event) => setRegistrationMonitorDepartmentId(event.target.value)}
+                value={registrationMonitorStatus}
+                onChange={(event) => setRegistrationMonitorStatus(event.target.value)}
                 className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
               >
-                <option value="">All Departments</option>
-                {visibleDepartments.map((department) => (
-                  <option key={department.id} value={String(department.id)}>{department.department_name}</option>
+                <option value="ALL">All Statuses</option>
+                <option value="PENDING_REVIEW">Pending Review</option>
+                <option value="REVISION_REQUESTED">Revision Requested</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
+                <option value="WITHDRAWN">Withdrawn</option>
+              </select>
+              <select
+                value={registrationMonitorSportId}
+                onChange={(event) => setRegistrationMonitorSportId(event.target.value)}
+                className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
+              >
+                <option value="">All Sports</option>
+                {intramuralSports.map((sport) => (
+                  <option key={sport.id} value={String(sport.id)}>{getSportDisplayName(sport)}</option>
                 ))}
               </select>
-            ) : null}
-            <select
-              value={registrationMonitorParticipantShape}
-              onChange={(event) => setRegistrationMonitorParticipantShape(event.target.value)}
-              className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
-            >
-              <option value="ALL">All Entry Types</option>
-              <option value="TEAM">Team Entry</option>
-              <option value="DUO">Duo Entry</option>
-              <option value="SOLO">Solo Entry</option>
-            </select>
-            <input
-              type="text"
-              placeholder="Search by entry or team name"
-              value={registrationMonitorSearch}
-              onChange={(event) => setRegistrationMonitorSearch(event.target.value)}
-              className={`rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 placeholder-slate-400 dark:text-slate-200 dark:placeholder-slate-500 ${departmentId ? "lg:col-span-2" : ""}`}
-            />
-          </div>
-        </CollapsibleFilterPanel>
-
-        {registrationError ? (
-          <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span>{registrationError}</span>
-              <button
-                type="button"
-                onClick={loadRegistrations}
-                className="rounded border border-rose-300 bg-white px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+              {!departmentId ? (
+                <select
+                  value={registrationMonitorDepartmentId}
+                  onChange={(event) => setRegistrationMonitorDepartmentId(event.target.value)}
+                  className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
+                >
+                  <option value="">All Departments</option>
+                  {visibleDepartments.map((department) => (
+                    <option key={department.id} value={String(department.id)}>{department.department_name}</option>
+                  ))}
+                </select>
+              ) : null}
+              <select
+                value={registrationMonitorParticipantShape}
+                onChange={(event) => setRegistrationMonitorParticipantShape(event.target.value)}
+                className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
               >
-                Retry
-              </button>
+                <option value="ALL">All Entry Types</option>
+                <option value="TEAM">Team Entry</option>
+                <option value="DUO">Duo Entry</option>
+                <option value="SOLO">Solo Entry</option>
+              </select>
+              <input
+                type="text"
+                placeholder="Search by entry or team name"
+                value={registrationMonitorSearch}
+                onChange={(event) => setRegistrationMonitorSearch(event.target.value)}
+                className={`rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 placeholder-slate-400 dark:text-slate-200 dark:placeholder-slate-500 ${departmentId ? "lg:col-span-2" : ""}`}
+              />
             </div>
-          </div>
-        ) : null}
+          </CollapsibleFilterPanel>
 
-        {registrationLoading ? (
-          <div className="mt-3 rounded-lg border border-slate-200 px-3 py-5 text-center text-sm text-slate-500 dark:border-slate-800">
-            Loading registrations...
-          </div>
-        ) : monitoredRegistrationRows.length === 0 ? (
-          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-5 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-[var(--surface)]/40">
-            No registrations matched your filters.
-          </div>
-        ) : (
-          <>
-            <div className="mt-3 space-y-2 lg:hidden">
-              {pagedMonitoredRegistrationRows.map((row) => (
-                <div key={`registration-card-${row.id}`} className="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <TeamLogo imageUrl={row.logo_url} label={row.entry_name || row.team_name} scale="sm" className="shrink-0" />
-                      <p className="min-w-0 break-words font-semibold text-slate-900 dark:text-slate-100">{row.entry_name || row.team_name}</p>
+          {registrationError ? (
+            <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>{registrationError}</span>
+                <button
+                  type="button"
+                  onClick={loadRegistrations}
+                  className="rounded border border-rose-300 bg-white px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {registrationLoading ? (
+            <div className="mt-3 rounded-lg border border-slate-200 px-3 py-5 text-center text-sm text-slate-500 dark:border-slate-800">
+              Loading registrations...
+            </div>
+          ) : monitoredRegistrationRows.length === 0 ? (
+            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-5 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-[var(--surface)]/40">
+              No registrations matched your filters.
+            </div>
+          ) : (
+            <>
+              <div className="mt-3 space-y-2 lg:hidden">
+                {pagedMonitoredRegistrationRows.map((row) => (
+                  <div key={`registration-card-${row.id}`} className="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <TeamLogo imageUrl={row.logo_url} label={row.entry_name || row.team_name} scale="sm" className="shrink-0" />
+                        <p className="min-w-0 break-words font-semibold text-slate-900 dark:text-slate-100">{row.entry_name || row.team_name}</p>
+                      </div>
+                      <StatusBadge status={row.status_label || row.status} />
                     </div>
-                    <StatusBadge status={row.status_label || row.status} />
-                  </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">
-                    {sportMap[row.sport_id] || "-"} | {departmentMap[row.department_id] || "-"}
-                  </p>
-                  <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Type: {row.participant_shape}</p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">Submitted: {row.submitted_at ? formatDateTime(row.submitted_at) : "-"}</p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">
-                    Submitted by: {coachById[row.submitted_by_coach_id]?.name || coachById[row.submitted_by_coach_id]?.email || (row.submitted_by_coach_id ? `User ${row.submitted_by_coach_id}` : "-")}
-                  </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">
-                    Reviewed by: {row.reviewed_by_user_id ? `User ${row.reviewed_by_user_id}` : "-"}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-700 dark:text-slate-300">Latest note: {row.decision_note || row.latest_note_or_reason || "-"}</p>
-                  <div className="mt-3">
-                    <div className={`${isEntryAwaitingReview(row) ? "group" : ""} relative inline-block text-left`}>
-                      <button
-                        type="button"
-                        disabled={!isEntryAwaitingReview(row)}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-[var(--surface)]"
-                      >
-                        {isEntryAwaitingReview(row) ? "Review" : "Reviewed"}
-                        <svg className="h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                      <div className="absolute left-0 z-10 mt-1 hidden w-48 origin-top-left rounded-md bg-white shadow-lg  group-hover:block dark:bg-[var(--surface-soft)] dark:ring-white/10">
-                        <div className="py-1">
-                          <button
-                            type="button"
-                            onClick={() => openOverrideModal(row, "APPROVE")}
-                            className="block w-full px-4 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openOverrideModal(row, "REQUEST_REVISION")}
-                            className="block w-full px-4 py-2 text-left text-xs font-semibold text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-500/10"
-                          >
-                            Request changes
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openOverrideModal(row, "REJECT")}
-                            className="block w-full px-4 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
-                          >
-                            Reject
-                          </button>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      {sportMap[row.sport_id] || "-"} | {departmentMap[row.department_id] || "-"}
+                    </p>
+                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Type: {row.participant_shape}</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">Submitted: {row.submitted_at ? formatDateTime(row.submitted_at) : "-"}</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      Submitted by: {coachById[row.submitted_by_coach_id]?.name || coachById[row.submitted_by_coach_id]?.email || (row.submitted_by_coach_id ? `User ${row.submitted_by_coach_id}` : "-")}
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      Reviewed by: {row.reviewed_by_user_id ? `User ${row.reviewed_by_user_id}` : "-"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-700 dark:text-slate-300">Latest note: {row.decision_note || row.latest_note_or_reason || "-"}</p>
+                    <div className="mt-3">
+                      <div className={`${isEntryAwaitingReview(row) ? "group" : ""} relative inline-block text-left`}>
+                        <button
+                          type="button"
+                          disabled={!isEntryAwaitingReview(row)}
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-[var(--surface)]"
+                        >
+                          {isEntryAwaitingReview(row) ? "Review" : "Reviewed"}
+                          <svg className="h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                        <div className="absolute left-0 z-10 mt-1 hidden w-48 origin-top-left rounded-md bg-white shadow-lg  group-hover:block dark:bg-[var(--surface-soft)] dark:ring-white/10">
+                          <div className="py-1">
+                            <button
+                              type="button"
+                              onClick={() => openOverrideModal(row, "APPROVE")}
+                              className="block w-full px-4 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openOverrideModal(row, "REQUEST_REVISION")}
+                              className="block w-full px-4 py-2 text-left text-xs font-semibold text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-500/10"
+                            >
+                              Request changes
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openOverrideModal(row, "REJECT")}
+                              className="block w-full px-4 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                            >
+                              Reject
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            <div className="mt-3 hidden overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800 lg:block">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600 dark:bg-[var(--surface-soft)] dark:text-[var(--text-soft)]">
-                  <tr>
-                    <th className="px-3 py-2">Entry</th>
-                    <th className="px-3 py-2">Type</th>
-                    <th className="px-3 py-2">Sport</th>
-                    <th className="px-3 py-2">Department</th>
-                    <th className="px-3 py-2">Status</th>
-                    <th className="px-3 py-2">Submitted By</th>
-                    <th className="px-3 py-2">Reviewed By</th>
-                    <th className="px-3 py-2">Note</th>
-                    <th className="px-3 py-2 text-right">Review</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {pagedMonitoredRegistrationRows.map((row) => (
-                    <tr key={row.id}>
-                      <td className="px-3 py-2 font-semibold text-slate-900 dark:text-slate-100">
-                        <span className="flex min-w-0 items-center gap-2">
-                          <TeamLogo imageUrl={row.logo_url} label={row.entry_name || row.team_name} scale="sm" className="shrink-0" />
-                          <span className="break-words">{row.entry_name || row.team_name}</span>
-                        </span>
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
-                          {row.participant_shape}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2">
-                        {sportMap[row.sport_id] || "-"}
-                      </td>
-                      <td className="px-3 py-2">{departmentMap[row.department_id] || "-"}</td>
-                      <td className="px-3 py-2">
-                        <StatusBadge status={row.status_label || row.status} />
-                      </td>
-                      <td className="px-3 py-2">
-                        {coachById[row.submitted_by_coach_id]?.name || coachById[row.submitted_by_coach_id]?.email || (row.submitted_by_coach_id ? `User ${row.submitted_by_coach_id}` : "-")}
-                      </td>
-                      <td className="px-3 py-2">
-                        {row.reviewed_by_user_id ? `User ${row.reviewed_by_user_id}` : "-"}
-                      </td>
-                      <td className="px-3 py-2 text-xs">{row.decision_note || row.latest_note_or_reason || "-"}</td>
-                      <td className="px-3 py-2 text-right">
-                        <div className={`${isEntryAwaitingReview(row) ? "group" : ""} relative inline-block text-left`}>
-                          <button
-                            type="button"
-                            disabled={!isEntryAwaitingReview(row)}
-                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-[var(--surface)]"
-                          >
-                            {isEntryAwaitingReview(row) ? "Review" : "Reviewed"}
-                            <svg className="h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                            </svg>
-                          </button>
-                          <div className="absolute right-0 z-10 mt-1 hidden w-40 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 group-hover:block dark:bg-[var(--surface-soft)] dark:ring-white/10">
-                            <div className="py-1">
-                              <button
-                                type="button"
-                                onClick={() => openOverrideModal(row, "APPROVE")}
-                                className="block w-full px-4 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
-                              >
-                                Approve
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openOverrideModal(row, "REQUEST_REVISION")}
-                                className="block w-full px-4 py-2 text-left text-xs font-semibold text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-500/10"
-                              >
-                                Request changes
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openOverrideModal(row, "REJECT")}
-                                className="block w-full px-4 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
-                              >
-                                Reject
-                              </button>
+              <div className="mt-3 hidden overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800 lg:block">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600 dark:bg-[var(--surface-soft)] dark:text-[var(--text-soft)]">
+                    <tr>
+                      <th className="px-3 py-2">Entry</th>
+                      <th className="px-3 py-2">Type</th>
+                      <th className="px-3 py-2">Sport</th>
+                      <th className="px-3 py-2">Department</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Submitted By</th>
+                      <th className="px-3 py-2">Reviewed By</th>
+                      <th className="px-3 py-2">Note</th>
+                      <th className="px-3 py-2 text-right">Review</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {pagedMonitoredRegistrationRows.map((row) => (
+                      <tr key={row.id}>
+                        <td className="px-3 py-2 font-semibold text-slate-900 dark:text-slate-100">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <TeamLogo imageUrl={row.logo_url} label={row.entry_name || row.team_name} scale="sm" className="shrink-0" />
+                            <span className="break-words">{row.entry_name || row.team_name}</span>
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                            {row.participant_shape}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          {sportMap[row.sport_id] || "-"}
+                        </td>
+                        <td className="px-3 py-2">{departmentMap[row.department_id] || "-"}</td>
+                        <td className="px-3 py-2">
+                          <StatusBadge status={row.status_label || row.status} />
+                        </td>
+                        <td className="px-3 py-2">
+                          {coachById[row.submitted_by_coach_id]?.name || coachById[row.submitted_by_coach_id]?.email || (row.submitted_by_coach_id ? `User ${row.submitted_by_coach_id}` : "-")}
+                        </td>
+                        <td className="px-3 py-2">
+                          {row.reviewed_by_user_id ? `User ${row.reviewed_by_user_id}` : "-"}
+                        </td>
+                        <td className="px-3 py-2 text-xs">{row.decision_note || row.latest_note_or_reason || "-"}</td>
+                        <td className="px-3 py-2 text-right">
+                          <div className={`${isEntryAwaitingReview(row) ? "group" : ""} relative inline-block text-left`}>
+                            <button
+                              type="button"
+                              disabled={!isEntryAwaitingReview(row)}
+                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-[var(--surface)]"
+                            >
+                              {isEntryAwaitingReview(row) ? "Review" : "Reviewed"}
+                              <svg className="h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                            <div className="absolute right-0 z-10 mt-1 hidden w-40 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 group-hover:block dark:bg-[var(--surface-soft)] dark:ring-white/10">
+                              <div className="py-1">
+                                <button
+                                  type="button"
+                                  onClick={() => openOverrideModal(row, "APPROVE")}
+                                  className="block w-full px-4 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openOverrideModal(row, "REQUEST_REVISION")}
+                                  className="block w-full px-4 py-2 text-left text-xs font-semibold text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-500/10"
+                                >
+                                  Request changes
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openOverrideModal(row, "REJECT")}
+                                  className="block w-full px-4 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                                >
+                                  Reject
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {registrationMonitorTotalPages > 1 ? (
-              <div className="mt-3 flex items-center justify-between gap-2">
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Page {registrationMonitorCurrentPage} of {registrationMonitorTotalPages}
-                </p>
-                <div className="flex items-center gap-2">
-                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    {monitoredRegistrationRows.length === 0
-                      ? "Showing 0 registrations."
-                      : `Showing ${registrationMonitorRangeStart}-${registrationMonitorRangeEnd} of ${monitoredRegistrationRows.length} registration${monitoredRegistrationRows.length === 1 ? "" : "s"}.`}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setRegistrationMonitorPage((prev) => Math.max(1, prev - 1))}
-                    disabled={registrationMonitorCurrentPage <= 1}
-                    className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-[var(--surface)]"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRegistrationMonitorPage((prev) => Math.min(registrationMonitorTotalPages, prev + 1))}
-                    disabled={registrationMonitorCurrentPage >= registrationMonitorTotalPages}
-                    className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-[var(--surface)]"
-                  >
-                    Next
-                  </button>
-                </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ) : null}
-          </>
-        )}
-      </div>
+
+              {registrationMonitorTotalPages > 1 ? (
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Page {registrationMonitorCurrentPage} of {registrationMonitorTotalPages}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                      {monitoredRegistrationRows.length === 0
+                        ? "Showing 0 registrations."
+                        : `Showing ${registrationMonitorRangeStart}-${registrationMonitorRangeEnd} of ${monitoredRegistrationRows.length} registration${monitoredRegistrationRows.length === 1 ? "" : "s"}.`}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setRegistrationMonitorPage((prev) => Math.max(1, prev - 1))}
+                      disabled={registrationMonitorCurrentPage <= 1}
+                      className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-[var(--surface)]"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRegistrationMonitorPage((prev) => Math.min(registrationMonitorTotalPages, prev + 1))}
+                      disabled={registrationMonitorCurrentPage >= registrationMonitorTotalPages}
+                      className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-[var(--surface)]"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
       ) : null}
 
       {!departmentId && !showRegistrationMonitoring && (
@@ -1544,11 +1543,10 @@ const Teams = ({ readOnly = false, departmentId = null, allowCoachAssignment = f
                     key={department.id}
                     type="button"
                     onClick={() => setActiveDepartmentFilter(String(department.id))}
-                    className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
-                      isActive
-                        ? "border-blue-500 bg-blue-600 text-white"
-                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-[var(--surface)]"
-                    }`}
+                    className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${isActive
+                      ? "border-blue-500 bg-blue-600 text-white"
+                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-[var(--surface)]"
+                      }`}
                   >
                     {department.department_name} ({count})
                   </button>
@@ -1560,273 +1558,271 @@ const Teams = ({ readOnly = false, departmentId = null, allowCoachAssignment = f
       )}
 
       {(!showRegistrationMonitoring || registrationMonitorMode === "TEAM") ? (
-      <div className="rounded-xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-800 dark:bg-[var(--surface)]">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-xl font-bold">Registered Teams</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              View team ownership, coach assignment, and registration status. Teams are created through department and coach workflows.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {canCreateTeam && (
-              <button
-                onClick={openCreateModal}
-                className="rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
-              >
-                Create Team
-              </button>
-            )}
-            {!readOnly && allowCoachAssignment && departmentId && (
-              <button
-                onClick={() => openAssignCoachModal()}
-                className="rounded bg-emerald-700 px-3 py-2 text-sm font-semibold text-white"
-              >
-                Assign Coach
-              </button>
-            )}
-          </div>
-        </div>
-
-        <CollapsibleFilterPanel
-          title="Team Filters"
-          activeCount={teamActiveFilterCount}
-          onClear={clearTeamFilters}
-          summaryText={
-            teamActiveFilterCount > 0
-              ? `Filtered by: ${teamFilterSummary.join(" · ")}`
-              : "No active filters"
-          }
-          compact
-          className="mb-4"
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            {!departmentId ? (
-              <select
-                value={activeDepartmentFilter}
-                onChange={(event) => setActiveDepartmentFilter(event.target.value)}
-                className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
-              >
-                <option value="">All Departments</option>
-                {visibleDepartments.map((department) => (
-                  <option key={department.id} value={String(department.id)}>{department.department_name}</option>
-                ))}
-              </select>
-            ) : null}
-            <select
-              value={teamSportFilter}
-              onChange={(event) => setTeamSportFilter(event.target.value)}
-              className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
-            >
-              <option value="">All Sports</option>
-              {intramuralSports.map((sport) => (
-                <option key={sport.id} value={String(sport.id)}>{getSportDisplayName(sport)}</option>
-              ))}
-            </select>
-            <select
-              value={registrationStatusFilter}
-              onChange={(event) => setRegistrationStatusFilter(event.target.value)}
-              className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="SUBMITTED">Waiting</option>
-              <option value="REVISION_REQUESTED">Revision Requested</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="WITHDRAWN">Withdrawn</option>
-              <option value="NOT_REGISTERED">Not Registered</option>
-            </select>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-[var(--surface-soft)]">
-              {[
-                { key: "active", label: "Active" },
-                { key: "archived", label: "Archived" },
-                { key: "all", label: "All" }
-              ].map((option) => (
+        <div className="rounded-xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-800 dark:bg-[var(--surface)]">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-xl font-bold">Registered Teams</h2>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                View team ownership, coach assignment, and registration status. Teams are created through department and coach workflows.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {canCreateTeam && (
                 <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => setArchiveFilter(option.key)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
-                    archiveFilter === option.key
-                      ? "bg-blue-600 text-white"
-                      : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[var(--surface)]"
-                  }`}
+                  onClick={openCreateModal}
+                  className="rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
                 >
-                  {option.label}
+                  Create Team
                 </button>
-              ))}
+              )}
+              {!readOnly && allowCoachAssignment && departmentId && (
+                <button
+                  onClick={() => openAssignCoachModal()}
+                  className="rounded bg-emerald-700 px-3 py-2 text-sm font-semibold text-white"
+                >
+                  Assign Coach
+                </button>
+              )}
             </div>
           </div>
-        </CollapsibleFilterPanel>
 
-        {filteredTeams.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 p-6 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-400">
-            {teamActiveFilterCount > 0
-              ? "No results match your filters."
-              : "No teams are registered for the selected Intramural."}
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left">
-                <thead>
-                  <tr className="bg-slate-100 text-xs uppercase tracking-wider text-slate-600 dark:bg-[var(--surface-soft)] dark:text-[var(--text-soft)]">
-                    <th className="px-4 py-3 font-semibold">Team</th>
-                    <th className="px-4 py-3 font-semibold">Sport</th>
-                    <th className="px-4 py-3 font-semibold">Department</th>
-                    <th className="px-4 py-3 font-semibold">Coach</th>
-                    <th className="px-4 py-3 font-semibold">Registration</th>
-                    {!readOnly && <th className="px-4 py-3 text-right font-semibold">Manage</th>}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 text-sm dark:divide-slate-800/80">
-                  {filteredTeams.map((team) => (
-                    <tr
-                      key={team.id}
-                      className={`${
-                        team.is_archived
+          <CollapsibleFilterPanel
+            title="Team Filters"
+            activeCount={teamActiveFilterCount}
+            onClear={clearTeamFilters}
+            summaryText={
+              teamActiveFilterCount > 0
+                ? `Filtered by: ${teamFilterSummary.join(" · ")}`
+                : "No active filters"
+            }
+            compact
+            className="mb-4"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              {!departmentId ? (
+                <select
+                  value={activeDepartmentFilter}
+                  onChange={(event) => setActiveDepartmentFilter(event.target.value)}
+                  className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
+                >
+                  <option value="">All Departments</option>
+                  {visibleDepartments.map((department) => (
+                    <option key={department.id} value={String(department.id)}>{department.department_name}</option>
+                  ))}
+                </select>
+              ) : null}
+              <select
+                value={teamSportFilter}
+                onChange={(event) => setTeamSportFilter(event.target.value)}
+                className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
+              >
+                <option value="">All Sports</option>
+                {intramuralSports.map((sport) => (
+                  <option key={sport.id} value={String(sport.id)}>{getSportDisplayName(sport)}</option>
+                ))}
+              </select>
+              <select
+                value={registrationStatusFilter}
+                onChange={(event) => setRegistrationStatusFilter(event.target.value)}
+                className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="SUBMITTED">Waiting</option>
+                <option value="REVISION_REQUESTED">Revision Requested</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
+                <option value="WITHDRAWN">Withdrawn</option>
+                <option value="NOT_REGISTERED">Not Registered</option>
+              </select>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-[var(--surface-soft)]">
+                {[
+                  { key: "active", label: "Active" },
+                  { key: "archived", label: "Archived" },
+                  { key: "all", label: "All" }
+                ].map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => setArchiveFilter(option.key)}
+                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${archiveFilter === option.key
+                      ? "bg-blue-600 text-white"
+                      : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[var(--surface)]"
+                      }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </CollapsibleFilterPanel>
+
+          {filteredTeams.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-300 p-6 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-400">
+              {teamActiveFilterCount > 0
+                ? "No results match your filters."
+                : "No teams are registered for the selected Intramural."}
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left">
+                  <thead>
+                    <tr className="bg-slate-100 text-xs uppercase tracking-wider text-slate-600 dark:bg-[var(--surface-soft)] dark:text-[var(--text-soft)]">
+                      <th className="px-4 py-3 font-semibold">Team</th>
+                      <th className="px-4 py-3 font-semibold">Sport</th>
+                      <th className="px-4 py-3 font-semibold">Department</th>
+                      <th className="px-4 py-3 font-semibold">Coach</th>
+                      <th className="px-4 py-3 font-semibold">Registration</th>
+                      {!readOnly && <th className="px-4 py-3 text-right font-semibold">Manage</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 text-sm dark:divide-slate-800/80">
+                    {filteredTeams.map((team) => (
+                      <tr
+                        key={team.id}
+                        className={`${team.is_archived
                           ? "bg-slate-100/70 text-slate-500 dark:bg-[var(--surface-soft)] dark:text-slate-400"
                           : "bg-white/70 dark:bg-slate-950/30"
-                      }`}
-                    >
-                      {editingId === team.id && !readOnly ? (
-                        <>
-                          <td className="px-4 py-3">
-                            <input
-                              className="w-full rounded border border-slate-300 bg-white p-2 text-slate-900 outline-none transition focus:border-cyan-500/50 dark:border-slate-700 dark:bg-[var(--surface)] dark:text-slate-100"
-                              value={editForm.team_name}
-                              onChange={(event) =>
-                                setEditForm({ ...editForm, team_name: event.target.value })
-                              }
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <select
-                              className="w-full rounded border border-slate-300 bg-white p-2 text-slate-900 outline-none transition focus:border-cyan-500/50 dark:border-slate-700 dark:bg-[var(--surface)] dark:text-slate-100"
-                              value={editForm.sport_id}
-                              onChange={(event) =>
-                                setEditForm({ ...editForm, sport_id: event.target.value })
-                              }
-                            >
-                              <option value="">Select Sport</option>
-                              {intramuralSports.map((sport) => (
-                                <option key={sport.id} value={sport.id}>
-                                  {getSportDisplayName(sport)}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
-                            {departmentMap[team.department_id] || team.department_id || "-"}
-                          </td>
-                          <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
-                            {team.coach_name || team.coach_email || team.coach_id || "Not Assigned"}
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${registrationChipClass(getTournamentRegistrationChip(team).tone)}`}>
-                              {getTournamentRegistrationChip(team).label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                onClick={saveEdit}
-                                className="rounded bg-blue-600 px-3 py-1 text-white"
+                          }`}
+                      >
+                        {editingId === team.id && !readOnly ? (
+                          <>
+                            <td className="px-4 py-3">
+                              <input
+                                className="w-full rounded border border-slate-300 bg-white p-2 text-slate-900 outline-none transition focus:border-cyan-500/50 dark:border-slate-700 dark:bg-[var(--surface)] dark:text-slate-100"
+                                value={editForm.team_name}
+                                onChange={(event) =>
+                                  setEditForm({ ...editForm, team_name: event.target.value })
+                                }
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <select
+                                className="w-full rounded border border-slate-300 bg-white p-2 text-slate-900 outline-none transition focus:border-cyan-500/50 dark:border-slate-700 dark:bg-[var(--surface)] dark:text-slate-100"
+                                value={editForm.sport_id}
+                                onChange={(event) =>
+                                  setEditForm({ ...editForm, sport_id: event.target.value })
+                                }
                               >
-                                Save
-                              </button>
-                              <button
-                                onClick={cancelEdit}
-                                className="rounded bg-slate-200 px-3 py-1 text-slate-800 transition hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
-                            <div className="flex items-center gap-2">
-                              <TeamLogo imageUrl={team.logo_url} label={team.team_name || "Team"} scale="sm" />
-                              <span>{team.team_name}</span>
-                              {team.is_archived ? (
-                                <span className="rounded-full bg-slate-300 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-                                  Archived
-                                </span>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                            {sportMap[team.sport_id] || team.sport_id || "-"}
-                          </td>
-                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                            {departmentMap[team.department_id] || team.department_id || "-"}
-                          </td>
-                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                            {team.coach_name
-                              ? `${team.coach_name}${team.coach_email ? ` (${team.coach_email})` : ""}`
-                              : team.coach_id && coachById[team.coach_id]
-                                ? `${coachById[team.coach_id].name} (${coachById[team.coach_id].email})`
-                                : team.coach_id
-                                  ? "Unknown user"
-                                  : "Not Assigned"}
-                          </td>
-                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${registrationChipClass(getTournamentRegistrationChip(team).tone)}`}>
-                              {getTournamentRegistrationChip(team).label}
-                            </span>
-                          </td>
-                          {!readOnly && (
+                                <option value="">Select Sport</option>
+                                {intramuralSports.map((sport) => (
+                                  <option key={sport.id} value={sport.id}>
+                                    {getSportDisplayName(sport)}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                              {departmentMap[team.department_id] || team.department_id || "-"}
+                            </td>
+                            <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                              {team.coach_name || team.coach_email || team.coach_id || "Not Assigned"}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                              <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${registrationChipClass(getTournamentRegistrationChip(team).tone)}`}>
+                                {getTournamentRegistrationChip(team).label}
+                              </span>
+                            </td>
                             <td className="px-4 py-3">
                               <div className="flex justify-end gap-2">
                                 <button
-                                  onClick={() => openTeamDetails(team)}
-                                  className="rounded border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                                  onClick={saveEdit}
+                                  className="rounded bg-blue-600 px-3 py-1 text-white"
                                 >
-                                  View
+                                  Save
                                 </button>
-                                {allowCoachAssignment && departmentId && (
-                                  <button
-                                    onClick={() => openAssignCoachModal(team)}
-                                    className="rounded bg-emerald-700 px-3 py-1 text-white"
-                                  >
-                                    {team.coach_id ? "Change Coach" : "Assign Coach"}
-                                  </button>
-                                )}
-                                <details className="relative">
-                                  <summary className="cursor-pointer list-none rounded border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200">
-                                    More
-                                  </summary>
-                                  <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-[var(--surface)]">
-                                    <button type="button" onClick={() => startEdit(team)} disabled={team.is_archived} className="block w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-[var(--surface-soft)]">Edit team</button>
-                                    {team.is_archived ? (
-                                      <button type="button" onClick={() => handleRestoreTeam(team)} className="block w-full px-3 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10">Restore team</button>
-                                    ) : (
-                                      <button type="button" onClick={() => openDeleteTeamModal(team)} className="block w-full px-3 py-2 text-left text-xs font-semibold text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-500/10">Archive team</button>
-                                    )}
-                                    <label className="block cursor-pointer px-3 py-2 text-left text-xs font-semibold text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/10">
-                                      {uploadingLogoTeamId === team.id ? "Uploading logo..." : "Change logo"}
-                                      <input type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" disabled={uploadingLogoTeamId === team.id} onChange={(event) => handleUploadTeamLogo(team.id, event.target.files?.[0] || null)} />
-                                    </label>
-                                    {team.logo_url ? (
-                                      <button type="button" onClick={() => handleRemoveTeamLogo(team.id)} disabled={uploadingLogoTeamId === team.id} className="block w-full px-3 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-500/10">Remove logo</button>
-                                    ) : null}
-                                  </div>
-                                </details>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="rounded bg-slate-200 px-3 py-1 text-slate-800 transition hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+                                >
+                                  Cancel
+                                </button>
                               </div>
                             </td>
-                          )}
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
+                              <div className="flex items-center gap-2">
+                                <TeamLogo imageUrl={team.logo_url} label={team.team_name || "Team"} scale="sm" />
+                                <span>{team.team_name}</span>
+                                {team.is_archived ? (
+                                  <span className="rounded-full bg-slate-300 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                                    Archived
+                                  </span>
+                                ) : null}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                              {sportMap[team.sport_id] || team.sport_id || "-"}
+                            </td>
+                            <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                              {departmentMap[team.department_id] || team.department_id || "-"}
+                            </td>
+                            <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                              {team.coach_name
+                                ? `${team.coach_name}${team.coach_email ? ` (${team.coach_email})` : ""}`
+                                : team.coach_id && coachById[team.coach_id]
+                                  ? `${coachById[team.coach_id].name} (${coachById[team.coach_id].email})`
+                                  : team.coach_id
+                                    ? "Unknown user"
+                                    : "Not Assigned"}
+                            </td>
+                            <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                              <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${registrationChipClass(getTournamentRegistrationChip(team).tone)}`}>
+                                {getTournamentRegistrationChip(team).label}
+                              </span>
+                            </td>
+                            {!readOnly && (
+                              <td className="px-4 py-3">
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    onClick={() => openTeamDetails(team)}
+                                    className="rounded border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                                  >
+                                    View
+                                  </button>
+                                  {allowCoachAssignment && departmentId && (
+                                    <button
+                                      onClick={() => openAssignCoachModal(team)}
+                                      className="rounded bg-emerald-700 px-3 py-1 text-white"
+                                    >
+                                      {team.coach_id ? "Change Coach" : "Assign Coach"}
+                                    </button>
+                                  )}
+                                  <details className="relative">
+                                    <summary className="cursor-pointer list-none rounded border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200">
+                                      More
+                                    </summary>
+                                    <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-[var(--surface)]">
+                                      <button type="button" onClick={() => startEdit(team)} disabled={team.is_archived} className="block w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-[var(--surface-soft)]">Edit team</button>
+                                      {team.is_archived ? (
+                                        <button type="button" onClick={() => handleRestoreTeam(team)} className="block w-full px-3 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10">Restore team</button>
+                                      ) : (
+                                        <button type="button" onClick={() => openDeleteTeamModal(team)} className="block w-full px-3 py-2 text-left text-xs font-semibold text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-500/10">Archive team</button>
+                                      )}
+                                      <label className="block cursor-pointer px-3 py-2 text-left text-xs font-semibold text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/10">
+                                        {uploadingLogoTeamId === team.id ? "Uploading logo..." : "Change logo"}
+                                        <input type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" disabled={uploadingLogoTeamId === team.id} onChange={(event) => handleUploadTeamLogo(team.id, event.target.files?.[0] || null)} />
+                                      </label>
+                                      {team.logo_url ? (
+                                        <button type="button" onClick={() => handleRemoveTeamLogo(team.id)} disabled={uploadingLogoTeamId === team.id} className="block w-full px-3 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-500/10">Remove logo</button>
+                                      ) : null}
+                                    </div>
+                                  </details>
+                                </div>
+                              </td>
+                            )}
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
       ) : null}
 
       {overrideModal.open ? (
@@ -1888,13 +1884,12 @@ const Teams = ({ readOnly = false, departmentId = null, allowCoachAssignment = f
                 type="button"
                 onClick={submitCoordinatorOverride}
                 disabled={overrideModal.busy}
-                className={`min-h-11 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${
-                  overrideModal.action === "APPROVE"
-                    ? "bg-emerald-700 hover:bg-emerald-600"
-                    : overrideModal.action === "REQUEST_REVISION"
+                className={`min-h-11 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${overrideModal.action === "APPROVE"
+                  ? "bg-emerald-700 hover:bg-emerald-600"
+                  : overrideModal.action === "REQUEST_REVISION"
                     ? "bg-amber-700 hover:bg-amber-600"
                     : "bg-rose-700 hover:bg-rose-600"
-                }`}
+                  }`}
               >
                 {overrideModal.busy ? "Saving..." : ENTRY_REVIEW_COPY[overrideModal.action]?.confirmLabel}
               </button>

@@ -83,6 +83,7 @@ const AppSidebar = ({
             {!effectiveCollapsed ? (
               <div>
                 <div className="os-brand-text">OmniSport AI</div>
+                <div className="os-brand-subtitle truncate">{roleLabel}</div>
               </div>
             ) : null}
           </div>

@@ -38,6 +38,7 @@ import {
   slugifyEventKey,
   validateEventCategories,
 } from "../../utils/tournamentEventCategories";
+import { isHiddenSport } from "../../utils/sportVisibility";
 
 const DRAFT_STORAGE_VERSION = 3;
 const DRAFT_KEY_PREFIX = "omnisport:tournament-create-draft";
@@ -192,16 +193,21 @@ const TournamentCreateWizard = () => {
 
   const normalizedSports = useMemo(
     () =>
-      (Array.isArray(sports) ? sports : []).map((sport) => ({
-        ...sport,
-        id: Number(sport.id),
-        label: getSportDisplayName(sport, sportTemplates),
-        participantShape: inferParticipantShape(sport),
-      })),
+      (Array.isArray(sports) ? sports : [])
+        .filter((sport) => !isHiddenSport(sport))
+        .map((sport) => ({
+          ...sport,
+          id: Number(sport.id),
+          label: getSportDisplayName(sport, sportTemplates),
+          participantShape: inferParticipantShape(sport),
+        })),
     [sportTemplates, sports]
   );
 
-  const selectedSportIds = useMemo(() => toIntList(state.selectedSports), [state.selectedSports]);
+  const selectedSportIds = useMemo(() => {
+    const validIds = new Set(normalizedSports.map((s) => s.id));
+    return toIntList(state.selectedSports).filter((id) => validIds.has(id));
+  }, [normalizedSports, state.selectedSports]);
   const selectedDepartmentIds = useMemo(() => toIntList(state.selectedDepartments), [state.selectedDepartments]);
 
   const normalizedDepartments = useMemo(
@@ -1040,7 +1046,7 @@ const TournamentCreateWizard = () => {
         <label className="space-y-1.5"><span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Daily Start Hour</span><input type="number" min="0" max="23" value={state.format.schedule_start_hour} onChange={(event) => updateState((prev) => ({ ...prev, format: { ...prev.format, schedule_start_hour: Number(event.target.value) } }))} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm" /></label>
         <label className="space-y-1.5"><span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Daily End Hour</span><input type="number" min="1" max="24" value={state.format.schedule_end_hour} onChange={(event) => updateState((prev) => ({ ...prev, format: { ...prev.format, schedule_end_hour: Number(event.target.value) } }))} className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm" /></label>
       </div>
-      <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg bg-slate-50 px-3 text-sm dark:bg-slate-800/50"><input type="checkbox" checked={Boolean(state.format.include_evening)} onChange={(event) => updateState((prev) => ({ ...prev, format: { ...prev.format, include_evening: event.target.checked } }))} /><span>Allow evening matches</span></label>
+      {/* <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg bg-slate-50 px-3 text-sm dark:bg-slate-800/50"><input type="checkbox" checked={Boolean(state.format.include_evening)} onChange={(event) => updateState((prev) => ({ ...prev, format: { ...prev.format, include_evening: event.target.checked } }))} /><span>Allow evening matches</span></label> */}
     </div>
   );
 
@@ -1870,82 +1876,82 @@ const TournamentCreateWizard = () => {
       {/* Creation Loading & Success Modal */}
       {creationModal.isOpen && typeof document !== "undefined"
         ? createPortal(
-            <div
-              role="dialog"
-              aria-modal="true"
-              className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-md transition-all duration-300"
-            >
-              <div className="relative w-full max-w-sm rounded-2xl border border-slate-200/80 bg-white p-7 text-center shadow-2xl transition-all duration-300 dark:border-slate-800 dark:bg-slate-900">
-                {creationModal.status === "loading" && (
-                  <div className="space-y-4">
-                    <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
-                      <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping" />
-                      <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-                        <Loader2 className="h-8 w-8 animate-spin" />
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                        {creationModal.title}
-                      </h3>
-                      <p className="mt-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                        {creationModal.message}
-                      </p>
-                    </div>
-                    <div className="mx-auto mt-4 h-1.5 w-full max-w-[200px] overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                      <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-blue-600 to-indigo-500" />
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-md transition-all duration-300"
+          >
+            <div className="relative w-full max-w-sm rounded-2xl border border-slate-200/80 bg-white p-7 text-center shadow-2xl transition-all duration-300 dark:border-slate-800 dark:bg-slate-900">
+              {creationModal.status === "loading" && (
+                <div className="space-y-4">
+                  <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
+                    <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping" />
+                    <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+                      <Loader2 className="h-8 w-8 animate-spin" />
                     </div>
                   </div>
-                )}
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                      {creationModal.title}
+                    </h3>
+                    <p className="mt-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                      {creationModal.message}
+                    </p>
+                  </div>
+                  <div className="mx-auto mt-4 h-1.5 w-full max-w-[200px] overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-blue-600 to-indigo-500" />
+                  </div>
+                </div>
+              )}
 
-                {creationModal.status === "success" && (
-                  <div className="space-y-4">
-                    <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
-                        <CheckCircle2 className="h-9 w-9 animate-bounce" />
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                        {creationModal.title}
-                      </h3>
-                      <p className="mt-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                        {creationModal.message}
-                      </p>
+              {creationModal.status === "success" && (
+                <div className="space-y-4">
+                  <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
+                      <CheckCircle2 className="h-9 w-9 animate-bounce" />
                     </div>
                   </div>
-                )}
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                      {creationModal.title}
+                    </h3>
+                    <p className="mt-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                      {creationModal.message}
+                    </p>
+                  </div>
+                </div>
+              )}
 
-                {creationModal.status === "error" && (
-                  <div className="space-y-4">
-                    <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400">
-                        <AlertCircle className="h-8 w-8" />
-                      </div>
+              {creationModal.status === "error" && (
+                <div className="space-y-4">
+                  <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400">
+                      <AlertCircle className="h-8 w-8" />
                     </div>
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                        {creationModal.title}
-                      </h3>
-                      <p className="mt-1.5 text-xs leading-relaxed text-rose-600 dark:text-rose-400">
-                        {creationModal.message}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCreationModal({ isOpen: false, status: "loading", title: "", message: "" })
-                      }
-                      className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition"
-                    >
-                      Dismiss
-                    </button>
                   </div>
-                )}
-              </div>
-            </div>,
-            document.body
-          )
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                      {creationModal.title}
+                    </h3>
+                    <p className="mt-1.5 text-xs leading-relaxed text-rose-600 dark:text-rose-400">
+                      {creationModal.message}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCreationModal({ isOpen: false, status: "loading", title: "", message: "" })
+                    }
+                    className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
+        )
         : null}
       {typeof document !== "undefined" ? renderEventDrawer() : null}
     </div>

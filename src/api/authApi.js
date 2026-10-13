@@ -20,5 +20,20 @@ export const authApi = {
   logout: async () => {
     const response = await axiosInstance.post('/auth/logout');
     return response.data;
+  },
+
+  logoutAll: async () => {
+    const response = await axiosInstance.post('/auth/logout-all');
+    return response.data;
+  },
+
+  changePassword: async ({ current_password, new_password, confirm_new_password }) => {
+    const response = await axiosInstance.post('/auth/change-password', {
+      current_password,
+      new_password,
+      confirm_new_password,
+    });
+    return response.data;
   }
 };
+

@@ -6,6 +6,7 @@ import {
   getMatchParticipantTarget,
 } from "../utils/bracketTargets";
 import SecondaryClockPanel from "./SecondaryClockPanel";
+import SportMatchAnalytics from "../live-scoring/SportMatchAnalytics.jsx";
 
 const ScoreboardDisplay = ({
   match,
@@ -30,6 +31,10 @@ const ScoreboardDisplay = ({
   getClockControlDisabledReason,
   teamOptions,
   secondaryClock,
+  sportKey = "",
+  timeline = [],
+  participants = [],
+  playerStats = null,
 }) => {
   const activeWinnerTeamId = Number(winnerTeamId || match?.winner_team_id || 0) || null;
   const useResultConsole = sportProfile === "turn_based" || sportProfile === "time_based";
@@ -73,10 +78,10 @@ const ScoreboardDisplay = ({
     : matchPhaseLabel;
   const targetBits = setPresentation
     ? [
-        setPresentation.target?.points ? `Target ${setPresentation.target.points}` : "",
-        setPresentation.target?.winBy ? `Win by ${setPresentation.target.winBy}` : "",
-        setPresentation.target?.cap ? `Cap ${setPresentation.target.cap}` : "",
-      ].filter(Boolean)
+      setPresentation.target?.points ? `Target ${setPresentation.target.points}` : "",
+      setPresentation.target?.winBy ? `Win by ${setPresentation.target.winBy}` : "",
+      setPresentation.target?.cap ? `Cap ${setPresentation.target.cap}` : "",
+    ].filter(Boolean)
     : [];
   const stateToggleDisabled = !canApplyStateOverride || isApplyingStateOverride;
   const venueName = String(
@@ -132,7 +137,7 @@ const ScoreboardDisplay = ({
           <div className="mb-3">
             {cleanVenueLabel && (
               <div className="flex items-center gap-2">
-                <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
+                <span className="rounded-full border border-slate-300  px-2 py-0.5 text-[11px] dark:border-slate-700 ">
                   Venue: {cleanVenueLabel}
                 </span>
               </div>
@@ -141,11 +146,10 @@ const ScoreboardDisplay = ({
 
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-1.5 sm:gap-2.5">
             {/* first container score */}
-            <div className={`min-w-0 rounded-xl bg-white px-2 py-3 text-center shadow-sm shadow-slate-300/35 sm:px-3 sm:py-3.5 dark:bg-slate-950/45 dark:shadow-lg dark:shadow-slate-950/40 ${
-              isCombatOrBoxing
-                ? "border border-red-300/80 bg-red-50/30 dark:border-red-800/50 dark:bg-red-950/20"
-                : isTeam1State ? "ring-2 ring-amber-400/40" : ""
-            }`}>
+            <div className={`min-w-0 rounded-xl bg-white px-2 py-3 text-center shadow-sm shadow-slate-300/35 sm:px-3 sm:py-3.5 dark:bg-slate-950/45 dark:shadow-lg dark:shadow-slate-950/40 ${isCombatOrBoxing
+              ? "border border-red-300/80 bg-red-50/30 dark:border-red-800/50 dark:bg-red-950/20"
+              : isTeam1State ? "ring-2 ring-amber-400/40" : ""
+              }`}>
               {isCombatOrBoxing && (
                 <div className="mb-1.5">
                   <span className="inline-block rounded-full bg-red-600 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow-xs">
@@ -180,20 +184,19 @@ const ScoreboardDisplay = ({
               )}
               {hasStateToggle && (
                 <>
-                  <div className="flex items-center gap-1.5">
+                  {/* <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       aria-label={`Set ${sportStateLabel || "state"} to ${leftTeamName}`}
                       title={`${sportStateLabel || "State"}: ${leftTeamName}`}
                       onClick={() => onStateOverrideApply?.(team1Id)}
                       disabled={stateToggleDisabled}
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold transition ${
-                        stateToggleDisabled
-                          ? "cursor-not-allowed border-slate-300 bg-slate-100 text-slate-400 opacity-70 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-500"
-                          : isLeftActive
-                            ? "border-cyan-500/70 bg-cyan-500/20 text-cyan-800 dark:text-cyan-100"
-                            : "border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-400"
-                      }`}
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold transition ${stateToggleDisabled
+                        ? "cursor-not-allowed border-slate-300 bg-slate-100 text-slate-400 opacity-70 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-500"
+                        : isLeftActive
+                          ? "border-cyan-500/70 bg-cyan-500/20 text-cyan-800 dark:text-cyan-100"
+                          : "border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-400"
+                        }`}
                     >
                       A
                     </button>
@@ -203,35 +206,36 @@ const ScoreboardDisplay = ({
                       title={`${sportStateLabel || "State"}: ${rightTeamName}`}
                       onClick={() => onStateOverrideApply?.(team2Id)}
                       disabled={stateToggleDisabled}
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold transition ${
-                        stateToggleDisabled
-                          ? "cursor-not-allowed border-slate-300 bg-slate-100 text-slate-400 opacity-70 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-500"
-                          : isRightActive
-                            ? "border-cyan-500/70 bg-cyan-500/20 text-cyan-800 dark:text-cyan-100"
-                            : "border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-400"
-                      }`}
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold transition ${stateToggleDisabled
+                        ? "cursor-not-allowed border-slate-300 bg-slate-100 text-slate-400 opacity-70 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-500"
+                        : isRightActive
+                          ? "border-cyan-500/70 bg-cyan-500/20 text-cyan-800 dark:text-cyan-100"
+                          : "border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-400"
+                        }`}
                     >
                       B
                     </button>
-                  </div>
+                  </div> */}
+
+
+
                   {/* <p className="text-[10px] font-semibold text-slate-400">
                     {sportStateLabel || "State"}: <span className="text-cyan-200">{stateTeamShort}</span>
                   </p> */}
                 </>
               )}
-              {shouldHighlightState && !activeStateTeamId && (
+              {/* {shouldHighlightState && !activeStateTeamId && (
                 <p className="text-center text-[11px] font-medium text-slate-500 dark:text-slate-400">
                   {sportStateMode === "server" ? "Service not assigned" : `${sportStateLabel || "State"} not assigned`}
                 </p>
-              )}
+              )} */}
             </div>
 
             {/* second container score */}
-            <div className={`min-w-0 rounded-xl bg-white px-2 py-3 text-center shadow-sm shadow-slate-300/35 sm:px-3 sm:py-3.5 dark:bg-slate-950/45 dark:shadow-lg dark:shadow-slate-950/40 ${
-              isCombatOrBoxing
-                ? "border border-blue-300/80 bg-blue-50/30 dark:border-blue-800/50 dark:bg-blue-950/20"
-                : isTeam2State ? "ring-2 ring-amber-400/40" : ""
-            }`}>
+            <div className={`min-w-0 rounded-xl bg-white px-2 py-3 text-center shadow-sm shadow-slate-300/35 sm:px-3 sm:py-3.5 dark:bg-slate-950/45 dark:shadow-lg dark:shadow-slate-950/40 ${isCombatOrBoxing
+              ? "border border-blue-300/80 bg-blue-50/30 dark:border-blue-800/50 dark:bg-blue-950/20"
+              : isTeam2State ? "ring-2 ring-amber-400/40" : ""
+              }`}>
               {isCombatOrBoxing && (
                 <div className="mb-1.5">
                   <span className="inline-block rounded-full bg-blue-600 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow-xs">
@@ -255,9 +259,9 @@ const ScoreboardDisplay = ({
             </div>
           </div>
 
-          {setPresentation && !setPresentation.service?.assigned && (
+          {/* {setPresentation && !setPresentation.service?.assigned && (
             <p className="mt-2 text-center text-xs font-medium text-slate-500 dark:text-slate-400">Service not assigned</p>
-          )}
+          )} */}
 
           {compactClockControls.length > 0 && (
             <div className="mt-3 flex flex-wrap justify-center gap-1.5">
@@ -287,6 +291,20 @@ const ScoreboardDisplay = ({
           {secondaryClock?.config?.enabled ? (
             <div className="mt-3">
               <SecondaryClockPanel {...secondaryClock} />
+            </div>
+          ) : null}
+
+          {/* ── Sport Statistics & Box Score ── */}
+          {sportKey && (participants?.length >= 2 || teamOptions?.length >= 2) ? (
+            <div className="mt-4">
+              <SportMatchAnalytics
+                sportKey={sportKey}
+                participants={participants?.length >= 2 ? participants : teamOptions}
+                scores={[team1LiveScore, team2LiveScore]}
+                timeline={timeline}
+                currentPeriod={phaseText || matchPhaseLabel}
+                playerStats={playerStats}
+              />
             </div>
           ) : null}
         </div>

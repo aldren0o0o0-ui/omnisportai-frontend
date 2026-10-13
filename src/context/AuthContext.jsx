@@ -146,6 +146,29 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const logoutAll = async () => {
+    try {
+      const pushToken = getStoredPushToken();
+      if (pushToken) {
+        try {
+          await unregisterPushToken(pushToken);
+        } catch {
+          // Keep logout resilient if push cleanup fails.
+        } finally {
+          clearStoredPushToken();
+        }
+      }
+      await authApi.logoutAll();
+    } finally {
+      clearRoleMissionCardSessionDismissals();
+      setAccessToken(null);
+      setIsAuthenticated(false);
+      setUser(null);
+      setSessionRecovery(false);
+      setRecoveryAttempt(0);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -153,6 +176,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         logout,
+        logoutAll,
         user,
         isViewerOnly,
         roleNames,
@@ -166,6 +190,7 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
+
 };
 
 // eslint-disable-next-line react-refresh/only-export-components

@@ -59,6 +59,11 @@ export const undoLastMatchEvent = async (matchId) => {
   return res.data;
 };
 
+export const recordManualMatchResult = async (matchId, payload) => {
+  const res = await api.post(`/matches/${matchId}/manual-result`, payload);
+  return res.data;
+};
+
 export const migrateMatchTemplate = async (matchId, payload) => {
   const res = await api.post(`/matches/${matchId}/migrate-template`, payload);
   return res.data;

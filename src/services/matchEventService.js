@@ -12,6 +12,7 @@ import {
   getMatchReplay,
   getMatchTimeline,
   migrateMatchTemplate,
+  recordManualMatchResult,
   undoLastMatchEvent
 } from "../api/matchApi";
 
@@ -29,5 +30,6 @@ export {
   getMatchReplay,
   getMatchTimeline,
   migrateMatchTemplate,
+  recordManualMatchResult,
   undoLastMatchEvent
 };

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import useTournamentAccess from "../../hooks/useTournamentAccess";
@@ -17,7 +17,6 @@ import { getTournaments } from "../../services/tournamentService";
 import {
   getApplication,
   getCoachApplications,
-  getDecisionLogs,
   finalizeTeamRoster,
   publishTeamTryoutSchedule,
   getTeamTryoutSchedule,
@@ -39,12 +38,30 @@ import DashboardCard from "../../components/common/DashboardCard";
 import StatusBadge from "../../components/common/StatusBadge";
 import EmptyState from "../../components/common/EmptyState";
 import LoadingState from "../../components/common/LoadingState";
-import { UserPlus } from "lucide-react";
+import {
+  Clock,
+  Lock,
+  UserPlus,
+  User,
+  Mail,
+  Phone,
+  Building2,
+  Target,
+  HeartPulse,
+  FileText,
+  ExternalLink,
+  CheckCircle2,
+  AlertTriangle,
+  Shield,
+  Calendar,
+} from "lucide-react";
 import { resolveMediaUrl } from "../../utils/media";
 import {
   buildWorkspace,
   extractMedicalCertificateUrl,
   getMedicalCertificateStatus,
+  getRegistrationWindowStatus,
+  isRegistrationOpenStatus,
   isTryoutDone,
   TEAM_LOCKED_REGISTRATION_STATUSES,
   TEAM_RESUBMITTABLE_REGISTRATION_STATUSES,
@@ -55,19 +72,12 @@ import ApplicantWorkspaceSection from "./recruitment/ApplicantWorkspaceSection";
 import TryoutScheduleDrawer from "./recruitment/TryoutScheduleDrawer";
 import MedicalCertificateProgress from "./recruitment/MedicalCertificateProgress";
 import { useWorkspace } from "../../context/WorkspaceContext";
-import { HistoricalBanner } from "../../components/intramural";
+import { HistoricalBanner, IntramuralStatusBadge } from "../../components/intramural";
 import {
   getTournamentAccessModeLabel,
   shouldShowCoachTools,
 } from "../../utils/tournamentAccess";
 import { useProfileDrawer, resolveProfileUserId } from "../../components/profile";
-
-const ACTIONS_BY_STATUS = {
-  FOR_TRYOUT: [
-    { key: "ACCEPTED_AS_PLAYER", label: "Accept", tone: "success" },
-    { key: "REJECTED", label: "Reject", tone: "danger" },
-  ],
-};
 
 const toUpper = (value) => String(value || "").trim().toUpperCase();
 
@@ -129,17 +139,15 @@ const chunkItems = (items, size) => {
   return chunks;
 };
 
-const actionClassName = (tone) => {
-  if (tone === "success") return "bg-emerald-600 hover:bg-emerald-500";
-  if (tone === "danger") return "bg-rose-600 hover:bg-rose-500";
-  if (tone === "warning") return "bg-orange-600 hover:bg-orange-500";
-  return "bg-blue-600 hover:bg-blue-500";
-};
-
 const PlayerApplications = () => {
   const { user } = useAuth();
-  const { selectedIntramural, isViewingHistorical } = useWorkspace();
+  const { selectedIntramural, isViewingHistorical, workspace: activeWorkspaceContext } = useWorkspace();
   const selectedWorkspaceId = selectedIntramural?.id ?? null;
+  const intramuralStatus = String(selectedIntramural?.status || activeWorkspaceContext?.status || "").toUpperCase();
+  const registrationWindow = useMemo(
+    () => getRegistrationWindowStatus(intramuralStatus, isViewingHistorical),
+    [intramuralStatus, isViewingHistorical]
+  );
   const [searchParams, setSearchParams] = useSearchParams();
   const [applications, setApplications] = useState([]);
   const [teamRegistrations, setTeamRegistrations] = useState([]);
@@ -150,12 +158,9 @@ const PlayerApplications = () => {
 
   const [selectedApplicationId, setSelectedApplicationId] = useState(null);
   const [selectedApplication, setSelectedApplication] = useState(null);
-  const [decisionLogs, setDecisionLogs] = useState([]);
-  const [decisionNote, setDecisionNote] = useState("");
   const [capacityInfo, setCapacityInfo] = useState(null);
 
   const [isDetailLoading, setIsDetailLoading] = useState(false);
-  const [isSubmittingDecision, setIsSubmittingDecision] = useState(false);
   const [isReviewingMedical, setIsReviewingMedical] = useState(false);
 
   const [capacityByTeamId, setCapacityByTeamId] = useState({});
@@ -179,13 +184,8 @@ const PlayerApplications = () => {
   const tournamentAccess = useTournamentAccess(selectedTournamentId);
   const coachApplicationManageMode = shouldShowCoachTools(tournamentAccess);
   const { openProfile } = useProfileDrawer();
-  const [decisionConfirmModal, setDecisionConfirmModal] = useState({
-    open: false,
-    status: "",
-    label: "",
-    error: "",
-  });
   const requestedApplicationId = Number(searchParams.get("applicationId") || 0);
+  const deepLinkHandledRef = useRef(false);
 
   const loadApplications = useCallback(async () => {
     if (!selectedTournamentId) {
@@ -297,9 +297,9 @@ const PlayerApplications = () => {
       })
     );
 
-  const map = {};
-  for (const [teamId, data] of entries) map[teamId] = data;
-  setCapacityByTeamId(map);
+    const map = {};
+    for (const [teamId, data] of entries) map[teamId] = data;
+    setCapacityByTeamId(map);
   };
 
   useEffect(() => {
@@ -339,29 +339,20 @@ const PlayerApplications = () => {
   }, [loadApplications, loadCoachEntryPools, loadTeamRegistrations]);
 
   useEffect(() => {
-    if (!requestedApplicationId) {
-      if (selectedApplicationId) {
-        setSelectedApplicationId(null);
-        setSelectedApplication(null);
-        setDecisionLogs([]);
-        setDecisionNote("");
-        setCapacityInfo(null);
-      }
-      return;
-    }
+    if (!requestedApplicationId || deepLinkHandledRef.current) return;
     if (isLoading || applications.length === 0) return;
     const matchedApplication = applications.find((row) => Number(row?.id) === requestedApplicationId);
     if (!matchedApplication) return;
+    deepLinkHandledRef.current = true;
     // Focus the workspace that owns the deep-linked application.
     const matchedKey = applicantTryoutKey(matchedApplication);
     if (matchedKey && matchedKey !== activeWorkspaceKey) setActiveWorkspaceKey(matchedKey);
-    if (Number(selectedApplicationId || 0) === requestedApplicationId) return;
     openApplicationDetail(
       requestedApplicationId,
       matchedApplication.source_type,
       matchedApplication.pool_id || matchedApplication.team_id
     );
-  }, [applications, isLoading, requestedApplicationId, selectedApplicationId, activeWorkspaceKey]);
+  }, [applications, isLoading, requestedApplicationId, activeWorkspaceKey]);
 
   useEffect(() => {
     if (applications.length === 0) {
@@ -433,13 +424,13 @@ const PlayerApplications = () => {
             sportName: row?.sport_name || pool?.sport_name || "-",
             departmentId: Number(row?.department_id || pool?.department_id || 0) || null,
             departmentName: row?.department_name || pool?.department_name || "-",
-	            participantShape: toUpper(
-	              pool?.participant_shape ||
-	                (String(row?.team_name || "").toLowerCase().includes("duo") ||
-	                String(row?.position || "").toLowerCase().includes("double")
-	                  ? "DUO"
-	                  : "SOLO")
-	            ),
+            participantShape: toUpper(
+              pool?.participant_shape ||
+              (String(row?.team_name || "").toLowerCase().includes("duo") ||
+                String(row?.position || "").toLowerCase().includes("double")
+                ? "DUO"
+                : "SOLO")
+            ),
             eventName: pool?.event_name || "",
             poolStatus: pool?.status || "",
             maxEntriesPerDepartment: Number(pool?.max_entries_per_department || 0) || null,
@@ -626,7 +617,7 @@ const PlayerApplications = () => {
           selectionMaxPlayers:
             accepted?.maxEntriesPerDepartment
               ? Math.max(0, Number(accepted.maxEntriesPerDepartment) - Number(accepted.selectedEntriesCount || 0)) *
-                (toUpper(accepted?.participantShape) === "DUO" ? 2 : 1)
+              (toUpper(accepted?.participantShape) === "DUO" ? 2 : 1)
               : null,
           submissionPayload: accepted?.submissionPayload || null,
           // Accepted players keep the `players` key the submit handler expects.
@@ -812,26 +803,26 @@ const PlayerApplications = () => {
   };
 
   const showSelectTournamentFallback = Boolean(
-      !selectedTournamentId && tournaments.length > 0
+    !selectedTournamentId && tournaments.length > 0
   );
   const showAccessVerificationFallback = Boolean(
     selectedTournamentId &&
-      !tournamentAccess.loading &&
-      tournamentAccess.error &&
-      !coachApplicationManageMode &&
-      !tournamentAccess.isAssistantCoachMode
+    !tournamentAccess.loading &&
+    tournamentAccess.error &&
+    !coachApplicationManageMode &&
+    !tournamentAccess.isAssistantCoachMode
   );
   const showCoachViewerFallback = Boolean(
     selectedTournamentId &&
-      !tournamentAccess.loading &&
-      !tournamentAccess.error &&
-      !coachApplicationManageMode &&
-      !tournamentAccess.isAssistantCoachMode
+    !tournamentAccess.loading &&
+    !tournamentAccess.error &&
+    !coachApplicationManageMode &&
+    !tournamentAccess.isAssistantCoachMode
   );
   const showAssistantCoachPlaceholder = Boolean(
     selectedTournamentId &&
-      !tournamentAccess.loading &&
-      tournamentAccess.isAssistantCoachMode
+    !tournamentAccess.loading &&
+    tournamentAccess.isAssistantCoachMode
   );
   const pageTitle = showAssistantCoachPlaceholder
     ? "Assistant Coach Mode"
@@ -848,9 +839,9 @@ const PlayerApplications = () => {
       ? "Coach application tools are unavailable for this tournament. Public tournament information remains available."
       : showAccessVerificationFallback
         ? "Unable to verify your tournament access. Showing viewer-safe information only."
-      : showSelectTournamentFallback
-        ? "Choose a tournament to see your available tools."
-        : "Manage applicants, schedule tryouts, build your official roster, and submit your team for facilitator review.";
+        : showSelectTournamentFallback
+          ? "Choose a tournament to see your available tools."
+          : "Manage applicants, schedule tryouts, build your official roster, and submit your team for facilitator review.";
   const pageBreadcrumbs = showAssistantCoachPlaceholder
     ? "Assistant Coach / Player Applications"
     : showCoachViewerFallback || showAccessVerificationFallback
@@ -861,33 +852,19 @@ const PlayerApplications = () => {
 
   const openApplicationDetail = async (applicationId, sourceType, poolId = null) => {
     setSelectedApplicationId(applicationId);
-    const nextSearchParams = new URLSearchParams(searchParams);
-    nextSearchParams.set("applicationId", String(applicationId));
-    if (sourceType) nextSearchParams.set("source", sourceType);
-    if (poolId) nextSearchParams.set("poolId", poolId);
-    setSearchParams(nextSearchParams, { replace: true });
     setIsDetailLoading(true);
-    setDecisionNote("");
     setCapacityInfo(null);
     try {
       let application = null;
-      let logsData = { items: [] };
 
       if (sourceType === "ENTRY_POOL_APPLICATION") {
         const matchingApp = applications.find(a => String(a.id) === String(applicationId) && a.source_type === "ENTRY_POOL_APPLICATION");
         application = matchingApp || null;
       } else {
-        const [appRes, logsRes] = await Promise.all([
-          getApplication(applicationId),
-          getDecisionLogs(applicationId),
-        ]);
-        application = appRes;
-        logsData = logsRes;
+        application = await getApplication(applicationId);
       }
 
       setSelectedApplication(application);
-      setDecisionLogs(Array.isArray(logsData?.items) ? logsData.items : []);
-      setDecisionNote(application?.decision_note || "");
 
       if (application?.team_id && sourceType !== "ENTRY_POOL_APPLICATION") {
         const roster = await getTeamRoster(
@@ -916,66 +893,23 @@ const PlayerApplications = () => {
       setMessage(error?.response?.data?.detail || "Failed to load application details.");
       setSelectedApplicationId(null);
       setSelectedApplication(null);
-      setDecisionLogs([]);
     } finally {
       setIsDetailLoading(false);
     }
   };
 
   const closeModal = () => {
-    if (isSubmittingDecision) return;
-    setDecisionConfirmModal({ open: false, status: "", label: "", error: "" });
-    const nextSearchParams = new URLSearchParams(searchParams);
-    nextSearchParams.delete("applicationId");
-    nextSearchParams.delete("source");
-    nextSearchParams.delete("poolId");
-    setSearchParams(nextSearchParams, { replace: true });
-  };
-
-  const runDecision = async (newStatus) => {
-    if (!selectedApplication) return;
-    const schedule = tryoutSchedulesByKey[applicantTryoutKey(selectedApplication)] || null;
-    if (!isTryoutDone(schedule)) {
-      const friendlyMessage = schedule
-        ? "You can make the final accept or reject decision after the tryout is completed."
-        : "Schedule a tryout first before making the final accept or reject decision.";
-      setMessage(friendlyMessage);
-      setDecisionConfirmModal((prev) => ({ ...prev, error: friendlyMessage }));
-      return;
-    }
-
-    setIsSubmittingDecision(true);
-    setMessage("");
-    try {
-      const sourceType = selectedApplication.source_type || searchParams.get("source");
-      if (sourceType === "ENTRY_POOL_APPLICATION") {
-        await updateEntryPoolApplicationDecision(selectedApplication.id, {
-          status: newStatus,
-          decision_note: decisionNote || null,
-        });
-      } else {
-        await updateApplicationStatus(selectedApplication.id, {
-          new_status: newStatus,
-          decision_note: decisionNote || null,
-        });
-      }
-	      setMessage(`Application moved to ${newStatus}.`);
-	      setDecisionConfirmModal({ open: false, status: "", label: "", error: "" });
-	      await loadApplications();
-	      await loadTeamRegistrations();
-	      await loadCoachEntryPools();
-	      await openApplicationDetail(selectedApplication.id, sourceType, selectedApplication.pool_id || selectedApplication.team_id);
-    } catch (error) {
-      const backendMessage = error?.response?.data?.detail || "Failed to update application status.";
-      if (String(backendMessage).includes("Team roster is already full for this sport.")) {
-        setMessage("Cannot accept applicant because the team roster is already full.");
-        setDecisionConfirmModal((prev) => ({ ...prev, error: "Cannot accept applicant because the team roster is already full." }));
-      } else {
-        setMessage(backendMessage);
-        setDecisionConfirmModal((prev) => ({ ...prev, error: backendMessage }));
-      }
-    } finally {
-      setIsSubmittingDecision(false);
+    setSelectedApplicationId(null);
+    setSelectedApplication(null);
+    setCapacityInfo(null);
+    if (searchParams.get("applicationId")) {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("applicationId");
+        next.delete("source");
+        next.delete("poolId");
+        return next;
+      }, { replace: true });
     }
   };
 
@@ -1066,15 +1000,6 @@ const PlayerApplications = () => {
     }
   };
 
-  const openDecisionConfirm = (statusKey, actionLabel) => {
-    setDecisionConfirmModal({
-      open: true,
-      status: statusKey,
-      label: actionLabel || "Confirm Action",
-      error: "",
-    });
-  };
-
   const openUserProfile = (userId) => {
     const resolved = resolveProfileUserId(userId);
     if (!resolved) return;
@@ -1084,10 +1009,18 @@ const PlayerApplications = () => {
     });
   };
 
-  const closeUserProfile = () => {};
+  const closeUserProfile = () => { };
 
   const submitAcceptedTeamRegistration = async (group) => {
     if (!selectedTournamentId) return;
+
+    if (!registrationWindow.isOpen) {
+      setMessage(
+        registrationWindow.reason ||
+        "Registration is not open. Teams and entries cannot be submitted to the sports facilitator."
+      );
+      return;
+    }
 
     if (group?.groupType === "pool") {
       const poolId = Number(group?.poolId || 0);
@@ -1111,7 +1044,7 @@ const PlayerApplications = () => {
       } catch (error) {
         setMessage(
           error?.response?.data?.detail ||
-            `Failed to submit ${group.teamName} to the sports facilitator.`
+          `Failed to submit ${group.teamName} to the sports facilitator.`
         );
       } finally {
         setTeamRegistrationBusyId(null);
@@ -1174,7 +1107,7 @@ const PlayerApplications = () => {
     } catch (error) {
       setMessage(
         error?.response?.data?.detail ||
-          `Failed to submit ${group.teamName} to the sports facilitator.`
+        `Failed to submit ${group.teamName} to the sports facilitator.`
       );
     } finally {
       setTeamRegistrationBusyId(null);
@@ -1191,8 +1124,8 @@ const PlayerApplications = () => {
       ? readinessByTeamId[activeWorkspace.teamId] || null
       : null;
   const workspace = useMemo(
-    () => buildWorkspace(activeWorkspace, activeSchedule, activeReadiness),
-    [activeWorkspace, activeSchedule, activeReadiness]
+    () => buildWorkspace(activeWorkspace, activeSchedule, activeReadiness, registrationWindow),
+    [activeWorkspace, activeSchedule, activeReadiness, registrationWindow]
   );
   const activeApplicants = activeWorkspace?.allApplicants || [];
   const activeAcceptedPlayers = activeWorkspace?.players || [];
@@ -1218,16 +1151,6 @@ const PlayerApplications = () => {
     ? tryoutSchedulesByKey[applicantTryoutKey(selectedApplication)] || null
     : null;
   const selectedApplicationTryoutDone = isTryoutDone(selectedApplicationSchedule);
-  const selectedApplicationDecisionDisabledReason = !selectedApplicationSchedule
-    ? "Schedule a tryout first. Final decisions are available after the tryout is completed."
-    : !selectedApplicationTryoutDone
-      ? "Final decisions are available after the tryout date and time."
-      : "";
-  const selectedApplicationActions = ACTIONS_BY_STATUS[toUpper(selectedApplication?.application_status)] || [];
-  const canDecideSelectedApplication =
-    coachApplicationManageMode &&
-    selectedApplicationActions.length > 0 &&
-    selectedApplicationTryoutDone;
 
   return (
     <div className="os-page-shell">
@@ -1237,18 +1160,7 @@ const PlayerApplications = () => {
         subtitle={pageSubtitle}
         breadcrumbs={pageBreadcrumbs}
         action={
-          <select
-            value={selectedTournamentId}
-            onChange={(event) => setSelectedTournamentId(event.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-          >
-            <option value="">All Tournaments</option>
-            {tournaments.map((row) => (
-              <option key={`coach-apps-tournament-${row.id}`} value={row.id}>
-                {row.tournament_name || "Unnamed tournament"}
-              </option>
-            ))}
-          </select>
+          ''
         }
       />
 
@@ -1288,87 +1200,125 @@ const PlayerApplications = () => {
       ) : null}
 
       {showSelectTournamentFallback ||
-      showAccessVerificationFallback ||
-      showCoachViewerFallback ||
-      showAssistantCoachPlaceholder ? null : (
-      <>
-      {workspaces.length === 0 ? (
-        <EmptyState
-          icon={UserPlus}
-          title="No applicants yet"
-          message="Players will appear here once they apply. Share your tournament so athletes can submit their applications."
-        />
-      ) : (
-        <div className="space-y-6">
-          {workspaces.length > 1 ? (
-            <DashboardCard>
-              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Team / Group
-              </label>
-              <select
-                value={activeWorkspace?.groupKey || ""}
-                onChange={(event) => setActiveWorkspaceKey(event.target.value)}
-                className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white sm:max-w-md"
-              >
-                {workspaces.map((group) => (
-                  <option key={`workspace-option-${group.groupKey}`} value={group.groupKey}>
-                    {group.teamName} — {group.sportName} ({group.counts.total} applicant
-                    {group.counts.total === 1 ? "" : "s"})
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                You manage {workspaces.length} teams in this tournament. Switch between them to guide each one separately.
-              </p>
-            </DashboardCard>
+        showAccessVerificationFallback ||
+        showCoachViewerFallback ||
+        showAssistantCoachPlaceholder ? null : (
+        <>
+          {isViewingHistorical ? (
+            <HistoricalBanner intramural={selectedIntramural} className="mb-6" />
+          ) : registrationWindow.isPlanning ? (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <Clock size={18} className="shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                    Planning Phase • Registration Not Open
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-300/80">
+                    This intramural is currently in the Planning phase. You can manage recruitment, tryouts, and accepted players, but team submissions to the sports facilitator will be available once registration opens.
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <IntramuralStatusBadge status={intramuralStatus || "DRAFT"} />
+              </div>
+            </div>
+          ) : registrationWindow.isClosed ? (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-500/30 dark:bg-rose-500/10">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <Lock size={18} className="shrink-0 text-rose-600 dark:text-rose-400" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-rose-900 dark:text-rose-200">
+                    Registration Closed
+                  </p>
+                  <p className="text-xs text-rose-700 dark:text-rose-300/80">
+                    Registration is closed for this intramural. Team and entry submissions can no longer be sent to the sports facilitator.
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <IntramuralStatusBadge status={intramuralStatus} />
+              </div>
+            </div>
           ) : null}
 
-          <TeamSummaryCards workspace={workspace} />
+          {workspaces.length === 0 ? (
+            <EmptyState
+              icon={UserPlus}
+              title="No applicants yet"
+              message="Players will appear here once they apply. Share your tournament so athletes can submit their applications."
+            />
+          ) : (
+            <div className="space-y-6">
+              {workspaces.length > 1 ? (
+                <DashboardCard>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Team / Group
+                  </label>
+                  <select
+                    value={activeWorkspace?.groupKey || ""}
+                    onChange={(event) => setActiveWorkspaceKey(event.target.value)}
+                    className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white sm:max-w-md"
+                  >
+                    {workspaces.map((group) => (
+                      <option key={`workspace-option-${group.groupKey}`} value={group.groupKey}>
+                        {group.teamName} — {group.sportName} ({group.counts.total} applicant
+                        {group.counts.total === 1 ? "" : "s"})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    You manage {workspaces.length} teams in this tournament. Switch between them to guide each one separately.
+                  </p>
+                </DashboardCard>
+              ) : null}
 
-          {/* Table + workflow progress rail. On desktop the rail shares a
+              <TeamSummaryCards workspace={workspace} />
+
+              {/* Table + workflow progress rail. On desktop the rail shares a
               stretched grid row with the table card so it always levels to the
               bottom of the table; on mobile the progress card stacks on top. */}
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-stretch">
-            <div className="order-2 lg:order-1">
-              <DashboardCard>
-                <ApplicantWorkspaceSection
-                  workspace={workspace}
-                  applicants={activeApplicants}
-                  acceptedPlayers={activeAcceptedPlayers}
-                  schedule={activeSchedule}
-                  isPool={activeWorkspace?.groupType === "pool"}
-                  rowDecisionBusyId={rowDecisionBusyId}
-                  submitBusy={teamRegistrationBusyId === activeWorkspace?.groupKey}
-                  canManage={coachApplicationManageMode}
-                  submitLabel={submitButtonLabel}
-                  onRowDecision={runRowDecision}
-                  onFinalizeRoster={finalizeSelectedRoster}
-                  onMedicalReview={(row, decision) => runMedicalReview(decision, row)}
-                  medicalReviewBusyId={medicalReviewBusyId}
-                  onOpenDetail={(row) =>
-                    openApplicationDetail(row.id, row.source_type, row.pool_id || row.team_id)
-                  }
-                  onOpenProfile={openUserProfile}
-                  onViewSchedule={() => setScheduleDrawerOpen(true)}
-                  onScheduleTryout={handleScheduleTryout}
-                  onSubmit={() => activeWorkspace && submitAcceptedTeamRegistration(activeWorkspace)}
-                />
-              </DashboardCard>
-            </div>
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-stretch">
+                <div className="order-2 lg:order-1">
+                  <DashboardCard>
+                    <ApplicantWorkspaceSection
+                      workspace={workspace}
+                      applicants={activeApplicants}
+                      acceptedPlayers={activeAcceptedPlayers}
+                      schedule={activeSchedule}
+                      isPool={activeWorkspace?.groupType === "pool"}
+                      rowDecisionBusyId={rowDecisionBusyId}
+                      submitBusy={teamRegistrationBusyId === activeWorkspace?.groupKey}
+                      canManage={coachApplicationManageMode}
+                      submitLabel={submitButtonLabel}
+                      onRowDecision={runRowDecision}
+                      onFinalizeRoster={finalizeSelectedRoster}
+                      onMedicalReview={(row, decision) => runMedicalReview(decision, row)}
+                      medicalReviewBusyId={medicalReviewBusyId}
+                      onOpenDetail={(row) =>
+                        openApplicationDetail(row.id, row.source_type, row.pool_id || row.team_id)
+                      }
+                      onOpenProfile={openUserProfile}
+                      onViewSchedule={() => setScheduleDrawerOpen(true)}
+                      onScheduleTryout={handleScheduleTryout}
+                      onSubmit={() => activeWorkspace && submitAcceptedTeamRegistration(activeWorkspace)}
+                    />
+                  </DashboardCard>
+                </div>
 
-            <div className="order-1 lg:order-2">
-              <RecruitmentProgress workspace={workspace} />
-            </div>
-          </div>
+                <div className="order-1 lg:order-2">
+                  <RecruitmentProgress workspace={workspace} />
+                </div>
+              </div>
 
-          {activeWorkspace?.groupType === "team" ? (
+              {/* {activeWorkspace?.groupType === "team" ? (
             <MedicalCertificateProgress
               players={activeAcceptedPlayers}
             />
-          ) : null}
-        </div>
-      )}
-      </>
+          ) : null} */}
+            </div>
+          )}
+        </>
       )}
 
       <TryoutScheduleDrawer
@@ -1384,278 +1334,265 @@ const PlayerApplications = () => {
         open={Boolean(selectedApplicationId)}
         onClose={closeModal}
         title="Review Applicant"
-        subtitle="Check the applicant profile, tryout status, and medical certificate."
-        maxWidthClass="max-w-3xl"
+        subtitle="Applicant profile, position, and medical clearance."
+        maxWidthClass="max-w-2xl"
+        footer={
+          <div className="flex w-full items-center justify-end">
+            <button
+              type="button"
+              onClick={closeModal}
+              className="rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-5 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-700"
+            >
+              Close
+            </button>
+          </div>
+        }
       >
         {isDetailLoading || !selectedApplication ? (
-          <LoadingState message="Loading application details..." />
+          <LoadingState message="Loading applicant profile..." />
         ) : (
-          <div className="space-y-4">
-            <section className="grid gap-4 md:grid-cols-2">
-              <article className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Applicant</h3>
-                <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-300">
-                  <p><span className="font-medium text-slate-500 dark:text-slate-400">Name:</span> {selectedApplication.applicant_name || "-"}</p>
-                  <p><span className="font-medium text-slate-500 dark:text-slate-400">Email:</span> {selectedApplication.applicant_email || "-"}</p>
-                  {resolveProfileUserId(selectedApplication.applicant_id) ? (
-                    <p>
-                      <button
-                        type="button"
-                        onClick={() => openUserProfile(selectedApplication.applicant_id)}
-                        className="text-xs font-semibold text-blue-700 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
-                      >
-                        View Profile
-                      </button>
-                    </p>
-                  ) : null}
-                  <p><span className="font-medium text-slate-500 dark:text-slate-400">Department:</span> {selectedApplication.department_name || selectedApplication.department_id || "-"}</p>
-                  <p><span className="font-medium text-slate-500 dark:text-slate-400">Contact:</span> {selectedApplication.contact_number || "-"}</p>
-                </div>
-              </article>
-              <article className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Assignment</h3>
-                <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-300">
-                  <p><span className="font-medium text-slate-500 dark:text-slate-400">{selectedApplicationSourceType === "ENTRY_POOL_APPLICATION" ? "Entry:" : "Team:"}</span> {selectedApplication.team_name || "-"}</p>
-                  <p><span className="font-medium text-slate-500 dark:text-slate-400">Tournament:</span> {selectedApplication.tournament_name || "Legacy / Not set"}</p>
-                  <p><span className="font-medium text-slate-500 dark:text-slate-400">Sport:</span> {getSportDisplayName(selectedApplication, selectedApplication.sport_id || "-")}</p>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-slate-500 dark:text-slate-400">Status:</span> 
-                    <StatusBadge status={selectedApplication.application_status} />
-                  </div>
-                  <p>
-                    <span className="font-medium text-slate-500 dark:text-slate-400">Roster:</span>{" "}
-                    {capacityInfo
-                      ? `${capacityInfo.currentPlayers ?? "-"} / ${capacityInfo.maxPlayers ?? "-"}`
-                      : "-"}
-                  </p>
-                  {capacityInfo?.availableSlots !== null && capacityInfo?.availableSlots !== undefined ? (
-                    <p><span className="font-medium text-slate-500 dark:text-slate-400">Available Slots:</span> {capacityInfo.availableSlots}</p>
-                  ) : null}
-                </div>
-              </article>
-            </section>
+          (() => {
+            const rawHealthNotes = String(selectedApplication.health_notes || "").trim();
+            const certificateUrl = extractMedicalCertificateUrl(rawHealthNotes);
+            const medicalStatus = getMedicalCertificateStatus(selectedApplication);
+            const cleanHealthNotes = rawHealthNotes
+              .replace(/\r/g, "\n")
+              .split("\n")
+              .filter(
+                (line) =>
+                  !line.toLowerCase().startsWith("medical certificate attachment:") &&
+                  !line.toLowerCase().startsWith("medical certificate status:")
+              )
+              .join("\n")
+              .trim();
 
-            <section className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-200">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="font-semibold">
-                    {selectedApplicationSchedule
-                      ? selectedApplicationTryoutDone
-                        ? "Tryout completed"
-                        : "Tryout scheduled"
-                      : "No tryout schedule yet"}
-                  </p>
-                  <p className="mt-0.5">
-                    {selectedApplicationSchedule?.scheduled_date
-                      ? formatDate(selectedApplicationSchedule.scheduled_date)
-                      : "Schedule a tryout before making the final accept or reject decision."}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (selectedApplicationSchedule) setScheduleDrawerOpen(true);
-                    else if (activeWorkspace) openTryoutModal(activeWorkspace);
-                  }}
-                  className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200"
-                >
-                  {selectedApplicationSchedule ? "View Tryout" : "Schedule Tryout"}
-                </button>
-              </div>
-            </section>
+            const medicalStatusLabel =
+              medicalStatus === "RECEIVED"
+                ? "Received & Verified"
+                : medicalStatus === "REJECTED"
+                  ? "Needs Resubmission"
+                  : medicalStatus === "PENDING"
+                    ? (certificateUrl ? "Waiting for Review" : "Waiting for Upload")
+                    : "Not Submitted";
 
-            <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="mb-3 text-sm font-bold text-slate-900 dark:text-white">Application Details</h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Position</div>
-                  <div className="mt-1 text-sm text-slate-900 dark:text-slate-200">{selectedApplication.position || "-"}</div>
-                </div>
-                <div>
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Availability</div>
-                  <div className="mt-1 whitespace-pre-wrap text-sm text-slate-900 dark:text-slate-200">{selectedApplication.availability || "-"}</div>
-                </div>
-                <div className="md:col-span-2">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Experience</div>
-                  <div className="mt-1 whitespace-pre-wrap text-sm text-slate-900 dark:text-slate-200">{selectedApplication.experience || "-"}</div>
-                </div>
-                <div className="md:col-span-2">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Skills</div>
-                  <div className="mt-1 whitespace-pre-wrap text-sm text-slate-900 dark:text-slate-200">{selectedApplication.skills || "-"}</div>
-                </div>
-                <div className="md:col-span-2">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Health Notes</div>
-                  <div className="mt-1 space-y-2 text-sm text-slate-900 dark:text-slate-200">
-                    {(() => {
-                      const certificateUrl = extractMedicalCertificateUrl(selectedApplication.health_notes);
-                      const medicalStatus = getMedicalCertificateStatus(selectedApplication);
-                      const statusLabel =
-                        medicalStatus === "RECEIVED"
-                          ? "Received"
-                          : medicalStatus === "REJECTED"
-                            ? "Needs resubmission"
-                            : medicalStatus === "PENDING"
-                              ? "Waiting for coach review"
-                              : "Waiting for player upload";
-                      return (
-                        <div className="space-y-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <StatusBadge
-                              status={medicalStatus === "RECEIVED" ? "APPROVED" : medicalStatus === "REJECTED" ? "REJECTED" : "PENDING"}
-                              customLabel={statusLabel}
-                            />
-                            {selectedApplication.medical_certificate_note ? (
-                              <span className="text-xs text-slate-500 dark:text-slate-400">
-                                {selectedApplication.medical_certificate_note}
-                              </span>
-                            ) : null}
-                          </div>
-                          {certificateUrl ? (
-                            <div className="flex flex-wrap items-center gap-2">
-                              <a
-                                href={resolveMediaUrl(certificateUrl)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900/50 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/40"
-                              >
-                                Open Medical Certificate
-                              </a>
-                              {medicalStatus !== "RECEIVED" ? (
-                                <button
-                                  type="button"
-                                  disabled={isReviewingMedical}
-                                  onClick={() => runMedicalReview("RECEIVED")}
-                                  className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-900/50 dark:bg-emerald-900/20 dark:text-emerald-300"
-                                >
-                                  {isReviewingMedical ? "Saving..." : "Mark as received"}
-                                </button>
-                              ) : null}
-                              {medicalStatus !== "REJECTED" ? (
-                                <button
-                                  type="button"
-                                  disabled={isReviewingMedical}
-                                  onClick={() => runMedicalReview("REJECTED")}
-                                  className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-300"
-                                >
-                                  {isReviewingMedical ? "Saving..." : "Request resubmission"}
-                                </button>
-                              ) : null}
-                            </div>
-                          ) : (
-                            <p className="text-sm text-slate-500 dark:text-slate-400">
-                              The player has not submitted a medical certificate yet.
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-                <div className="md:col-span-2">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Reason for Joining</div>
-                  <div className="mt-1 whitespace-pre-wrap text-sm text-slate-900 dark:text-slate-200">{selectedApplication.reason || "-"}</div>
-                </div>
-              </div>
-            </section>
+            const medicalBadgeTone =
+              medicalStatus === "RECEIVED"
+                ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30"
+                : medicalStatus === "REJECTED"
+                  ? "bg-rose-500/10 text-rose-700 border-rose-500/20 dark:bg-rose-500/15 dark:text-rose-400 dark:border-rose-500/30"
+                  : certificateUrl
+                    ? "bg-amber-500/10 text-amber-700 border-amber-500/20 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30"
+                    : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
 
-            <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="mb-3 text-sm font-bold text-slate-900 dark:text-white">Final Decision</h3>
-              {selectedApplicationDecisionDisabledReason && selectedApplicationActions.length > 0 ? (
-                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/15 dark:text-amber-200">
-                  {selectedApplicationDecisionDisabledReason}
-                </div>
-              ) : null}
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Decision Note
-                <textarea
-                  rows={3}
-                  value={decisionNote}
-                  onChange={(event) => setDecisionNote(event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-blue-400"
-                  placeholder="Add context for the applicant."
-                />
-              </label>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {selectedApplicationActions.map((action) => (
-                  <button
-                    key={action.key}
-                    type="button"
-                    disabled={isSubmittingDecision || !canDecideSelectedApplication}
-                    onClick={() => openDecisionConfirm(action.key, action.label)}
-                    className={`rounded-xl px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${actionClassName(action.tone)}`}
-                    title={!canDecideSelectedApplication ? selectedApplicationDecisionDisabledReason : undefined}
-                  >
-                    {isSubmittingDecision ? "Saving..." : action.label}
-                  </button>
-                ))}
-                {selectedApplicationActions.length === 0 ? (
-                  <span className="text-sm font-medium text-slate-500 dark:text-slate-400">No normal actions available for this status.</span>
-                ) : null}
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="mb-4 text-sm font-bold text-slate-900 dark:text-white">Decision History</h3>
-              {decisionLogs.length === 0 ? (
-                <EmptyState message="No decision logs yet." />
-              ) : (
-                <div className="space-y-3">
-                  {decisionLogs.map((log) => (
-                    <article key={log.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700/50 dark:bg-slate-800/50">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <StatusBadge status={log.new_status} />
-                        <span className="text-xs text-slate-500 dark:text-slate-400">{formatDate(log.created_at)}</span>
+            return (
+              <div className="space-y-6">
+                {/* 1. Applicant Header (Minimalist & Flat) */}
+                <div className="flex flex-col gap-4 pb-5 border-b border-slate-200 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3.5">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-base font-bold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                      {(selectedApplication.applicant_name || "A").charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-base font-bold text-slate-900 dark:text-slate-100">
+                        {selectedApplication.applicant_name || "Unknown Applicant"}
+                      </h3>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <StatusBadge status={selectedApplication.application_status} />
+                        {/* {(selectedApplication.department_name || selectedApplication.department_id) && (
+                          <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                            <Building2 className="h-3 w-3 text-slate-400 dark:text-slate-500" />
+                            {selectedApplication.department_name || selectedApplication.department_id}
+                          </span>
+                        )} */}
                       </div>
-                      <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                        {log.old_status ? `${log.old_status} ➔ ${log.new_status}` : `Set to ${log.new_status}`}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{log.note || "-"}</p>
-                    </article>
-                  ))}
+                    </div>
+                  </div>
+
+                  {/* {resolveProfileUserId(selectedApplication.applicant_id) && (
+                    <button
+                      type="button"
+                      onClick={() => openUserProfile(selectedApplication.applicant_id)}
+                      className="inline-flex items-center gap-1.5 self-start sm:self-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs transition hover:bg-slate-50 dark:hover:bg-slate-700"
+                    >
+                      <User className="h-3.5 w-3.5 text-slate-400 dark:text-slate-400" />
+                      <span>Full Profile</span>
+                      <ExternalLink className="h-3 w-3 text-slate-400 dark:text-slate-400" />
+                    </button>
+                  )} */}
                 </div>
-              )}
-            </section>
-          </div>
+
+                {/* 2. Applicant Info & Position (Position directly under Applicant, no contact no) */}
+                <div className="space-y-3 pb-5 border-b border-slate-200 dark:border-slate-800">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Applicant &amp; Position
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-1">
+                    <div>
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        Preferred Position
+                      </div>
+                      <div className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        <Target className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                        <span>{selectedApplication.position || "Not specified"}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        Email Address
+                      </div>
+                      <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-300">
+                        <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
+                        <span className="truncate">{selectedApplication.applicant_email || "-"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Assignment & Tryout (Flat minimalist rows) */}
+                <div className="space-y-3 pb-5 border-b border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-1.5">
+                    <Shield className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Assignment &amp; Tryout
+                    </span>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        {selectedApplicationSourceType === "ENTRY_POOL_APPLICATION" ? "Entry" : "Team"}
+                      </div>
+                      <div className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {selectedApplication.team_name || "-"}
+                      </div>
+                      {capacityInfo && (
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                          Roster: {capacityInfo.currentPlayers ?? "-"} / {capacityInfo.maxPlayers ?? "-"}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        Sport &amp; Tournament
+                      </div>
+                      <div className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {getSportDisplayName(selectedApplication, selectedApplication.sport_id || "-")}
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {selectedApplication.tournament_name || "Legacy / Not set"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tryout schedule row */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                      <div>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          {selectedApplicationSchedule
+                            ? selectedApplicationTryoutDone
+                              ? "Tryout Completed"
+                              : "Tryout Scheduled"
+                            : "No Tryout Scheduled"}
+                        </span>
+                        {selectedApplicationSchedule?.scheduled_date && (
+                          <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
+                            ({formatDate(selectedApplicationSchedule.scheduled_date)})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedApplicationSchedule) setScheduleDrawerOpen(true);
+                        else if (activeWorkspace) openTryoutModal(activeWorkspace);
+                      }}
+                      className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+                    >
+                      {selectedApplicationSchedule ? "View Tryout" : "Schedule Tryout"}
+                    </button> */}
+                  </div>
+                </div>
+
+                {/* 3. Health Notes & Medical Clearance (Directly under Applicant) */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <HeartPulse className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Health Notes &amp; Medical Clearance
+                      </span>
+                    </div>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${medicalBadgeTone}`}>
+                      {medicalStatusLabel}
+                    </span>
+                  </div>
+
+                  {selectedApplication.medical_certificate_note && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {selectedApplication.medical_certificate_note}
+                    </p>
+                  )}
+
+                  {certificateUrl ? (
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                      <a
+                        href={resolveMediaUrl(certificateUrl)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs"
+                      >
+                        <FileText className="h-3.5 w-3.5 text-slate-400 dark:text-slate-400" />
+                        <span>Open Medical Certificate</span>
+                        <ExternalLink className="h-3 w-3 text-slate-400 dark:text-slate-400" />
+                      </a>
+
+                      {coachApplicationManageMode && medicalStatus !== "RECEIVED" && (
+                        <button
+                          type="button"
+                          disabled={isReviewingMedical}
+                          onClick={() => runMedicalReview("RECEIVED")}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 transition hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-60 shadow-xs"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <span>{isReviewingMedical ? "Saving..." : "Mark as Received"}</span>
+                        </button>
+                      )}
+
+                      {coachApplicationManageMode && medicalStatus !== "REJECTED" && (
+                        <button
+                          type="button"
+                          disabled={isReviewingMedical}
+                          onClick={() => runMedicalReview("REJECTED")}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 dark:border-rose-700/60 bg-rose-50 dark:bg-rose-950/30 px-3 py-1.5 text-xs font-semibold text-rose-700 dark:text-rose-300 transition hover:bg-rose-100 dark:hover:bg-rose-900/40 disabled:opacity-60 shadow-xs"
+                        >
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          <span>{isReviewingMedical ? "Saving..." : "Request Resubmission"}</span>
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      No medical certificate document uploaded yet.
+                    </p>
+                  )}
+
+                  {cleanHealthNotes ? (
+                    <div className="pt-1 text-xs text-slate-600 dark:text-slate-400">
+                      <span className="font-semibold text-slate-500 dark:text-slate-400">Remarks: </span>
+                      <span className="whitespace-pre-wrap">{cleanHealthNotes}</span>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })()
         )}
-      </AppModal>
-      <AppModal
-        open={decisionConfirmModal.open}
-        onClose={() => {
-          if (isSubmittingDecision) return;
-          setDecisionConfirmModal({ open: false, status: "", label: "", error: "" });
-        }}
-        title={decisionConfirmModal.label || "Confirm Action"}
-        subtitle="This decision will update the applicant status for the selected tournament team."
-        maxWidthClass="max-w-xl"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-slate-700 dark:text-slate-300">
-            Proceed with this application decision?
-          </p>
-          {decisionConfirmModal.error ? (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300">
-              {decisionConfirmModal.error}
-            </div>
-          ) : null}
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setDecisionConfirmModal({ open: false, status: "", label: "", error: "" })}
-              disabled={isSubmittingDecision}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => runDecision(decisionConfirmModal.status)}
-              disabled={isSubmittingDecision || !decisionConfirmModal.status}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
-            >
-              {isSubmittingDecision ? "Saving..." : "Confirm"}
-            </button>
-          </div>
-        </div>
       </AppModal>
 
       <AppModal

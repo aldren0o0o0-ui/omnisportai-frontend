@@ -137,8 +137,8 @@ const TeamApplicationWizard = () => {
         if (!mounted) return;
         setLoadError(
           error?.response?.data?.detail ||
-            error?.message ||
-            "Unable to load team details for this application."
+          error?.message ||
+          "Unable to load team details for this application."
         );
       } finally {
         if (mounted) setIsLoading(false);
@@ -271,10 +271,10 @@ const TeamApplicationWizard = () => {
             <p className="text-xs uppercase tracking-wide text-slate-500">Sport</p>
             <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">{getSportDisplayName(team, "-")}</p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/40">
+          {/* <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/40">
             <p className="text-xs uppercase tracking-wide text-slate-500">Department</p>
             <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">{team?.department_name || "-"}</p>
-          </div>
+          </div> */}
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/40">
             <p className="text-xs uppercase tracking-wide text-slate-500">Coach</p>
             <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">{team?.coach_name || team?.coach_email || "-"}</p>
@@ -283,12 +283,12 @@ const TeamApplicationWizard = () => {
             <p className="text-xs uppercase tracking-wide text-slate-500">Tournament</p>
             <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">{team?.tournament_name || "Unnamed tournament"}</p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/40">
+          {/* <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/40">
             <p className="text-xs uppercase tracking-wide text-slate-500">Current Roster / Max</p>
             <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">
               {(currentPlayers ?? "-") + " / " + (maxPlayers ?? "-")}
             </p>
-          </div>
+          </div> */}
         </div>
       </DashboardCard>
 

@@ -1247,7 +1247,7 @@ const UserManagement = ({ managementPage = "users" }) => {
       tournamentId: selectedTournamentId ? Number(selectedTournamentId) : null,
     });
   };
-  const closeUserProfile = useCallback(() => {}, []);
+  const closeUserProfile = useCallback(() => { }, []);
 
   const accountsColumns = [
     {
@@ -1331,13 +1331,13 @@ const UserManagement = ({ managementPage = "users" }) => {
       {managementPage === "users" ? <SectionTabs tabs={USER_SECTIONS} activeTab={activeTab} onChange={setActiveTab} /> : null}
 
       {refsLoading ? <LoadingState message="Loading user management references..." /> : null}
-      <InlineAlert
+      {/* <InlineAlert
         message={refsError}
         tone="error"
         actionLabel="Retry"
         onAction={() => void loadRefs()}
-        actionClassName={BTN_GHOST}
-      />
+        actionClass Name={BTN_GHOST}
+      /> */}
 
       {activeTab === "all_accounts" ? (
         <DashboardCard className="space-y-4">
@@ -1466,11 +1466,10 @@ const UserManagement = ({ managementPage = "users" }) => {
             </div>
           ) : (
             <div
-              className={`rounded-lg px-3 py-2 text-sm ${
-                departmentsWithoutManagers.length === 0
-                  ? "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300"
-                  : "border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
-              }`}
+              className={`rounded-lg px-3 py-2 text-sm ${departmentsWithoutManagers.length === 0
+                ? "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300"
+                : "border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
+                }`}
             >
               {managerCompletenessMessage}
             </div>
@@ -1524,11 +1523,10 @@ const UserManagement = ({ managementPage = "users" }) => {
             </div>
           ) : (
             <div
-              className={`rounded-lg px-3 py-2 text-sm ${
-                sportsWithoutFacilitators.length === 0
-                  ? "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300"
-                  : "border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
-              }`}
+              className={`rounded-lg px-3 py-2 text-sm ${sportsWithoutFacilitators.length === 0
+                ? "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300"
+                : "border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
+                }`}
             >
               {facilitatorCompletenessMessage}
             </div>
@@ -1645,155 +1643,155 @@ const UserManagement = ({ managementPage = "users" }) => {
             { header: "Actions", render: (row) => <details className="relative"><summary className="cursor-pointer list-none rounded-lg border border-slate-200 px-3 py-1.5 font-bold dark:border-slate-700">•••</summary><div className="absolute right-0 z-20 mt-1 grid min-w-40 rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"><button type="button" onClick={() => openUserProfile(row)} className="rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800">View Profile</button><button type="button" onClick={() => openStaffRemoveConfirm(row.sport_id, row.user_id)} className="rounded-md px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/30">Remove Assignment</button></div></details> },
           ]} data={staffAssignmentRows} keyExtractor={(row) => `${row.sport_id}-${row.user_id}-${row.id || row.assigned_role}`} />}
           <div className="hidden" aria-hidden="true">
-          {staffLoading ? (
-            <LoadingState message="Loading staff assignments..." />
-          ) : sports.length === 0 ? (
-            <EmptyState title="No sports found" message="Staff summary is unavailable without sports." icon={FolderOpen} />
-          ) : (
-            <>
-              <DataTable
-                columns={[
-                  { header: "Sport", render: (row) => getSportDisplayName(row) },
-                  { header: "Assigned Staff Count", render: (row) => row.count },
-                  {
-                    header: "Staff Roles",
-                    render: (row) => {
-                      const labels = Object.entries(row.roles).map(([role, count]) => `${role} (${count})`);
-                      return labels.length > 0 ? labels.join(", ") : "No staff assigned";
+            {staffLoading ? (
+              <LoadingState message="Loading staff assignments..." />
+            ) : sports.length === 0 ? (
+              <EmptyState title="No sports found" message="Staff summary is unavailable without sports." icon={FolderOpen} />
+            ) : (
+              <>
+                <DataTable
+                  columns={[
+                    { header: "Sport", render: (row) => getSportDisplayName(row) },
+                    { header: "Assigned Staff Count", render: (row) => row.count },
+                    {
+                      header: "Staff Roles",
+                      render: (row) => {
+                        const labels = Object.entries(row.roles).map(([role, count]) => `${role} (${count})`);
+                        return labels.length > 0 ? labels.join(", ") : "No staff assigned";
+                      },
                     },
-                  },
-                  {
-                    header: "Status",
-                    render: (row) => (
-                      <StatusBadge
-                        status={row.count > 0 ? "ACTIVE" : "PENDING"}
-                        customLabel={row.count > 0 ? "Assigned" : "Missing"}
+                    {
+                      header: "Status",
+                      render: (row) => (
+                        <StatusBadge
+                          status={row.count > 0 ? "ACTIVE" : "PENDING"}
+                          customLabel={row.count > 0 ? "Assigned" : "Missing"}
+                        />
+                      ),
+                    },
+                    {
+                      header: "Actions",
+                      render: (row) => (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className={BTN_GHOST}
+                            onClick={() => setSelectedStaffSportId(String(row.sport_id))}
+                          >
+                            View Assignments
+                          </button>
+                          <button
+                            type="button"
+                            className={BTN_PRIMARY}
+                            onClick={() => {
+                              setSelectedStaffSportId(String(row.sport_id));
+                              setTimeout(openStaffAssignModal, 0);
+                            }}
+                          >
+                            Assign
+                          </button>
+                        </div>
+                      ),
+                    },
+                  ]}
+                  data={sports.map((sport) => {
+                    const sportId = Number(sport.id);
+                    const summary = staffCountsBySport[sportId] || { count: 0, roles: {} };
+                    return {
+                      sport_id: sportId,
+                      sport_name: sport.sport_name || sport.name || "Unassigned sport",
+                      count: summary.count,
+                      roles: summary.roles,
+                    };
+                  })}
+                  keyExtractor={(row) => row.sport_id}
+                />
+
+                <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
+                  <div className="mb-3 flex items-center gap-2">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Selected Sport</label>
+                    <select
+                      value={selectedStaffSportId}
+                      onChange={(event) => setSelectedStaffSportId(event.target.value)}
+                      className={INPUT_CLS}
+                    >
+                      <option value="">Select sport</option>
+                      {sports.map((sport) => (
+                        <option key={sport.id} value={sport.id}>
+                          {getSportDisplayName(sport)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selectedStaffSportId ? (
+                    selectedStaffRows.length === 0 ? (
+                      <EmptyState
+                        title={`No staff assigned to ${sportById[Number(selectedStaffSportId)] || "selected sport"}`}
+                        message="Use Assign Staff/Official to add assignment."
+                        icon={FolderOpen}
                       />
-                    ),
-                  },
-                  {
-                    header: "Actions",
-                    render: (row) => (
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className={BTN_GHOST}
-                          onClick={() => setSelectedStaffSportId(String(row.sport_id))}
-                        >
-                          View Assignments
-                        </button>
-                        <button
-                          type="button"
-                          className={BTN_PRIMARY}
-                          onClick={() => {
-                            setSelectedStaffSportId(String(row.sport_id));
-                            setTimeout(openStaffAssignModal, 0);
-                          }}
-                        >
-                          Assign
-                        </button>
-                      </div>
-                    ),
-                  },
-                ]}
-                data={sports.map((sport) => {
-                  const sportId = Number(sport.id);
-                  const summary = staffCountsBySport[sportId] || { count: 0, roles: {} };
-                  return {
-                    sport_id: sportId,
-                    sport_name: sport.sport_name || sport.name || "Unassigned sport",
-                    count: summary.count,
-                    roles: summary.roles,
-                  };
-                })}
-                keyExtractor={(row) => row.sport_id}
-              />
-
-              <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
-                <div className="mb-3 flex items-center gap-2">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Selected Sport</label>
-                  <select
-                    value={selectedStaffSportId}
-                    onChange={(event) => setSelectedStaffSportId(event.target.value)}
-                    className={INPUT_CLS}
-                  >
-                    <option value="">Select sport</option>
-                    {sports.map((sport) => (
-                      <option key={sport.id} value={sport.id}>
-                        {getSportDisplayName(sport)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {selectedStaffSportId ? (
-                  selectedStaffRows.length === 0 ? (
-                    <EmptyState
-                      title={`No staff assigned to ${sportById[Number(selectedStaffSportId)] || "selected sport"}`}
-                      message="Use Assign Staff/Official to add assignment."
-                      icon={FolderOpen}
-                    />
-                  ) : (
-                    <DataTable
-                      columns={[
-                        {
-                          header: "Account",
-                          render: (row) => (
-                            <div>
-                              {Number(row.user_id || 0) > 0 ? (
-                                <button
-                                  type="button"
-                                  onClick={() => openUserProfile(row)}
-                                  className="font-semibold text-blue-700 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
-                                >
-                                  {row.name || "Unknown user"}
-                                </button>
-                              ) : (
-                                <p className="font-semibold text-slate-900 dark:text-slate-100">
-                                  {row.name || "Profile unavailable"}
-                                </p>
-                              )}
-                              <p className="text-xs text-slate-500 dark:text-slate-400">{row.email || "-"}</p>
-                            </div>
-                          ),
-                        },
-                        { header: "Staff Assignment", render: (row) => row.assigned_role || row.role || "-" },
-                        { header: "Status", render: (row) => <StatusBadge status={String(row.status || "").toUpperCase() || "ACTIVE"} /> },
-                        { header: "Assigned Date", render: (row) => fmtDateTime(row.assigned_at) },
-                        {
-                          header: "Actions",
-                          render: (row) => (
-                            <div className="flex flex-wrap gap-2">
-                              {Number(row.user_id || 0) > 0 ? (
+                    ) : (
+                      <DataTable
+                        columns={[
+                          {
+                            header: "Account",
+                            render: (row) => (
+                              <div>
+                                {Number(row.user_id || 0) > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => openUserProfile(row)}
+                                    className="font-semibold text-blue-700 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+                                  >
+                                    {row.name || "Unknown user"}
+                                  </button>
+                                ) : (
+                                  <p className="font-semibold text-slate-900 dark:text-slate-100">
+                                    {row.name || "Profile unavailable"}
+                                  </p>
+                                )}
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{row.email || "-"}</p>
+                              </div>
+                            ),
+                          },
+                          { header: "Staff Assignment", render: (row) => row.assigned_role || row.role || "-" },
+                          { header: "Status", render: (row) => <StatusBadge status={String(row.status || "").toUpperCase() || "ACTIVE"} /> },
+                          { header: "Assigned Date", render: (row) => fmtDateTime(row.assigned_at) },
+                          {
+                            header: "Actions",
+                            render: (row) => (
+                              <div className="flex flex-wrap gap-2">
+                                {Number(row.user_id || 0) > 0 ? (
+                                  <button
+                                    type="button"
+                                    className={BTN_GHOST}
+                                    onClick={() => openUserProfile(row)}
+                                  >
+                                    View Profile
+                                  </button>
+                                ) : null}
                                 <button
                                   type="button"
                                   className={BTN_GHOST}
-                                  onClick={() => openUserProfile(row)}
+                                  onClick={() => openStaffRemoveConfirm(row.sport_id, row.user_id)}
                                 >
-                                  View Profile
+                                  Remove Assignment
                                 </button>
-                              ) : null}
-                              <button
-                                type="button"
-                                className={BTN_GHOST}
-                                onClick={() => openStaffRemoveConfirm(row.sport_id, row.user_id)}
-                              >
-                                Remove Assignment
-                              </button>
-                            </div>
-                          ),
-                        },
-                      ]}
-                      data={selectedStaffRows}
-                      keyExtractor={(row) => `${row.sport_id}-${row.user_id}-${row.id || row.assigned_role}`}
-                    />
-                  )
-                ) : (
-                  <EmptyState title="Select a sport" message="Choose a sport to view assignments." icon={FolderOpen} />
-                )}
-              </div>
-            </>
-          )}
+                              </div>
+                            ),
+                          },
+                        ]}
+                        data={selectedStaffRows}
+                        keyExtractor={(row) => `${row.sport_id}-${row.user_id}-${row.id || row.assigned_role}`}
+                      />
+                    )
+                  ) : (
+                    <EmptyState title="Select a sport" message="Choose a sport to view assignments." icon={FolderOpen} />
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </DashboardCard>
       ) : null}
@@ -1810,37 +1808,37 @@ const UserManagement = ({ managementPage = "users" }) => {
           {refsLoading ? <LoadingState message="Loading departments..." /> : null}
 
           {!refsLoading ? (
-          <div className="max-w-xl">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
-              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                <Building2 size={14} />
-                Create Department
+            <div className="max-w-xl">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  <Building2 size={14} />
+                  Create Department
+                </div>
+                <div className="space-y-2">
+                  <input
+                    value={departmentForm.department_code}
+                    onChange={(event) => setDepartmentForm((previous) => ({ ...previous, department_code: event.target.value }))}
+                    className={INPUT_CLS}
+                    placeholder="Department code (e.g. CITE)"
+                  />
+                  <input
+                    value={departmentForm.department_name}
+                    onChange={(event) => setDepartmentForm((previous) => ({ ...previous, department_name: event.target.value }))}
+                    className={INPUT_CLS}
+                    placeholder="Department name"
+                  />
+                  <button
+                    type="button"
+                    className={BTN_PRIMARY}
+                    onClick={() => void handleDepartmentCreate()}
+                    disabled={departmentBusy}
+                  >
+                    {departmentBusy ? "Saving..." : "Create Department"}
+                  </button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <input
-                  value={departmentForm.department_code}
-                  onChange={(event) => setDepartmentForm((previous) => ({ ...previous, department_code: event.target.value }))}
-                  className={INPUT_CLS}
-                  placeholder="Department code (e.g. CITE)"
-                />
-                <input
-                  value={departmentForm.department_name}
-                  onChange={(event) => setDepartmentForm((previous) => ({ ...previous, department_name: event.target.value }))}
-                  className={INPUT_CLS}
-                  placeholder="Department name"
-                />
-                <button
-                  type="button"
-                  className={BTN_PRIMARY}
-                  onClick={() => void handleDepartmentCreate()}
-                  disabled={departmentBusy}
-                >
-                  {departmentBusy ? "Saving..." : "Create Department"}
-                </button>
-              </div>
-            </div>
 
-          </div>
+            </div>
           ) : null}
 
           {!refsLoading && departments.length === 0 ? (
@@ -1944,7 +1942,7 @@ const UserManagement = ({ managementPage = "users" }) => {
                 Search
                 <input type="search" className={INPUT_CLS} value={departmentDetail.search} placeholder={departmentDetail.tab === "teams" ? "Search team, sport, or coach" : departmentDetail.tab === "entries" ? "Search entry, sport, or type" : "Search player, team, or entry"} onChange={(event) => setDepartmentDetail((previous) => ({ ...previous, search: event.target.value, teamPage: 1, entryPage: 1, playerPage: 1 }))} />
               </label>
-             
+
               <label className="grid min-w-0 flex-1 gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
                 Intramural
                 <select className={INPUT_CLS} value={departmentDetail.tournamentId} disabled={departmentDetail.loading} onChange={(event) => void loadDepartmentTeams(departmentDetail.department, event.target.value)}>
@@ -1953,10 +1951,10 @@ const UserManagement = ({ managementPage = "users" }) => {
                 </select>
               </label>
 
-               <div className="flex shrink-0 rounded-lg bg-slate-200/70 p-1 dark:bg-slate-900" role="tablist" aria-label="Department records">
+              <div className="flex shrink-0 rounded-lg bg-slate-200/70 p-1 dark:bg-slate-900" role="tablist" aria-label="Department records">
                 {[{ id: "teams", label: "Teams" }, { id: "entries", label: "Solo / Duo" }, { id: "players", label: "Players" }].map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={departmentDetail.tab === tab.id} onClick={() => setDepartmentDetail((previous) => ({ ...previous, tab: tab.id, teamPage: 1, entryPage: 1, playerPage: 1 }))} className={`min-h-10 flex-1 rounded-md px-3 py-2 text-sm font-semibold transition lg:flex-none ${departmentDetail.tab === tab.id ? "bg-white text-blue-700 shadow-sm dark:bg-slate-700 dark:text-blue-300" : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"}`}>{tab.label}</button>)}
               </div>
-              
+
             </div>
           </div>
           <InlineAlert message={departmentDetail.error} tone="error" />
@@ -2238,13 +2236,12 @@ const UserManagement = ({ managementPage = "users" }) => {
                 return (
                   <label
                     key={candidate.user_id}
-                    className={`block rounded-xl border px-3 py-2 ${
-                      alreadyAssigned
-                        ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-70 dark:border-slate-700 dark:bg-slate-800/50"
-                        : Number(staffAssignForm.userId) === Number(candidate.user_id)
-                          ? "border-blue-300 bg-blue-50 dark:border-blue-500/60 dark:bg-blue-500/10"
-                          : "cursor-pointer border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800/40"
-                    }`}
+                    className={`block rounded-xl border px-3 py-2 ${alreadyAssigned
+                      ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-70 dark:border-slate-700 dark:bg-slate-800/50"
+                      : Number(staffAssignForm.userId) === Number(candidate.user_id)
+                        ? "border-blue-300 bg-blue-50 dark:border-blue-500/60 dark:bg-blue-500/10"
+                        : "cursor-pointer border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800/40"
+                      }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>

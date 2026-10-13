@@ -41,7 +41,7 @@ const VenueScheduleFilterBar = ({
       className="flex flex-none flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-2.5 shadow-sm shadow-slate-200/30 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/50 dark:shadow-none xl:flex-row xl:items-center xl:justify-between"
       aria-label="Schedule navigation and filters"
     >
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
+      {/* <div className="flex min-w-0 flex-wrap items-center gap-2">
         <span className="mr-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
           <SlidersHorizontal size={14} aria-hidden="true" />
           <span className="sr-only">Schedule filters</span>
@@ -118,7 +118,7 @@ const VenueScheduleFilterBar = ({
             Clear
           </button>
         ) : null}
-      </div>
+      </div> */}
 
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-slate-200/80 pt-2.5 dark:border-slate-800 xl:border-l xl:border-t-0 xl:pl-2.5 xl:pt-0">
         <button

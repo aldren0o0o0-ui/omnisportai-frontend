@@ -17,7 +17,6 @@ const SEGMENT_LABELS = {
   "user-management": "User Management",
   management: "Management",
   "coach-assignments": "Coach Assignments",
-  "assigned-staff": "Staff & Officials",
   approvals: "Entry Approvals",
   "player-applications": "Recruitment",
   "team-registration": "Team Registration",
@@ -25,7 +24,7 @@ const SEGMENT_LABELS = {
   intelligence: "Intelligence",
   analytics: "Analytics",
   notifications: "Notifications",
-  "notification-settings": "Settings",
+  "notification-settings": "Notification Settings",
   "staff-applications": "Staff Applications",
   players: "Players",
   leaderboards: "Leaderboards",
@@ -35,6 +34,8 @@ const SEGMENT_LABELS = {
   "live-scoring": "Live Scoring",
   "result-corrections": "Result Corrections",
   settings: "Settings",
+  appearance: "Appearance",
+  about: "About",
 };
 
 export const buildBreadcrumbs = (pathname) => {

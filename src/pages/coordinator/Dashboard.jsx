@@ -33,6 +33,7 @@ import { getChampionshipStandings } from "../../services/standingsService";
 import { getBrackets } from "../../services/bracketService";
 import { getTournamentTeamRegistrations } from "../../services/teamService";
 import { listEntries } from "../../services/competitionEntryService";
+import { isHiddenSport } from "../../utils/sportVisibility";
 import { getSports } from "../../services/sportService";
 import { deriveCompetitionSetupProgress, deriveStaffCoverage } from "./coordinatorSetupProgress";
 
@@ -120,7 +121,7 @@ const Dashboard = () => {
     loading: dashboardLoading,
     error,
   } = useRoleDashboardData({ autoRefreshOnTournamentChange: true });
-  const activeIntramural = selectedIntramural || activeWorkspace || null;
+  const activeIntramural = selectedIntramural || null;
   const dashboardTournamentRows = useMemo(
     () => (Array.isArray(tournaments) ? tournaments : []),
     [tournaments]
@@ -135,20 +136,8 @@ const Dashboard = () => {
   }, [dashboardTournamentRows, selectedTournamentId]);
   const displayedIntramural = useMemo(() => {
     if (activeIntramural) return activeIntramural;
-    if (!selectedDashboardTournament?.workspace_id) return null;
-    return {
-      id: Number(selectedDashboardTournament.workspace_id),
-      name: selectedDashboardTournament.workspace_name || selectedDashboardTournament.name,
-      school_year: selectedDashboardTournament.school_year || "",
-      semester: selectedDashboardTournament.semester || "",
-      description: selectedDashboardTournament.description || "",
-      start_date: selectedDashboardTournament.start_date || selectedDashboardTournament.start_at || null,
-      end_date: selectedDashboardTournament.end_date || selectedDashboardTournament.end_at || null,
-      status: selectedDashboardTournament.status || "DRAFT",
-      is_active: Boolean(selectedDashboardTournament.is_active),
-      started_at: selectedDashboardTournament.started_at || null,
-    };
-  }, [activeIntramural, selectedDashboardTournament]);
+    return null;
+  }, [activeIntramural]);
   const displayedManageTo = "/coordinator/intramurals";
   const displayedWorkspaceId = displayedIntramural?.id ? Number(displayedIntramural.id) : null;
   const selectedTournamentNumericId = Number(selectedTournamentId || selectedDashboardTournament?.id || 0);
@@ -487,6 +476,7 @@ const Dashboard = () => {
       .map(decorate)
       .sort((left, right) => Number(left.complete) - Number(right.complete) || right.missing - left.missing || left.name.localeCompare(right.name));
     const sports = [...sportMap.values()]
+      .filter((row) => !isHiddenSport(row))
       .map(decorate)
       .sort((left, right) => Number(left.complete) - Number(right.complete) || right.missing - left.missing || left.name.localeCompare(right.name));
 
@@ -981,11 +971,10 @@ const Dashboard = () => {
     setSelectedSetupStepKey(item.key);
   }, []);
 
-  // Intramural-first empty state: no active intramural → one clear CTA, no empty widgets.
-  if (!intramuralLoading && !dashboardLoading && !displayedIntramural && dashboardTournamentRows.length === 0) {
+  // Intramural-first empty state: no selected intramural → show welcome and create CTA, no empty widgets.
+  if (!intramuralLoading && !selectedIntramural) {
     return (
-      <div className="os-page-shell mx-auto max-w-[1600px] gap-6 px-2 pb-1 sm:px-3 lg:px-4">
-        <PageHeaderCard title="Intramural Overview" />
+      <div className="os-page-shell mx-auto w-full max-w-[1600px] pb-4">
         <EmptyIntramuralState role="coordinator" />
       </div>
     );

@@ -1,4 +1,5 @@
 import React from "react";
+import { Trophy } from "lucide-react";
 
 const toneClasses = {
   success: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200",
@@ -22,6 +23,8 @@ export default function TallyBoardShell({
   isUndoing,
   onUndo,
   secondaryPanels,
+  canDeclareWinner,
+  onDeclareWinner,
 }) {
   const blockedDescriptionId = blockingMessage ? "tally-board-blocked-reason" : undefined;
   return (
@@ -40,6 +43,17 @@ export default function TallyBoardShell({
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${toneClasses[connection?.tone] || toneClasses.neutral}`} role="status">
               {connection?.label || "Connecting"}
             </span>
+            {canDeclareWinner && (
+              <button
+                type="button"
+                onClick={onDeclareWinner}
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 text-xs font-bold text-amber-800 shadow-xs transition hover:border-amber-400 hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500/25"
+                title="Directly declare winner and final score if tally board was not used"
+              >
+                <Trophy size={14} className="text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                Declare Winner
+              </button>
+            )}
             <button type="button" onClick={onRefresh} className="min-h-10 rounded-lg border border-[var(--border-soft)] px-3 text-xs font-semibold hover:bg-[var(--surface-muted)]">Refresh</button>
             <button type="button" onClick={onExit} className="min-h-10 rounded-lg border border-[var(--border-soft)] px-3 text-xs font-semibold hover:bg-[var(--surface-muted)]">Exit</button>
           </div>

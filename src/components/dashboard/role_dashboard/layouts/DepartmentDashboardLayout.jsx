@@ -9,9 +9,12 @@ import { getDepartmentCoachAssignments } from "../../../../services/tournamentSe
 import { getManagedCompetitionParticipants } from "../../../../services/competitionParticipantService";
 import { getScheduleEvents } from "../../../../services/scheduleService";
 import { getSportDisplayName } from "../../../../utils/tournamentEventCategories";
+import { listEntries } from "../../../../services/competitionEntryService";
+import { getTournamentTeamRegistrations, getTeams } from "../../../../services/teamService";
 import {
   AnnouncementTimeline,
   buildAnnouncementTimeline,
+  buildShowcaseEntries,
   deriveTournamentPhase,
   resolveDashboardLifecycleStage,
   findTableByKeywords,
@@ -29,6 +32,7 @@ import {
 import { mapChampionshipLeaderboard, mapChampionshipSportBreakdown } from "./dashboardStandingsUtils.js";
 import { DashboardStageSwitcher, LiveDashboardStage } from "./DashboardLifecycleStages";
 import { useProfileDrawer } from "../../../profile";
+import { useAuth } from "../../../../context/AuthContext";
 import TeamDetailsDrawer from "../../../dashboard/TeamDetailsDrawer";
 import DepartmentOperationsDashboard from "./DepartmentOperationsDashboard";
 
@@ -39,11 +43,15 @@ const DepartmentDashboardLayout = ({
   workspaceId = null,
 }) => {
   const { openProfile } = useProfileDrawer();
+  const { user } = useAuth();
   const [championship, setChampionship] = useState(null);
   const [championshipUnavailable, setChampionshipUnavailable] = useState(false);
   const [brackets, setBrackets] = useState([]);
   const [coachTargets, setCoachTargets] = useState([]);
   const [directoryParticipants, setDirectoryParticipants] = useState([]);
+  const [teamRegistrations, setTeamRegistrations] = useState([]);
+  const [competitionEntries, setCompetitionEntries] = useState([]);
+  const [allTeams, setAllTeams] = useState([]);
   const [userSelectedStage, setUserSelectedStage] = useState(null);
   const [selectedSportGroup, setSelectedSportGroup] = useState(null);
 
@@ -94,12 +102,17 @@ const DepartmentDashboardLayout = ({
       try {
         setChampionship(null);
         setChampionshipUnavailable(false);
-        const [champData, bracketsData, coachData, directoryRows, schedulePayload] = await Promise.all([
+        const [champData, bracketsData, coachData, directoryRows, schedulePayload, teamPayload, entryPayload, allTeamsPayload] = await Promise.all([
           getChampionshipStandings({ tournamentId }).catch(() => null),
           getBrackets().catch(() => []),
           tournamentId ? getDepartmentCoachAssignments(Number(tournamentId)).catch(() => []) : [],
           tournamentId && Number(workspaceId) > 0 ? getManagedCompetitionParticipants({ workspaceId: Number(workspaceId), tournamentId: Number(tournamentId), includeMembers: true }).catch(() => []) : [],
           tournamentId ? getScheduleEvents(Number(tournamentId)).catch(() => ({ events: [] })) : Promise.resolve({ events: [] }),
+          tournamentId
+            ? getTournamentTeamRegistrations(Number(tournamentId), { status: "ALL", page: 1, limit: 200 }).catch(() => [])
+            : [],
+          tournamentId ? listEntries({ tournamentId: Number(tournamentId) }).catch(() => []) : [],
+          tournamentId ? getTeams(null, Number(tournamentId)).catch(() => []) : getTeams().catch(() => []),
         ]);
         if (!active) return;
         setChampionship(champData || null);
@@ -107,6 +120,23 @@ const DepartmentDashboardLayout = ({
         if (Array.isArray(bracketsData)) setBrackets(bracketsData);
         if (Array.isArray(coachData)) setCoachTargets(coachData);
         setDirectoryParticipants(Array.isArray(directoryRows) ? directoryRows : []);
+        setTeamRegistrations(
+          Array.isArray(teamPayload)
+            ? teamPayload
+            : Array.isArray(teamPayload?.items)
+              ? teamPayload.items
+              : Array.isArray(teamPayload?.rows)
+                ? teamPayload.rows
+                : []
+        );
+        setCompetitionEntries(Array.isArray(entryPayload) ? entryPayload : []);
+        setAllTeams(
+          Array.isArray(allTeamsPayload)
+            ? allTeamsPayload
+            : Array.isArray(allTeamsPayload?.items)
+              ? allTeamsPayload.items
+              : []
+        );
         setScheduleEvents(
           Array.isArray(schedulePayload?.events)
             ? schedulePayload.events
@@ -347,19 +377,16 @@ const DepartmentDashboardLayout = ({
     { value: "live", label: "Live Center & Leaderboard", icon: Radio },
   ];
 
-  const showcaseEntries = useMemo(() => directoryParticipants.map((row) => ({
-    id: `entry-${row.entry_id}`,
-    entry_id: row.entry_id,
-    team_id: row.team_id,
-    name: row.display_name,
-    imageUrl: row.image_url,
-    meta: [row.sport_name, row.participant_shape, row.department_code || row.department_name].filter(Boolean).join(" · "),
-    department_id: row.department_id,
-    department_code: row.department_code,
-    department_name: row.department_name,
-    participant_shape: row.participant_shape,
-    members: row.members,
-  })), [directoryParticipants]);
+  const showcaseEntries = useMemo(
+    () => buildShowcaseEntries({
+      teamRegistrations,
+      competitionEntries,
+      teams: allTeams,
+      events,
+      dashboard,
+    }),
+    [teamRegistrations, competitionEntries, allTeams, events, dashboard]
+  );
 
   return (
     <div className="space-y-5 w-full min-w-0 max-w-full overflow-hidden">
@@ -493,7 +520,7 @@ const DepartmentDashboardLayout = ({
 
       {/* STAGE 3: Live Center & Leaderboard */}
       {effectiveStage === "live" && (
-        <LiveDashboardStage events={events} sports={displaySports} entries={showcaseEntries} tournamentId={tournamentId} scheduleHref="/department/schedules" scoreBasePath="/department/matches" standingsHref="/department/standings" entriesHref="/department/teams" departmentRows={olympicLeaderboard} breakdownRows={sportBreakdown} standingsUnavailable={championshipUnavailable} userDepartmentId={Array.from(scopeDepartments)[0] || null} matchCenterProps={{ events: operationalEvents, roleTitle: "Live Match Center", emptyTitle: "No department matches scheduled right now", emptyDescription: "Your department's match fixtures will appear here once scheduled." }}>
+        <LiveDashboardStage events={events} sports={displaySports} entries={showcaseEntries} tournamentId={tournamentId} scheduleHref="/department/schedules" scoreBasePath="/department/matches" standingsHref="/department/standings" entriesHref="/department/teams" departmentRows={olympicLeaderboard} breakdownRows={sportBreakdown} standingsUnavailable={championshipUnavailable} userDepartmentId={user?.department_id || Array.from(scopeDepartments)[0] || null} matchCenterProps={{ events: operationalEvents, roleTitle: "Live Match Center", emptyTitle: "No department matches scheduled right now", emptyDescription: "Your department's match fixtures will appear here once scheduled." }}>
           {announcements.length > 0 ? (
             <DashboardCard>
               <PanelHeader icon={Megaphone} title="Department Announcements" action={{ label: "View all", to: "/department/announcements" }} />

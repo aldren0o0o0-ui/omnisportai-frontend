@@ -6,7 +6,7 @@ import {
   CalendarDays,
   CalendarRange,
   Megaphone,
-  History,
+  ListOrdered,
   MapPin,
 } from "lucide-react";
 import { flattenSidebarGroups } from "./sidebarTypes";
@@ -27,13 +27,12 @@ export const sportFacilitatorSidebarGroups = [
     label: "Competition",
     icon: Trophy,
     items: [
-      { label: "Staff & Officials", icon: Users, path: "/sport-facilitator/assigned-staff" },
       { label: "Teams & Entries", icon: Users, path: "/sport-facilitator/teams-and-players" },
       { label: "Intramurals", icon: CalendarRange, path: "/sport-facilitator/intramurals" },
       { label: "Schedules", icon: CalendarDays, path: "/sport-facilitator/schedules" },
       { label: "Brackets", icon: Trophy, path: "/sport-facilitator/brackets" },
       { label: "Standings", icon: BarChart3, path: "/sport-facilitator/standings" },
-      { label: "Result Corrections", icon: History, path: "/sport-facilitator/result-corrections" },
+      { label: "Results", icon: ListOrdered, path: "/sport-facilitator/results" },
     ],
   },
   {

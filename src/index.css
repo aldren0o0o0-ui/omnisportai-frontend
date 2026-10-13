@@ -205,6 +205,8 @@ textarea {
   position: sticky;
   top: 0;
   z-index: 50;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
 }
 
 .os-sidebar.collapsed {
@@ -576,6 +578,7 @@ textarea {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
   border: 1px solid var(--border-soft);
   border-radius: 14px;
   background: var(--surface);
@@ -665,6 +668,9 @@ textarea {
   margin-left: auto;
   margin-right: auto;
   width: 100%;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .os-screen {
@@ -912,6 +918,7 @@ body {
   overflow-x: clip;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  scroll-behavior: smooth;
 }
 
 html::-webkit-scrollbar,
@@ -2984,3 +2991,72 @@ a:focus-visible {
     animation: none;
   }
 }
+
+/* ── Rich Text Editor & Output Typography Styles ── */
+.rich-text-editor-content,
+.rich-text-content {
+  line-height: 1.625;
+}
+
+.rich-text-editor-content ul,
+.rich-text-content ul {
+  list-style-type: disc !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+  padding-left: 1.75rem !important;
+}
+
+.rich-text-editor-content ol,
+.rich-text-content ol {
+  list-style-type: decimal !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+  padding-left: 1.75rem !important;
+}
+
+.rich-text-editor-content li,
+.rich-text-content li {
+  display: list-item !important;
+  list-style-position: outside !important;
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+  padding-left: 0.25rem !important;
+}
+
+.rich-text-editor-content ul li,
+.rich-text-content ul li {
+  list-style-type: disc !important;
+}
+
+.rich-text-editor-content ol li,
+.rich-text-content ol li {
+  list-style-type: decimal !important;
+}
+
+.rich-text-editor-content ul ul,
+.rich-text-content ul ul {
+  list-style-type: circle !important;
+  padding-left: 1.25rem !important;
+}
+
+.rich-text-editor-content ol ol,
+.rich-text-content ol ol {
+  list-style-type: lower-alpha !important;
+  padding-left: 1.25rem !important;
+}
+
+.rich-text-editor-content blockquote,
+.rich-text-content blockquote {
+  border-left: 4px solid #10b981 !important;
+  padding-left: 0.75rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+  font-style: italic !important;
+  color: #64748b !important;
+}
+
+.dark .rich-text-editor-content blockquote,
+.dark .rich-text-content blockquote {
+  color: #94a3b8 !important;
+}
+

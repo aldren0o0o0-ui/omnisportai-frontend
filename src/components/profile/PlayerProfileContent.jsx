@@ -1,12 +1,24 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useContext } from "react";
 import PlayerSportSelector from "./PlayerSportSelector";
 import PlayerMetricCards from "./PlayerMetricCards";
 import PlayerPerformanceChart from "./PlayerPerformanceChart";
 import PlayerMatchHistory from "./PlayerMatchHistory";
 import { Shield, Users, Activity } from "lucide-react";
 import { isRecordForSport } from "./profileUtils";
+import ProfileDrawerContext, { useProfileDrawer } from "./ProfileDrawerContext";
+
+const getInitials = (name) => {
+  if (!name || typeof name !== "string") return "P";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "P";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
 
 export const PlayerProfileContent = ({ profile = {} }) => {
+  const drawerCtx = useContext(ProfileDrawerContext);
+  const openProfile = drawerCtx?.openProfile;
+
   const sports = useMemo(() => {
     return Array.isArray(profile?.sports) ? profile.sports : [];
   }, [profile?.sports]);
@@ -236,46 +248,116 @@ export const PlayerProfileContent = ({ profile = {} }) => {
               const eventTitle = part.event_name || null;
               const tournamentTitle = part.tournament || null;
               const deptTitle = part.department || part.department_name || null;
-              const teammates = Array.isArray(part.teammates) ? part.teammates : [];
+              const teammates =
+                Array.isArray(part.teammates_detailed) && part.teammates_detailed.length > 0
+                  ? part.teammates_detailed
+                  : Array.isArray(part.teammates)
+                  ? part.teammates
+                  : [];
 
               return (
                 <div
                   key={part.entry_id || idx}
-                  className="flex flex-col gap-1 rounded-lg border border-[var(--border-soft)] bg-[var(--surface)] p-2 text-xs text-[var(--text-main)]"
+                  className="flex flex-col gap-1 p-2 text-xs text-[var(--text-main)]"
                   data-testid={`participation-card-${part.entry_id || idx}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0 font-semibold">
-                      <Shield size={12} className="text-[var(--primary)] shrink-0" aria-hidden="true" />
-                      <span className="truncate">{entryTitle}</span>
-                      {eventTitle ? (
+                      {/* <Shield size={12} className="text-[var(--primary)] shrink-0" aria-hidden="true" />
+                      <span className="truncate">{entryTitle}</span> */}
+                      {/* {eventTitle ? (
                         <span className="text-[var(--text-muted)] font-normal truncate">
                           ({eventTitle})
                         </span>
-                      ) : null}
+                      ) : null} */}
                     </div>
-                    {part.participant_shape ? (
+                    {/* {part.participant_shape ? (
                       <span className="shrink-0 rounded bg-[var(--surface-muted)] px-1.5 py-0.2 text-[10px] font-bold text-[var(--text-muted)]">
                         {part.participant_shape}
                       </span>
-                    ) : null}
+                    ) : null} */}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-[var(--text-soft)]">
-                    {tournamentTitle ? (
-                      <span className="font-medium text-[var(--primary)]">
-                        🏆 {tournamentTitle}
-                      </span>
-                    ) : null}
-                    {deptTitle && deptTitle !== entryTitle ? (
-                      <span>· {deptTitle}</span>
-                    ) : null}
-                    {teammates.length > 0 ? (
-                      <span className="text-[var(--text-muted)]">
-                        · Partner/Teammates: {teammates.join(", ")}
-                      </span>
-                    ) : null}
-                  </div>
+                  {/* {(tournamentTitle || (deptTitle && deptTitle !== entryTitle)) ? (
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-soft)]">
+                      {tournamentTitle ? (
+                        <span className="inline-flex items-center gap-1 font-medium text-[var(--primary)]">
+                          🏆 {tournamentTitle}
+                        </span>
+                      ) : null}
+                      {deptTitle && deptTitle !== entryTitle ? (
+                        <span className="text-[var(--text-muted)]">· {deptTitle}</span>
+                      ) : null}
+                    </div>
+                  ) : null} */}
+
+                  {/* Modern Formal Roster / Teammates List */}
+                  {teammates.length > 0 ? (
+                    <div className="mt-2 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-semibold text-[10px] uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                          <Users size={12} className="text-[var(--primary)]" aria-hidden="true" />
+                          Partner/Teammates
+                        </span>
+                        <span className="rounded-full bg-[var(--surface-muted)] border border-[var(--border-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--text-muted)]">
+                          {teammates.length} {teammates.length === 1 ? "player" : "players"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-1.5">
+                        {teammates.map((teammate, tIdx) => {
+                          const tmName =
+                            typeof teammate === "string"
+                              ? teammate
+                              : teammate?.name || teammate?.display_name || teammate?.full_name || "Player";
+                          const tmUserId = typeof teammate === "object" ? (teammate?.user_id || null) : null;
+                          const tmPlayerId = typeof teammate === "object" ? (teammate?.player_id || teammate?.id || null) : null;
+                          const initials = getInitials(tmName);
+                          const isDuo = String(part.participant_shape || "").toUpperCase() === "DUO";
+                          const isClickable = Boolean(openProfile && (tmUserId || tmPlayerId));
+
+                          return (
+                            <div
+                              key={tIdx}
+                              className="flex items-center justify-between gap-2 px-2.5 py-1.5 transition-colors hover:bg-[var(--surface-soft)] hover:border-[var(--border-strong)] rounded-lg group"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[9px] font-bold text-[var(--primary)] border border-[var(--primary)]/20 shadow-2xs">
+                                  {initials}
+                                </span>
+                                {isClickable ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openProfile({
+                                        userId: tmUserId,
+                                        playerId: tmPlayerId,
+                                        tournamentId: part.tournament_id || null,
+                                        sportId: part.sport_id || null,
+                                      })
+                                    }
+                                    className="truncate text-xs font-semibold text-[var(--text-main)] hover:text-[var(--primary)] hover:underline text-left cursor-pointer transition-colors focus:outline-hidden"
+                                    title={`View ${tmName}'s profile`}
+                                  >
+                                    {tmName}
+                                  </button>
+                                ) : (
+                                  <span
+                                    className="truncate text-xs font-semibold text-[var(--text-main)]"
+                                    title={tmName}
+                                  >
+                                    {tmName}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="shrink-0 text-[10px] font-medium text-[var(--text-muted)] bg-[var(--surface)] border border-[var(--border-soft)] rounded px-1.5 py-0.5">
+                                {isDuo ? "Partner" : "Roster"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               );
             })}

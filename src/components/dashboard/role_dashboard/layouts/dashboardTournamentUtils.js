@@ -175,40 +175,97 @@ export const buildShowcaseEntries = ({
   dashboard = null,
 } = {}) => {
   const list = [];
-  const seen = new Set();
+  const indexByTeamId = new Map();
+  const indexByEntryId = new Map();
+  const indexByNameSportDept = new Map();
+
+  const normalizeStr = (s) => String(s || "").trim().toLowerCase();
 
   const add = (entryObj) => {
     const name = String(entryObj?.name || "").trim();
-    const key = `${entryObj?.type || "item"}-${entryObj?.teamId || entryObj?.entryId || name}`.toLowerCase();
-    if (name && !seen.has(key)) {
-      seen.add(key);
-      list.push({
-        id: entryObj?.id || `entry-${list.length + 1}`,
-        teamId: entryObj?.teamId ?? null,
-        entryId: entryObj?.entryId ?? null,
-        type: entryObj?.type || "team",
-        name,
-        meta: entryObj?.meta || "Competition entry",
-        imageUrl: entryObj?.imageUrl || null,
-        status: entryObj?.status || "",
-        sport_name: entryObj?.sport_name || "",
-        sport_id: entryObj?.sport_id ?? null,
-        department_name: entryObj?.department_name || "",
-        department_code: entryObj?.department_code || "",
-        department_id: entryObj?.department_id ?? null,
-        coach_name: entryObj?.coach_name || "",
-        coach_id: entryObj?.coach_id ?? null,
-        participant_shape: entryObj?.participant_shape || "Team",
-        tournament_id: entryObj?.tournament_id ?? null,
-        tournament_sport_event_id: entryObj?.tournament_sport_event_id ?? null,
-        members: Array.isArray(entryObj?.members) ? entryObj.members : [],
-        member_count: Number.isFinite(Number(entryObj?.member_count))
-          ? Number(entryObj.member_count)
-          : Array.isArray(entryObj?.members)
-            ? entryObj.members.length
-            : null,
-      });
+    if (!name) return;
+
+    const normName = normalizeStr(name);
+    const normSport = normalizeStr(entryObj.sport_id || entryObj.sport_name || "");
+    const normDept = normalizeStr(entryObj.department_id || entryObj.department_code || entryObj.department_name || "");
+    const nameSportDeptKey = `${normName}|${normSport}|${normDept}`;
+    const nameSportKey = normSport ? `${normName}|${normSport}` : normName;
+
+    const teamId = entryObj.teamId ? Number(entryObj.teamId) : null;
+    const entryId = entryObj.entryId ? Number(entryObj.entryId) : null;
+
+    // Check if we already have this team/entry
+    let existingIndex = -1;
+    if (teamId && indexByTeamId.has(teamId)) {
+      existingIndex = indexByTeamId.get(teamId);
+    } else if (entryId && indexByEntryId.has(entryId)) {
+      existingIndex = indexByEntryId.get(entryId);
+    } else if (indexByNameSportDept.has(nameSportDeptKey)) {
+      existingIndex = indexByNameSportDept.get(nameSportDeptKey);
+    } else if (normSport && indexByNameSportDept.has(nameSportKey)) {
+      existingIndex = indexByNameSportDept.get(nameSportKey);
     }
+
+    if (existingIndex >= 0) {
+      // Merge with existing entry to retain the most complete metadata
+      const existing = list[existingIndex];
+      list[existingIndex] = {
+        ...existing,
+        teamId: existing.teamId || teamId,
+        entryId: existing.entryId || entryId,
+        imageUrl: existing.imageUrl || entryObj.imageUrl || null,
+        status: existing.status || entryObj.status || "",
+        sport_name: existing.sport_name || entryObj.sport_name || "",
+        sport_id: existing.sport_id || entryObj.sport_id || null,
+        department_name: existing.department_name || entryObj.department_name || "",
+        department_code: existing.department_code || entryObj.department_code || "",
+        department_id: existing.department_id || entryObj.department_id || null,
+        coach_name: existing.coach_name || entryObj.coach_name || "",
+        coach_id: existing.coach_id || entryObj.coach_id || null,
+        participant_shape: existing.participant_shape !== "Team" ? existing.participant_shape : (entryObj.participant_shape || existing.participant_shape),
+        tournament_id: existing.tournament_id || entryObj.tournament_id || null,
+        tournament_sport_event_id: existing.tournament_sport_event_id || entryObj.tournament_sport_event_id || null,
+        members: (Array.isArray(existing.members) && existing.members.length > 0) ? existing.members : (entryObj.members || []),
+        member_count: existing.member_count ?? entryObj.member_count ?? null,
+      };
+      if (teamId) indexByTeamId.set(teamId, existingIndex);
+      if (entryId) indexByEntryId.set(entryId, existingIndex);
+      return;
+    }
+
+    const newIndex = list.length;
+    const newEntry = {
+      id: entryObj?.id || `entry-${newIndex + 1}`,
+      teamId,
+      entryId,
+      type: entryObj?.type || "team",
+      name,
+      meta: entryObj?.meta || "Competition entry",
+      imageUrl: entryObj?.imageUrl || null,
+      status: entryObj?.status || "",
+      sport_name: entryObj?.sport_name || "",
+      sport_id: entryObj?.sport_id ?? null,
+      department_name: entryObj?.department_name || "",
+      department_code: entryObj?.department_code || "",
+      department_id: entryObj?.department_id ?? null,
+      coach_name: entryObj?.coach_name || "",
+      coach_id: entryObj?.coach_id ?? null,
+      participant_shape: entryObj?.participant_shape || "Team",
+      tournament_id: entryObj?.tournament_id ?? null,
+      tournament_sport_event_id: entryObj?.tournament_sport_event_id ?? null,
+      members: Array.isArray(entryObj?.members) ? entryObj.members : [],
+      member_count: Number.isFinite(Number(entryObj?.member_count))
+        ? Number(entryObj.member_count)
+        : Array.isArray(entryObj?.members)
+          ? entryObj.members.length
+          : null,
+    };
+
+    list.push(newEntry);
+    if (teamId) indexByTeamId.set(teamId, newIndex);
+    if (entryId) indexByEntryId.set(entryId, newIndex);
+    indexByNameSportDept.set(nameSportDeptKey, newIndex);
+    if (normSport) indexByNameSportDept.set(nameSportKey, newIndex);
   };
 
   // 1. Team registrations

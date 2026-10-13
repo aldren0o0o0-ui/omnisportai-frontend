@@ -12,6 +12,8 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
+  Clock,
+  Lock,
 } from "lucide-react";
 import { resolveMediaUrl } from "../../../utils/media";
 import {
@@ -112,6 +114,7 @@ const ApplicantWorkspaceSection = ({
   const [selectedPlayerIds, setSelectedPlayerIds] = useState([]);
   const [finalizeModalOpen, setFinalizeModalOpen] = useState(false);
   const [finalizeError, setFinalizeError] = useState("");
+  const [rejectConfirmRow, setRejectConfirmRow] = useState(null);
 
   // Default tab follows whether a roster exists; re-evaluated per workspace.
   useEffect(() => {
@@ -243,11 +246,10 @@ const ApplicantWorkspaceSection = ({
         )}
         <div className="min-w-0">
           <div
-            className={`truncate font-semibold ${
-              canViewProfile && linkColor
+            className={`truncate font-semibold ${canViewProfile && linkColor
                 ? "text-blue-700 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
                 : "text-slate-900 dark:text-white"
-            }`}
+              }`}
           >
             {row?.applicant_name || "Unknown user"}
           </div>
@@ -302,18 +304,17 @@ const ApplicantWorkspaceSection = ({
               type="button"
               disabled={!tryoutDone || busy || (usesDraftRosterSelection && selectionAtMaximum && !isSelected)}
               onClick={() => usesDraftRosterSelection ? togglePlayerSelection(row) : onRowDecision?.(row, "ACCEPTED_AS_PLAYER")}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                isSelected
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${isSelected
                   ? "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
                   : "bg-emerald-600 text-white hover:bg-emerald-500"
-              }`}
+                }`}
             >
               {busy ? "..." : isSelected ? "Unselect" : selectionAtMaximum && usesDraftRosterSelection ? "Roster full" : "Select Player"}
             </button>
             <button
               type="button"
               disabled={!tryoutDone || busy}
-              onClick={() => onRowDecision?.(row, "REJECTED")}
+              onClick={() => setRejectConfirmRow(row)}
               className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy ? "..." : "Reject"}
@@ -411,14 +412,25 @@ const ApplicantWorkspaceSection = ({
 
   const isReady = Boolean(workspace?.isReady);
   const isLocked = Boolean(workspace?.isLocked);
+  const isRegistrationOpen = workspace?.isRegistrationOpen !== false;
+  const isPlanning = Boolean(workspace?.registrationWindow?.isPlanning);
+  const isRegistrationClosed = Boolean(workspace?.registrationWindow?.isClosed);
+  const registrationBlockReason = workspace?.registrationBlockReason || "";
+
   const reasons = Array.isArray(workspace?.missingReasons) ? workspace.missingReasons : [];
   const readinessMessage =
     reasons.length > 0
       ? reasons.join(" ")
-      : "Complete the remaining recruitment steps before submitting to the sports facilitator.";
+      : !isRegistrationOpen
+        ? registrationBlockReason
+        : "Complete the remaining recruitment steps before submitting to the sports facilitator.";
   const visibleSubmitError = submitError || (!isReady && !isLocked ? readinessMessage : "");
 
   const handleSubmitClick = () => {
+    if (!isRegistrationOpen) {
+      setSubmitError(registrationBlockReason || "Registration is not open for submission.");
+      return;
+    }
     if (!isReady) {
       setSubmitError(readinessMessage);
       return;
@@ -435,11 +447,10 @@ const ApplicantWorkspaceSection = ({
           <button
             type="button"
             onClick={() => setTab("applicants")}
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
-              tab === "applicants"
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${tab === "applicants"
                 ? "bg-white text-blue-700 shadow-sm dark:bg-slate-900 dark:text-blue-300"
                 : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-            }`}
+              }`}
           >
             Applicants
             <span className="rounded-full bg-slate-200 px-1.5 text-xs font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-200">
@@ -449,11 +460,10 @@ const ApplicantWorkspaceSection = ({
           <button
             type="button"
             onClick={() => setTab("roster")}
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
-              tab === "roster"
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${tab === "roster"
                 ? "bg-white text-blue-700 shadow-sm dark:bg-slate-900 dark:text-blue-300"
                 : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-            }`}
+              }`}
           >
             Accepted Roster
             <span className="rounded-full bg-slate-200 px-1.5 text-xs font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-200">
@@ -657,23 +667,48 @@ const ApplicantWorkspaceSection = ({
                 Already sent for facilitator review.
               </span>
             </div>
+          ) : !isRegistrationOpen ? (
+            <div className={`rounded-xl border px-4 py-3 ${isPlanning
+                ? "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/15"
+                : "border-rose-200 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-900/15"
+              }`}>
+              <p className={`flex items-center gap-1.5 text-sm font-semibold ${isPlanning ? "text-amber-700 dark:text-amber-300" : "text-rose-700 dark:text-rose-300"
+                }`}>
+                {isPlanning ? <Clock size={15} /> : <Lock size={15} />}
+                {isPlanning ? "Registration Not Open (Planning Phase)" : "Registration Closed"}
+              </p>
+              <p className={`mt-1 text-sm ${isPlanning ? "text-amber-800 dark:text-amber-200" : "text-rose-800 dark:text-rose-200"
+                }`}>
+                {registrationBlockReason || (
+                  isPlanning
+                    ? "This intramural is currently in the Planning phase. Teams and entries cannot be submitted until registration is officially opened."
+                    : "Registration is closed for this intramural. Teams and entries can no longer be submitted to the sports facilitator."
+                )}
+              </p>
+            </div>
           ) : visibleSubmitError ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-900/15">
               <p className="flex items-center gap-1.5 text-sm font-semibold text-amber-700 dark:text-amber-300">
                 <AlertTriangle size={15} />
                 Not ready to submit yet
               </p>
-              <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">{visibleSubmitError}</p>
+              {/* <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">{visibleSubmitError}</p> */}
             </div>
           ) : null}
 
           <div className="flex items-center justify-end">
             <button
               type="button"
-              disabled={submitBusy || isLocked || !isReady}
+              disabled={submitBusy || isLocked || !isReady || !isRegistrationOpen}
               onClick={handleSubmitClick}
               className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
-              title={!isReady && !isLocked ? readinessMessage : undefined}
+              title={
+                !isRegistrationOpen
+                  ? registrationBlockReason
+                  : !isReady && !isLocked
+                    ? readinessMessage
+                    : undefined
+              }
             >
               <Send size={16} />
               {submitBusy ? "Submitting..." : submitLabel}
@@ -681,6 +716,50 @@ const ApplicantWorkspaceSection = ({
           </div>
         </div>
       ) : null}
+
+      {/* Reject-player confirmation modal */}
+      <AppModal
+        open={Boolean(rejectConfirmRow)}
+        onClose={() => {
+          if (rowDecisionBusyId === rejectConfirmRow?.id) return;
+          setRejectConfirmRow(null);
+        }}
+        title="Reject applicant?"
+        subtitle="This action cannot be undone. The applicant will be notified."
+        maxWidthClass="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-700 dark:text-slate-300">
+            You are about to reject{" "}
+            <span className="font-semibold text-slate-900 dark:text-white">
+              {rejectConfirmRow?.applicant_name || "this applicant"}
+            </span>
+            . Once rejected, their application status is final and cannot be reversed.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              disabled={rowDecisionBusyId === rejectConfirmRow?.id}
+              onClick={() => setRejectConfirmRow(null)}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={rowDecisionBusyId === rejectConfirmRow?.id}
+              onClick={async () => {
+                const row = rejectConfirmRow;
+                await onRowDecision?.(row, "REJECTED");
+                setRejectConfirmRow(null);
+              }}
+              className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-60"
+            >
+              {rowDecisionBusyId === rejectConfirmRow?.id ? "Rejecting..." : "Confirm Rejection"}
+            </button>
+          </div>
+        </div>
+      </AppModal>
     </section>
   );
 };

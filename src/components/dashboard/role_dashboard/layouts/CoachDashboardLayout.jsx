@@ -9,9 +9,12 @@ import { getManagedCompetitionParticipants } from "../../../../services/competit
 import { getScheduleEvents } from "../../../../services/scheduleService";
 import { getCoachApplications } from "../../../../services/teamApplicationService";
 import { getNotifications } from "../../../../services/notification/notificationService";
+import { listEntries } from "../../../../services/competitionEntryService";
+import { getTournamentTeamRegistrations, getTeams } from "../../../../services/teamService";
 import {
   AnnouncementTimeline,
   buildAnnouncementTimeline,
+  buildShowcaseEntries,
   deriveTournamentPhase,
   resolveDashboardLifecycleStage,
   findTableByKeywords,
@@ -29,6 +32,7 @@ import {
 import { mapChampionshipLeaderboard, mapChampionshipSportBreakdown } from "./dashboardStandingsUtils.js";
 import { DashboardStageSwitcher, LiveDashboardStage } from "./DashboardLifecycleStages";
 import { useProfileDrawer } from "../../../profile";
+import { useAuth } from "../../../../context/AuthContext";
 import CoachOperationsDashboard from "./CoachOperationsDashboard";
 
 const CoachDashboardLayout = ({
@@ -39,10 +43,14 @@ const CoachDashboardLayout = ({
   coachContexts = [],
 }) => {
   const { openProfile } = useProfileDrawer();
+  const { user } = useAuth();
   const [championship, setChampionship] = useState(null);
   const [championshipUnavailable, setChampionshipUnavailable] = useState(false);
   const [brackets, setBrackets] = useState([]);
   const [directoryParticipants, setDirectoryParticipants] = useState([]);
+  const [teamRegistrations, setTeamRegistrations] = useState([]);
+  const [competitionEntries, setCompetitionEntries] = useState([]);
+  const [allTeams, setAllTeams] = useState([]);
   const [coachApplications, setCoachApplications] = useState([]);
   const [coachNotifications, setCoachNotifications] = useState([]);
   const [userSelectedStage, setUserSelectedStage] = useState(null);
@@ -91,13 +99,18 @@ const CoachDashboardLayout = ({
       try {
         setChampionship(null);
         setChampionshipUnavailable(false);
-        const [champData, bracketsData, directoryRows, schedulePayload, applicationPayload, notificationPayload] = await Promise.all([
+        const [champData, bracketsData, directoryRows, schedulePayload, applicationPayload, notificationPayload, teamPayload, entryPayload, allTeamsPayload] = await Promise.all([
           getChampionshipStandings({ tournamentId }).catch(() => null),
           getBrackets().catch(() => []),
           tournamentId && Number(workspaceId) > 0 ? getManagedCompetitionParticipants({ workspaceId: Number(workspaceId), tournamentId: Number(tournamentId), includeMembers: true }).catch(() => []) : [],
           tournamentId ? getScheduleEvents(Number(tournamentId)).catch(() => ({ events: [] })) : Promise.resolve({ events: [] }),
           tournamentId ? getCoachApplications("ALL", Number(tournamentId)).catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
           tournamentId ? getNotifications({ limit: 30 }).catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
+          tournamentId
+            ? getTournamentTeamRegistrations(Number(tournamentId), { status: "ALL", page: 1, limit: 200 }).catch(() => [])
+            : [],
+          tournamentId ? listEntries({ tournamentId: Number(tournamentId) }).catch(() => []) : [],
+          tournamentId ? getTeams(null, Number(tournamentId)).catch(() => []) : getTeams().catch(() => []),
         ]);
         if (!active) return;
         setChampionship(champData || null);
@@ -108,6 +121,23 @@ const CoachDashboardLayout = ({
         setCoachNotifications(Array.isArray(notificationPayload?.items)
           ? notificationPayload.items
           : Array.isArray(notificationPayload) ? notificationPayload : []);
+        setTeamRegistrations(
+          Array.isArray(teamPayload)
+            ? teamPayload
+            : Array.isArray(teamPayload?.items)
+              ? teamPayload.items
+              : Array.isArray(teamPayload?.rows)
+                ? teamPayload.rows
+                : []
+        );
+        setCompetitionEntries(Array.isArray(entryPayload) ? entryPayload : []);
+        setAllTeams(
+          Array.isArray(allTeamsPayload)
+            ? allTeamsPayload
+            : Array.isArray(allTeamsPayload?.items)
+              ? allTeamsPayload.items
+              : []
+        );
         setScheduleEvents(
           Array.isArray(schedulePayload?.events)
             ? schedulePayload.events
@@ -153,9 +183,43 @@ const CoachDashboardLayout = ({
     }));
     const accepted = coachApplications.filter((row) => String(row?.application_status || "").trim().toUpperCase() === "ACCEPTED_AS_PLAYER");
     for (const application of accepted) {
-      const targetId = Number(application?.pool_id || application?.team_id || 0);
+      const applicantId = Number(application?.applicant_id || application?.user_id || application?.player_id || 0);
+      const applicantEmail = String(application?.applicant_email || application?.user_email || application?.email || "").trim().toLowerCase();
+      const applicantName = String(application?.applicant_name || application?.player_name || application?.user_name || "").trim().toLowerCase();
+
+      const memberMatches = (m) => {
+        const memPlayerId = Number(m?.player_id || m?.id || 0);
+        const memUserId = Number(m?.user_id || 0);
+        const memEmail = String(m?.email || "").trim().toLowerCase();
+        const memName = String(m?.display_name || m?.name || "").trim().toLowerCase();
+
+        if (applicantId > 0 && (memPlayerId === applicantId || memUserId === applicantId)) return true;
+        if (applicantEmail && memEmail && memEmail === applicantEmail) return true;
+        if (applicantName && memName && memName === applicantName) return true;
+        return false;
+      };
+
+      const targetId = Number(application?.pool_id || application?.entry_pool_id || application?.team_id || 0);
       const isPool = String(application?.source_type || "").trim().toUpperCase() === "ENTRY_POOL_APPLICATION";
-      let participant = rows.find((row) => Number(row?.team_id || row?.entry_pool_id || row?.pool_id || 0) === targetId);
+
+      // 1. Check if ANY existing entry in rows already contains this member
+      let participant = rows.find((row) => row.members?.some(memberMatches));
+
+      // 2. Try matching by team_id or pool_id
+      if (!participant && targetId > 0) {
+        participant = rows.find((row) => Number(row?.team_id || row?.entry_pool_id || row?.pool_id || 0) === targetId);
+      }
+
+      // 3. For pool applications, try matching by department and sport event
+      if (!participant && isPool) {
+        participant = rows.find((row) =>
+          Number(row?.department_id) === Number(application?.department_id) &&
+          Number(row?.sport_id) === Number(application?.sport_id) &&
+          (!application?.tournament_sport_event_id || Number(row?.tournament_sport_event_id) === Number(application?.tournament_sport_event_id))
+        );
+      }
+
+      // 4. Only create a synthetic participant if no existing entry matches
       if (!participant) {
         participant = {
           entry_id: null,
@@ -175,29 +239,74 @@ const CoachDashboardLayout = ({
         };
         rows.push(participant);
       }
-      const applicantId = Number(application?.applicant_id || application?.user_id || 0);
-      const applicantEmail = String(application?.applicant_email || application?.user_email || "").trim().toLowerCase();
-      const existingMember = participant.members.find((member) =>
-        (applicantId > 0 && Number(member?.player_id || member?.user_id || member?.id || 0) === applicantId)
-        || (applicantEmail && String(member?.email || "").trim().toLowerCase() === applicantEmail)
-      );
+
+      const existingMember = participant.members.find(memberMatches);
+
       if (existingMember) {
         existingMember.medical_certificate_status = application?.medical_certificate_status || existingMember.medical_certificate_status;
         existingMember.medical_certificate_note = application?.medical_certificate_note || existingMember.medical_certificate_note;
         existingMember.health_notes = application?.health_notes || existingMember.health_notes;
-      } else participant.members.push({
-        player_id: applicantId || application?.id,
-        user_id: applicantId || null,
-        display_name: application?.applicant_name || application?.user_name || "Accepted player",
-        email: application?.applicant_email || application?.user_email,
-        profile_image_url: application?.applicant_image_url,
-        position: application?.position || "Player",
-        medical_certificate_status: application?.medical_certificate_status,
-        medical_certificate_note: application?.medical_certificate_note,
-        health_notes: application?.health_notes,
-      });
+        if (!existingMember.profile_image_url && application?.applicant_image_url) {
+          existingMember.profile_image_url = application.applicant_image_url;
+        }
+        if (!existingMember.position && application?.position) {
+          existingMember.position = application.position;
+        }
+      } else {
+        participant.members.push({
+          player_id: applicantId || application?.id,
+          user_id: applicantId || null,
+          display_name: application?.applicant_name || application?.player_name || application?.user_name || "Accepted player",
+          email: application?.applicant_email || application?.user_email || application?.email,
+          profile_image_url: application?.applicant_image_url,
+          position: application?.position || "Player",
+          medical_certificate_status: application?.medical_certificate_status,
+          medical_certificate_note: application?.medical_certificate_note,
+          health_notes: application?.health_notes,
+        });
+      }
     }
-    return rows;
+
+    // Filter out synthetic participants whose members already exist in official entries
+    const finalRows = rows.filter((row) => {
+      if (row.entry_id !== null) return true;
+      if (!Array.isArray(row.members) || row.members.length === 0) return false;
+      const hasUniqueMembers = row.members.some((sm) => {
+        const smName = String(sm?.display_name || "").trim().toLowerCase();
+        const smId = Number(sm?.player_id || sm?.id || 0);
+        return !rows.some((other) =>
+          other.entry_id !== null &&
+          other.members?.some((om) => {
+            const omName = String(om?.display_name || "").trim().toLowerCase();
+            const omId = Number(om?.player_id || om?.id || 0);
+            return (smId > 0 && omId === smId) || (smName && omName === smName);
+          })
+        );
+      });
+      return hasUniqueMembers;
+    });
+
+    // Deduplicate members within each participant
+    finalRows.forEach((p) => {
+      if (!Array.isArray(p.members) || p.members.length <= 1) return;
+      const seen = new Map();
+      for (const m of p.members) {
+        const key = String(m?.display_name || m?.player_id || "").trim().toLowerCase();
+        if (!seen.has(key)) {
+          seen.set(key, m);
+        } else {
+          const ex = seen.get(key);
+          if (!ex.medical_certificate_status && m.medical_certificate_status) {
+            ex.medical_certificate_status = m.medical_certificate_status;
+            ex.medical_certificate_note = m.medical_certificate_note;
+            ex.health_notes = m.health_notes;
+          }
+        }
+      }
+      p.members = Array.from(seen.values());
+    });
+
+    return finalRows;
   }, [coachApplications, directoryParticipants]);
 
   // Scoped brackets strictly for this tournament
@@ -400,19 +509,16 @@ const CoachDashboardLayout = ({
     { value: "live", label: "Live Center & Leaderboard", icon: Radio },
   ];
 
-  const showcaseEntries = useMemo(() => operationalParticipants.map((row) => ({
-    id: `entry-${row.entry_id}`,
-    entry_id: row.entry_id,
-    team_id: row.team_id,
-    name: row.display_name,
-    imageUrl: row.image_url,
-    meta: [row.sport_name, row.participant_shape, row.department_code || row.department_name].filter(Boolean).join(" · "),
-    department_id: row.department_id,
-    department_code: row.department_code,
-    department_name: row.department_name,
-    participant_shape: row.participant_shape,
-    members: row.members,
-  })), [operationalParticipants]);
+  const showcaseEntries = useMemo(
+    () => buildShowcaseEntries({
+      teamRegistrations,
+      competitionEntries,
+      teams: allTeams,
+      events,
+      dashboard,
+    }),
+    [teamRegistrations, competitionEntries, allTeams, events, dashboard]
+  );
 
   return (
     <div className="space-y-5 w-full min-w-0 max-w-full overflow-hidden">
@@ -562,7 +668,7 @@ const CoachDashboardLayout = ({
 
       {/* STAGE 3: Live Center & Leaderboard */}
       {effectiveStage === "live" && (
-        <LiveDashboardStage events={events} sports={displaySports} entries={showcaseEntries} tournamentId={tournamentId} scheduleHref="/coach/schedules" scoreBasePath="/coach/matches" standingsHref="/coach/standings" entriesHref="/coach/teams-and-players" departmentRows={olympicLeaderboard} breakdownRows={sportBreakdown} standingsUnavailable={championshipUnavailable} matchCenterProps={{ events: operationalEvents, roleTitle: "Live Match Center", emptyTitle: "No upcoming team matches scheduled", emptyDescription: "Your next team fixture will appear here as soon as published." }}>
+        <LiveDashboardStage events={events} sports={displaySports} entries={showcaseEntries} tournamentId={tournamentId} scheduleHref="/coach/schedules" scoreBasePath="/coach/matches" standingsHref="/coach/standings" entriesHref="/coach/teams-and-players" departmentRows={olympicLeaderboard} breakdownRows={sportBreakdown} standingsUnavailable={championshipUnavailable} userDepartmentId={user?.department_id} matchCenterProps={{ events: operationalEvents, roleTitle: "Live Match Center", emptyTitle: "No upcoming team matches scheduled", emptyDescription: "Your next team fixture will appear here as soon as published." }}>
           {announcements.length > 0 ? (
             <DashboardCard>
               <PanelHeader icon={Megaphone} title="Latest Announcements" action={{ label: "View all", to: "/coach/announcements" }} />

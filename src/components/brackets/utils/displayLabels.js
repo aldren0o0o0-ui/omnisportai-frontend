@@ -55,7 +55,7 @@ const ACTION_CODE_LABELS = {
 const SPORT_DEFAULT_SUGGESTED_EVENT_TYPES = {
   basketball: ["FREE_THROW", "ONE_PT_MADE", "TWO_PT_MADE", "THREE_PT_MADE", "FOUL", "TIMEOUT"],
   volleyball: ["POINT", "RALLY_WIN", "SERVICE_ACE", "BLOCK", "FAULT", "TIMEOUT"],
-  badminton: ["POINT", "RALLY_WIN", "FAULT", "LET", "CHANGE_SERVER", "SERVICE_SET"],
+  badminton: ["POINT", "RALLY_WIN", "SMASH_WIN", "SERVICE_ACE", "FOOT_FAULT", "SERVE_FAULT", "FAULT", "LET"],
   tennis: ["POINT", "ACE", "FAULT", "DOUBLE_FAULT", "LET", "TIMEOUT"],
   boxing: ["JUDGE_SCORE", "KNOCKDOWN", "WARNING", "DEDUCTION", "ROUND_ADVANCE", "MATCH_END"],
   soccer: ["GOAL", "ASSIST", "FOUL", "YELLOW_CARD", "RED_CARD", "SUBSTITUTION"],
@@ -219,6 +219,10 @@ const inferFallbackCategoryByEventType = (eventType = "", sportKey = "") => {
     || normalizedEventType.includes("INTERVAL")
   ) {
     return "phase";
+  }
+
+  if (["SMASH_WIN", "SERVICE_ACE", "FOOT_FAULT", "SERVE_FAULT"].includes(normalizedEventType)) {
+    return "scoring";
   }
 
   if (

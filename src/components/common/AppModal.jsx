@@ -46,6 +46,12 @@ const AppModal = ({
     const docEl = document.documentElement;
     const previousBodyOverflow = body.style.overflow;
     const previousDocOverflow = docEl.style.overflow;
+    // Lock the actual scroll container (.os-content) rather than body/html
+    // Locking body/html can desync and leave the page scroll frozen after close
+    const scrollRoot = document.querySelector(".os-content") || body;
+    const previousScrollRootOverflow = scrollRoot.style.overflow;
+    scrollRoot.style.overflow = "hidden";
+    // Also lock body to prevent background wheel events on non-os-content pages
     body.style.overflow = "hidden";
     docEl.style.overflow = "hidden";
 
@@ -103,6 +109,8 @@ const AppModal = ({
     return () => {
       window.cancelAnimationFrame(frameId);
       window.removeEventListener("keydown", handleKeyDown);
+      // Restore scroll on all locked elements
+      scrollRoot.style.overflow = previousScrollRootOverflow;
       body.style.overflow = previousBodyOverflow;
       docEl.style.overflow = previousDocOverflow;
       const previous = previouslyFocusedRef.current;

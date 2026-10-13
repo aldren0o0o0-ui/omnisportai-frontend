@@ -499,7 +499,11 @@ export default function LifecycleReadinessPanel({
             </label>
           </div>
         ) : (
-          <p className="text-sm text-slate-600 dark:text-slate-300">The server will re-evaluate readiness immediately before changing the lifecycle state.</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            {currentAction?.action === "COMPLETE_INTRAMURAL"
+              ? "Completing this Intramural will conclude all remaining competitions. Any ongoing matches will be ended and unplayed matches cancelled. All scoring and editing activities will stop permanently."
+              : "The server will re-evaluate readiness immediately before changing the lifecycle state."}
+          </p>
         )}
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" disabled={busy} onClick={() => setConfirming(false)} className="os-btn-ghost-soft min-h-10">Cancel</button>

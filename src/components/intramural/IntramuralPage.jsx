@@ -62,6 +62,7 @@ const IntramuralPage = ({
   // Optional overview header card (name / year / semester / status)
   showOverview = false,
   manageTo = null,
+  showHistoricalBanner = true,
 
   shellClassName = '',      // extra classes appended to the os-page-shell container
 
@@ -156,7 +157,7 @@ const IntramuralPage = ({
         {header}
 
         {/* Historical (selected) intramural → read-only banner above content. */}
-        {isHistorical && intramural ? (
+        {showHistoricalBanner && isHistorical && intramural ? (
           <HistoricalBanner intramural={intramural} className="mb-1" />
         ) : null}
 

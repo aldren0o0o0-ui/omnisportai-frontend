@@ -36,3 +36,16 @@ test("all role layouts mount the same shared Match viewer route", () => {
   assert.match(app, /LiveMatchViewerPage/);
   assert.ok((app.match(/matches\/:matchId" element=\{renderLazyRoute\(LiveMatchViewerPage\)\}/g) || []).length >= 5);
 });
+
+test("viewer page mounts SportMatchAnalytics and removes old RecentActions and ViewerMatchTabs", () => {
+  const source = readRelative("./LiveMatchViewerPage.jsx");
+  assert.match(source, /SportMatchAnalytics/);
+  assert.match(source, /sportKey=\{viewer\.match\?\.sport\?\.key/);
+  assert.match(source, /participants=\{viewer\.participants\}/);
+  assert.match(source, /timeline=\{viewerTimeline\}/);
+  assert.match(source, /playerStats=\{viewerPlayerStats\}/);
+  // Replaced / removed from viewer render
+  assert.doesNotMatch(source, /<ViewerMatchTabs/);
+  assert.doesNotMatch(source, /<RecentActions/);
+});
+

@@ -33,12 +33,11 @@ const RoleDashboardShell = ({
     workspace: activeIntramural,
     loading: intramuralLoading,
   } = useWorkspace();
-  const viewingIntramural = selectedIntramural || activeIntramural || null;
+  const viewingIntramural = selectedIntramural || null;
 
   if (!intramuralLoading && !viewingIntramural) {
     return (
       <div className="os-page-shell w-full min-w-0 max-w-full overflow-hidden">
-        <PageHeaderCard eyebrow={eyebrow} title={title} subtitle={subtitle} icon={icon} />
         <EmptyIntramuralState role={role} />
       </div>
     );

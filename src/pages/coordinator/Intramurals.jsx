@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Trophy, Layers, ChevronRight, ArrowLeft, RefreshCw, AlertCircle } from "lucide-react";
 import {
   getIntramurals,
@@ -10,6 +10,7 @@ import {
 } from "../../services/intramuralService";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { getSportDisplayName } from "../../utils/tournamentEventCategories";
+import { filterVisibleSports } from "../../utils/sportVisibility";
 
 // Phase 4 (frontend): read-only Intramural Event -> Competition surface.
 // Consumes the Phase 3 API. Purely additive — the existing Tournaments page and
@@ -181,6 +182,11 @@ function CompetitionList({ intramural, onOpenCompetition, onBack }) {
     };
   }, [intramural.id]);
 
+  const visibleCompetitions = useMemo(
+    () => filterVisibleSports(competitions),
+    [competitions]
+  );
+
   return (
     <div className="space-y-4">
       <button
@@ -196,7 +202,7 @@ function CompetitionList({ intramural, onOpenCompetition, onBack }) {
           <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{intramural.name}</h2>
         </div>
         <p className={`mt-1 ${subtleText}`}>
-          {intramural.competition_count} competition(s)
+          {visibleCompetitions.length} competition(s)
           {intramural.season_label ? ` · ${intramural.season_label}` : ""}
         </p>
       </div>
@@ -205,11 +211,11 @@ function CompetitionList({ intramural, onOpenCompetition, onBack }) {
         <StateBox icon={RefreshCw}>Loading competitions...</StateBox>
       ) : error ? (
         <StateBox icon={AlertCircle}>{error}</StateBox>
-      ) : competitions.length === 0 ? (
+      ) : visibleCompetitions.length === 0 ? (
         <StateBox icon={Layers}>No competitions in this intramural event yet.</StateBox>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {competitions.map((c) => (
+          {visibleCompetitions.map((c) => (
             <button
               key={c.id}
               onClick={() => onOpenCompetition(c.id)}

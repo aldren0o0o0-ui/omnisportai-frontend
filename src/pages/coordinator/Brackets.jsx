@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { GitBranch, Zap, CheckCircle2, AlertCircle, ZoomIn, ZoomOut, Scan, RotateCcw, Calendar, MapPin, ChevronDown, Sparkles } from "lucide-react";
+import { GitBranch, Zap, CheckCircle2, AlertCircle, ZoomIn, ZoomOut, Scan, RotateCcw, Calendar, MapPin, ChevronDown, Sparkles, Eye } from "lucide-react";
 import ModernBracketView from "../../components/brackets/ModernBracketView";
 import EntryReadinessPanel from "../../components/brackets/EntryReadinessPanel";
 import ManualSeedingModal from "../../components/brackets/coordinator/ManualSeedingModal";
@@ -21,12 +21,18 @@ import {
   getBracketGenerationReadiness,
   getManualSeedingCandidates,
   upsertBracketConfiguration,
+  getFacilitatorTournaments,
 } from "../../services/bracketService";
+import {
+  DASHBOARD_TOURNAMENT_SELECTION_EVENT,
+  readStoredDashboardTournamentSelection,
+  writeStoredDashboardTournamentSelection,
+} from "../../utils/dashboardTournamentSelection";
 import { getSportEntryReadiness } from "../../services/competitionEntryService";
 import { getSports } from "../../services/sportService";
 import { getTournaments } from "../../services/tournamentService";
 import { getMatchEventConfig, migrateMatchTemplate } from "../../services/matchEventService";
-import { useWorkspace } from "../../context/WorkspaceContext";
+import { useWorkspace, readStoredSelectedIntramuralId } from "../../context/WorkspaceContext";
 import { HistoricalBanner } from "../../components/intramural";
 import ConfigLockedModal from "../../components/matches/ConfigLockedModal";
 import ConfigStatusBadge from "../../components/matches/ConfigStatusBadge";
@@ -252,10 +258,15 @@ const isStartedTournament = (row) => {
 
 const pickPreferredTournamentId = (rows) => {
   const safeRows = Array.isArray(rows) ? rows : [];
+  if (safeRows.length === 0) return 0;
   const activeRows = safeRows.filter(isActiveTournament);
   const startedActiveRows = activeRows.filter(isStartedTournament);
-  const candidates = startedActiveRows.length > 0 ? startedActiveRows : activeRows;
-  if (candidates.length === 0) return 0;
+  const candidates =
+    startedActiveRows.length > 0
+      ? startedActiveRows
+      : activeRows.length > 0
+        ? activeRows
+        : safeRows;
   const sorted = candidates
     .slice()
     .sort((left, right) => {
@@ -267,7 +278,7 @@ const pickPreferredTournamentId = (rows) => {
       if (rightStartDate !== leftStartDate) return rightStartDate - leftStartDate;
       return Number(right?.id || 0) - Number(left?.id || 0);
     });
-  const id = Number(sorted[0]?.id || 0);
+  const id = Number(sorted[0]?.id || safeRows[0]?.id || 0);
   return Number.isFinite(id) && id > 0 ? id : 0;
 };
 
@@ -352,20 +363,30 @@ const compareBracketPreference = (left, right) => {
 };
 
 const CoordinatorBrackets = ({
+  tournamentId = null,
   readOnly = false,
   pageTitle = "Tournament Brackets",
   pageSubtitle = "",
   introContent = null,
   allowLiveScoringActions = false,
   liveScoringSportIds = null,
+  assignedSportIds = null,
   liveScoringBasePath = "/coordinator",
   matchViewerBasePath = liveScoringBasePath,
   targetScopedManagement = false,
 }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { selectedIntramural, isViewingHistorical } = useWorkspace();
-  const selectedWorkspaceId = selectedIntramural?.id ?? null;
+  const {
+    selectedIntramural,
+    workspace,
+    loading: workspaceLoading,
+    isViewingHistorical,
+  } = useWorkspace();
+  const storedWorkspaceId = readStoredSelectedIntramuralId();
+  const effectiveIntramural = selectedIntramural || workspace || null;
+  const selectedWorkspaceId =
+    effectiveIntramural?.id ?? (storedWorkspaceId > 0 ? storedWorkspaceId : null);
   const [brackets, setBrackets] = useState([]);
   const [selectedBracketId, setSelectedBracketId] = useState(null);
   const [matches, setMatches] = useState([]);
@@ -377,9 +398,24 @@ const CoordinatorBrackets = ({
   const [migrationError, setMigrationError] = useState("");
   const [isReviewingMigration, setIsReviewingMigration] = useState(false);
   const [isResolvingMigration, setIsResolvingMigration] = useState(false);
-  const requestedTournamentId = Number(searchParams.get("tournament_id") || 0);
-  const [resolvedTournamentId, setResolvedTournamentId] = useState(0);
+  const requestedTournamentId = Number(tournamentId || searchParams.get("tournament_id") || 0);
+  const [resolvedTournamentId, setResolvedTournamentId] = useState(() => {
+    const propId = Number(tournamentId || 0);
+    if (propId > 0) return propId;
+    const queryId = Number(searchParams.get("tournament_id") || 0);
+    if (queryId > 0) return queryId;
+    const stored = readStoredDashboardTournamentSelection();
+    const storedId = Number(stored?.id || 0);
+    return storedId > 0 ? storedId : 0;
+  });
   const bracketRequestSequenceRef = useRef(0);
+
+  useEffect(() => {
+    const propId = Number(tournamentId || 0);
+    if (propId > 0 && propId !== resolvedTournamentId) {
+      setResolvedTournamentId(propId);
+    }
+  }, [tournamentId, resolvedTournamentId]);
 
   // --- Coordinator activation state ---
   const [, setSports] = useState([]);
@@ -407,10 +443,10 @@ const CoordinatorBrackets = ({
   const [bracketZoom, setBracketZoom] = useState(1);
   const [matchSearch, setMatchSearch] = useState("");
   const [isManualSeedModalOpen, setIsManualSeedModalOpen] = useState(false);
-  const [autoTournamentResolving, setAutoTournamentResolving] = useState(false);
+  const [autoTournamentResolving, setAutoTournamentResolving] = useState(true);
   const [seedCloseConfirmOpen, setSeedCloseConfirmOpen] = useState(false);
   const [generateReadyOnlyModalOpen, setGenerateReadyOnlyModalOpen] = useState(false);
-  const [showBracketSetup, setShowBracketSetup] = useState(false);
+  const [showBracketSetup, setShowBracketSetup] = useState(() => Boolean(targetScopedManagement));
   const [raceHeatsModalTrigger, setRaceHeatsModalTrigger] = useState(0);
   const [generationFormatByTarget, setGenerationFormatByTarget] = useState({});
   const [bracketPreview, setBracketPreview] = useState(null);
@@ -421,6 +457,16 @@ const CoordinatorBrackets = ({
   const canManageBrackets = !isReadOnlyMode;
   const canManageGlobalBrackets = canManageBrackets && !targetScopedManagement;
   const canOpenLiveScoringFromPage = !isReadOnlyMode || Boolean(allowLiveScoringActions);
+
+  const effectiveAssignedSportIds = useMemo(() => {
+    if (Array.isArray(assignedSportIds) && assignedSportIds.length > 0) {
+      return assignedSportIds.map(Number).filter((id) => id > 0);
+    }
+    if (Array.isArray(liveScoringSportIds) && liveScoringSportIds.length > 0) {
+      return liveScoringSportIds.map(Number).filter((id) => id > 0);
+    }
+    return [];
+  }, [assignedSportIds, liveScoringSportIds]);
 
   const visibleBrackets = useMemo(() => {
     const safeRows = Array.isArray(brackets) ? brackets : [];
@@ -494,11 +540,6 @@ const CoordinatorBrackets = ({
     const byId = new Map();
     visibleBrackets.forEach((entry) => {
       const sportId = Number(entry?.sport_id || 0);
-      if (
-        targetScopedManagement
-        && Array.isArray(liveScoringSportIds)
-        && !liveScoringSportIds.some((allowedSportId) => Number(allowedSportId) === sportId)
-      ) return;
       const targetKey = buildBracketTargetKey(
         entry?.sport_id,
         entry?.tournament_sport_event_id ?? null
@@ -539,11 +580,20 @@ const CoordinatorBrackets = ({
     return Array.from(byId.values()).sort((left, right) =>
       String(left?.targetLabel || "").localeCompare(String(right?.targetLabel || ""))
     );
-  }, [liveScoringSportIds, targetScopedManagement, visibleBrackets]);
-  const generationSportOptions = useMemo(
-    () => (generationSports.length > 0 ? generationSports : fallbackGenerationSports),
-    [fallbackGenerationSports, generationSports]
-  );
+  }, [visibleBrackets]);
+  const generationSportOptions = useMemo(() => {
+    const base = generationSports.length > 0 ? generationSports : fallbackGenerationSports;
+    if (targetScopedManagement && effectiveAssignedSportIds.length > 0) {
+      return [...base].sort((a, b) => {
+        const aAssigned = effectiveAssignedSportIds.includes(a.sportId);
+        const bAssigned = effectiveAssignedSportIds.includes(b.sportId);
+        if (aAssigned && !bAssigned) return -1;
+        if (!aAssigned && bAssigned) return 1;
+        return String(a.targetLabel || "").localeCompare(String(b.targetLabel || ""));
+      });
+    }
+    return base;
+  }, [effectiveAssignedSportIds, fallbackGenerationSports, generationSports, targetScopedManagement]);
   const generationSportGroups = useMemo(() => {
     const groups = new Map();
     generationSportOptions.forEach((row) => {
@@ -558,8 +608,16 @@ const CoordinatorBrackets = ({
       }
       groups.get(sportId).targets.push(row);
     });
-    return Array.from(groups.values());
-  }, [generationSportOptions]);
+    return Array.from(groups.values()).sort((a, b) => {
+      if (targetScopedManagement && effectiveAssignedSportIds.length > 0) {
+        const aAssigned = effectiveAssignedSportIds.includes(a.sportId);
+        const bAssigned = effectiveAssignedSportIds.includes(b.sportId);
+        if (aAssigned && !bAssigned) return -1;
+        if (!aAssigned && bAssigned) return 1;
+      }
+      return String(a.sportName || "").localeCompare(String(b.sportName || ""));
+    });
+  }, [effectiveAssignedSportIds, generationSportOptions, targetScopedManagement]);
   const selectedGenerationSport = useMemo(
     () => generationSportOptions.find((row) => row.targetKey === String(generationSportId || "")) || null,
     [generationSportId, generationSportOptions]
@@ -602,6 +660,17 @@ const CoordinatorBrackets = ({
       || selectedSportHasActiveLikeBracket
       || selectedSportHasCompletedBracket
   );
+  const isFacilitatorForSelectedSport = useMemo(() => {
+    if (!targetScopedManagement) return true;
+    if (!selectedGenerationSport) return false;
+    const currentSportId = Number(selectedGenerationSport.sportId || 0);
+    if (effectiveAssignedSportIds.length > 0) {
+      return effectiveAssignedSportIds.some((allowedId) => Number(allowedId) === currentSportId);
+    }
+    return false;
+  }, [effectiveAssignedSportIds, selectedGenerationSport, targetScopedManagement]);
+
+  const canManageCurrentSport = canManageBrackets && isFacilitatorForSelectedSport;
   const selectedGenerationBlockers = useMemo(
     () =>
       Array.isArray(selectedGenerationSport?.blockers)
@@ -716,6 +785,62 @@ const CoordinatorBrackets = ({
     return rawValue ? formatParticipantShapeLabel(rawValue) : "";
   }, [selectedGenerationSport?.participantShape]);
   const selectedBracketStatus = String(selectedBracket?.status || "").toUpperCase();
+  const activeTargetBracket = useMemo(() => {
+    if (selectedBracket) return selectedBracket;
+    if (!selectedGenerationSport) return null;
+    const targetKey = selectedGenerationSport.targetKey;
+    return (
+      visibleBrackets.find(
+        (entry) =>
+          buildBracketTargetKey(
+            entry?.sport_id,
+            entry?.tournament_sport_event_id ?? null
+          ) === targetKey
+      ) || null
+    );
+  }, [selectedBracket, selectedGenerationSport, visibleBrackets]);
+  const activeTargetBracketStatus = String(activeTargetBracket?.status || "").toUpperCase();
+  const isSelectedBracketActive = useMemo(() => {
+    if (["ACTIVE", "FINALIZED", "COMPLETED"].includes(activeTargetBracketStatus)) {
+      return true;
+    }
+    if (selectedGenerationSport?.formatLocked) {
+      return true;
+    }
+    if (selectedSportHasActiveLikeBracket || selectedSportHasCompletedBracket) {
+      return true;
+    }
+    return false;
+  }, [
+    activeTargetBracketStatus,
+    selectedGenerationSport?.formatLocked,
+    selectedSportHasActiveLikeBracket,
+    selectedSportHasCompletedBracket,
+  ]);
+  const hasEligibleBracketsToActivate = useMemo(() => {
+    if (selectedGenerationSport || targetScopedManagement) {
+      if (isSelectedBracketActive) return false;
+      return selectedSportHasGeneratedBracket || ["DRAFT", "GENERATED"].includes(activeTargetBracketStatus);
+    }
+    return visibleBrackets.some((b) => {
+      const s = String(b?.status || "").toUpperCase();
+      return s === "DRAFT" || s === "GENERATED";
+    });
+  }, [
+    selectedGenerationSport,
+    targetScopedManagement,
+    isSelectedBracketActive,
+    selectedSportHasGeneratedBracket,
+    activeTargetBracketStatus,
+    visibleBrackets,
+  ]);
+  const areAllBracketsActive = useMemo(() => {
+    if (visibleBrackets.length === 0) return false;
+    return visibleBrackets.every((b) => {
+      const s = String(b?.status || "").toUpperCase();
+      return ["ACTIVE", "FINALIZED", "COMPLETED"].includes(s);
+    });
+  }, [visibleBrackets]);
   const canOpenSelectedBracketLiveScoring = useMemo(() => {
     if (!canOpenLiveScoringFromPage) return false;
     if (!Array.isArray(liveScoringSportIds)) return true;
@@ -1022,44 +1147,106 @@ const CoordinatorBrackets = ({
     let active = true;
     const resolveTournamentContext = async () => {
       bracketRequestSequenceRef.current += 1;
-      setResolvedTournamentId(0);
-      setBrackets([]);
-      setSelectedBracketId(null);
-      setMatches([]);
-      setGenerationReadiness(null);
-      setGenerationSportId("");
-      setShowBracketSetup(false);
+      setShowBracketSetup(Boolean(targetScopedManagement));
+
       if (!selectedWorkspaceId) {
+        if (workspaceLoading) {
+          setAutoTournamentResolving(true);
+          return;
+        }
+        const storedSelection = readStoredDashboardTournamentSelection();
+        const storedTournamentId = Number(storedSelection?.id || 0);
+        const fallbackId = requestedTournamentId > 0 ? requestedTournamentId : storedTournamentId;
+        if (fallbackId > 0) {
+          setResolvedTournamentId(fallbackId);
+        }
         setAutoTournamentResolving(false);
         setLoading(false);
         return;
       }
+
       setAutoTournamentResolving(true);
       try {
-        const rows = await getTournaments(selectedWorkspaceId ? { workspaceId: selectedWorkspaceId } : {});
+        const [rows, facTourneys] = await Promise.all([
+          getTournaments({ workspaceId: selectedWorkspaceId, includeArchived: true }).catch(() => []),
+          targetScopedManagement ? getFacilitatorTournaments().catch(() => []) : Promise.resolve([]),
+        ]);
         if (!active) return;
 
         const scopedRows = Array.isArray(rows) ? rows : [];
-        const requestedTournamentIsInWorkspace = scopedRows.some(
-          (row) => Number(row?.id || 0) === requestedTournamentId
-        );
-        let targetTournamentId = requestedTournamentIsInWorkspace
-          ? requestedTournamentId
-          : pickPreferredTournamentId(scopedRows);
-        targetTournamentId = Number.isFinite(targetTournamentId) ? targetTournamentId : 0;
+        const facilitatorTournamentIds = Array.isArray(facTourneys)
+          ? Array.from(new Set(facTourneys.map((ft) => Number(ft?.id || 0)).filter(Boolean)))
+          : [];
 
-        const nextParams = new URLSearchParams(searchParams);
-        if (targetTournamentId > 0) {
-          nextParams.set("tournament_id", String(targetTournamentId));
+        let targetTournamentId = 0;
+
+        if (scopedRows.length > 0) {
+          const requestedTournamentIsInWorkspace = scopedRows.some(
+            (row) => Number(row?.id || 0) === requestedTournamentId
+          );
+          const storedSelection = readStoredDashboardTournamentSelection();
+          const storedTournamentId = Number(storedSelection?.id || 0);
+          const storedTournamentIsInWorkspace = scopedRows.some(
+            (row) => Number(row?.id || 0) === storedTournamentId
+          );
+
+          if (requestedTournamentIsInWorkspace) {
+            targetTournamentId = requestedTournamentId;
+          } else if (storedTournamentIsInWorkspace) {
+            targetTournamentId = storedTournamentId;
+          } else if (targetScopedManagement && facilitatorTournamentIds.length > 0) {
+            const matchingAssigned = scopedRows.find((row) =>
+              facilitatorTournamentIds.includes(Number(row?.id || 0))
+            );
+            if (matchingAssigned) {
+              targetTournamentId = Number(matchingAssigned.id || 0);
+            } else {
+              targetTournamentId = pickPreferredTournamentId(scopedRows);
+            }
+          } else {
+            targetTournamentId = pickPreferredTournamentId(scopedRows);
+          }
+
+          if (targetTournamentId <= 0 && scopedRows.length > 0) {
+            targetTournamentId = Number(scopedRows[0]?.id || 0);
+          }
         } else {
-          nextParams.delete("tournament_id");
+          targetTournamentId = requestedTournamentId > 0 ? requestedTournamentId : 0;
         }
-        if (nextParams.toString() !== searchParams.toString()) {
-          setSearchParams(nextParams, { replace: true });
+
+        targetTournamentId = Number.isFinite(targetTournamentId) && targetTournamentId > 0 ? targetTournamentId : 0;
+
+        if (targetTournamentId > 0) {
+          const matchingRow = scopedRows.find((r) => Number(r?.id || 0) === targetTournamentId);
+          writeStoredDashboardTournamentSelection({
+            id: String(targetTournamentId),
+            name: matchingRow?.tournament_name || effectiveIntramural?.name || "",
+          });
+          if (targetTournamentId !== requestedTournamentId) {
+            setSearchParams(
+              (prev) => {
+                const next = new URLSearchParams(prev);
+                next.set("tournament_id", String(targetTournamentId));
+                return next;
+              },
+              { replace: true }
+            );
+          }
+          setResolvedTournamentId(targetTournamentId);
+        } else {
+          setResolvedTournamentId(0);
+          setBrackets([]);
+          setSelectedBracketId(null);
+          setMatches([]);
         }
-        setResolvedTournamentId(targetTournamentId > 0 ? targetTournamentId : 0);
       } catch {
-        if (active) setResolvedTournamentId(0);
+        if (active) {
+          if (requestedTournamentId > 0) {
+            setResolvedTournamentId(requestedTournamentId);
+          } else {
+            setResolvedTournamentId(0);
+          }
+        }
       } finally {
         if (active) setAutoTournamentResolving(false);
       }
@@ -1069,7 +1256,40 @@ const CoordinatorBrackets = ({
     return () => {
       active = false;
     };
-  }, [requestedTournamentId, searchParams, selectedWorkspaceId, setSearchParams]);
+  }, [
+    requestedTournamentId,
+    selectedWorkspaceId,
+    workspaceLoading,
+    setSearchParams,
+    targetScopedManagement,
+    effectiveIntramural?.name,
+  ]);
+
+  useEffect(() => {
+    const handleTournamentSelectionUpdate = (event) => {
+      const newTourneyId = Number(event?.detail?.id || 0);
+      if (newTourneyId > 0 && newTourneyId !== requestedTournamentId) {
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.set("tournament_id", String(newTourneyId));
+            return next;
+          },
+          { replace: true }
+        );
+      }
+    };
+    window.addEventListener(
+      DASHBOARD_TOURNAMENT_SELECTION_EVENT,
+      handleTournamentSelectionUpdate
+    );
+    return () => {
+      window.removeEventListener(
+        DASHBOARD_TOURNAMENT_SELECTION_EVENT,
+        handleTournamentSelectionUpdate
+      );
+    };
+  }, [requestedTournamentId, setSearchParams]);
 
   useEffect(() => {
     if (resolvedTournamentId <= 0) {
@@ -1156,8 +1376,17 @@ const CoordinatorBrackets = ({
       const readiness = await getBracketGenerationReadiness(generationTournamentId);
       setGenerationReadiness(readiness);
       const rows = Array.isArray(readiness?.rows) ? readiness.rows : [];
-      const firstTargetKey = rows[0]
-        ? buildBracketTargetKey(rows[0]?.sport_id, rows[0]?.tournament_sport_event_id ?? null)
+      let preferredTarget = null;
+      if (targetScopedManagement && effectiveAssignedSportIds.length > 0) {
+        preferredTarget = rows.find((r) =>
+          effectiveAssignedSportIds.includes(Number(r?.sport_id || 0))
+        );
+      }
+      if (!preferredTarget && rows.length > 0) {
+        preferredTarget = rows[0];
+      }
+      const firstTargetKey = preferredTarget
+        ? buildBracketTargetKey(preferredTarget?.sport_id, preferredTarget?.tournament_sport_event_id ?? null)
         : "";
       setGenerationSportId((current) => {
         const currentTargetKey = String(current || "");
@@ -1172,7 +1401,7 @@ const CoordinatorBrackets = ({
       setGenerationReadiness(null);
       setGenerationSportId("");
     }
-  }, [canManageBrackets, generationTournamentId]);
+  }, [canManageBrackets, effectiveAssignedSportIds, generationTournamentId, targetScopedManagement]);
 
   const loadEntryReadiness = useCallback(async () => {
     if (!canManageBrackets) {
@@ -1640,6 +1869,11 @@ const CoordinatorBrackets = ({
 
   const handleGenerateSingleSport = useCallback(async (workflowMode = "FINAL") => {
     if (!canManageBrackets) return;
+    if (targetScopedManagement && !isFacilitatorForSelectedSport) {
+      setMessage("You can only generate brackets for your assigned sports.");
+      setSeedModalError("You can only generate brackets for your assigned sports.");
+      return;
+    }
     const tournamentId = Number(generationTournamentId || 0);
     const sportId = Number(selectedGenerationSport?.sportId || 0);
     const tournamentSportEventId =
@@ -1820,24 +2054,39 @@ const CoordinatorBrackets = ({
 
   const handleOpenSeedReview = useCallback(() => {
     if (generationBusy || manualSeedingBusy) return;
+    if (targetScopedManagement && !isFacilitatorForSelectedSport) {
+      setMessage("You can only generate brackets for your assigned sports.");
+      return;
+    }
+    if (isSelectedBracketActive) {
+      setMessage("This bracket is already activated and cannot be regenerated.");
+      return;
+    }
     setSeedModalError("");
     if (!selectedGenerationSport) {
       setMessage("Select an event category first to review seed order.");
       return;
     }
     setIsManualSeedModalOpen(true);
-  }, [generationBusy, manualSeedingBusy, selectedGenerationSport]);
+  }, [generationBusy, isFacilitatorForSelectedSport, isSelectedBracketActive, manualSeedingBusy, selectedGenerationSport, targetScopedManagement]);
 
   const handleOpenActivateAll = useCallback(() => {
     if (activationBusy) return;
+    if (targetScopedManagement && !isFacilitatorForSelectedSport) {
+      setMessage("You can only activate brackets for your assigned sports.");
+      return;
+    }
     setActivationResult(null);
     setActivationError("");
     if (generationTournamentId <= 0) {
       setMessage("Open the bracket page from an intramural first.");
       return;
     }
+    if (targetScopedManagement && selectedGenerationSport?.sportId) {
+      setActivationSportId(String(selectedGenerationSport.sportId));
+    }
     setShowConfirmAll(true);
-  }, [activationBusy, generationTournamentId]);
+  }, [activationBusy, generationTournamentId, isFacilitatorForSelectedSport, selectedGenerationSport?.sportId, targetScopedManagement]);
 
   const confirmCloseSeedModal = useCallback(() => {
     setSeedCloseConfirmOpen(false);
@@ -1891,7 +2140,10 @@ const CoordinatorBrackets = ({
     setActivationResult(null);
     setActivationError("");
     try {
-      const sportId = activationSportId ? Number(activationSportId) : null;
+      let sportId = activationSportId ? Number(activationSportId) : null;
+      if (targetScopedManagement && !sportId && selectedGenerationSport?.sportId) {
+        sportId = Number(selectedGenerationSport.sportId);
+      }
       const tournamentId = generationTournamentId > 0 ? Number(generationTournamentId) : null;
       const result = await activateAllBrackets({ sportId, tournamentId });
       setActivationResult(result);
@@ -1899,7 +2151,7 @@ const CoordinatorBrackets = ({
     } catch (error) {
       const status = error?.response?.status;
       if (status === 403) {
-        setActivationError("You are not authorized to activate all brackets.");
+        setActivationError("You are not authorized to activate these brackets.");
       } else if (status === 404) {
         setActivationError("Selected sport not found.");
       } else {
@@ -1908,7 +2160,15 @@ const CoordinatorBrackets = ({
     } finally {
       setActivationBusy(false);
     }
-  }, [activationBusy, activationSportId, canManageBrackets, generationTournamentId, reloadBrackets]);
+  }, [
+    activationBusy,
+    activationSportId,
+    canManageBrackets,
+    generationTournamentId,
+    reloadBrackets,
+    selectedGenerationSport?.sportId,
+    targetScopedManagement,
+  ]);
 
   const handleActivateSingle = useCallback(async (bracketId) => {
     if (!canManageBrackets) return;
@@ -2045,11 +2305,24 @@ const CoordinatorBrackets = ({
       />
     </>
   );
-  const bracketPageResolving = autoTournamentResolving || loading;
+  const bracketPageResolving =
+    autoTournamentResolving ||
+    loading ||
+    (workspaceLoading && !selectedWorkspaceId);
   const hasGeneratedBrackets = visibleBrackets.length > 0;
+  const hasAssignedSportsInTournament = effectiveAssignedSportIds.length > 0;
+  const canFacilitatorManageInTournament = targetScopedManagement ? hasAssignedSportsInTournament : true;
   const showEmptyBracketPage =
     !bracketPageResolving &&
-    (!selectedIntramural || generationTournamentId <= 0 || (!hasGeneratedBrackets && !showBracketSetup));
+    (
+      !effectiveIntramural
+      || generationTournamentId <= 0
+      || (
+        !hasGeneratedBrackets
+        && !showBracketSetup
+        && (!targetScopedManagement || !hasAssignedSportsInTournament)
+      )
+    );
 
   if (bracketPageResolving) {
     return (
@@ -2076,18 +2349,18 @@ const CoordinatorBrackets = ({
             <GitBranch size={23} aria-hidden="true" />
           </span>
           <h2 className="mt-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-            {!selectedIntramural ? "No Intramural selected" : !hasTournament ? "No tournament configured" : "No brackets yet"}
+            {!effectiveIntramural ? "No Intramural selected" : !hasTournament ? "No tournament configured" : "No brackets yet"}
           </h2>
           <p className="mt-2 max-w-lg text-sm leading-6 text-slate-600 dark:text-slate-400">
-            {!selectedIntramural
+            {!effectiveIntramural
               ? "Create or select an Intramural to view its brackets."
               : !hasTournament
                 ? "Configure a tournament for this Intramural before creating brackets."
-                : isReadOnlyMode
+                : isReadOnlyMode || (targetScopedManagement && !hasAssignedSportsInTournament)
                   ? "Generated brackets will appear here once they are created by the coordinator."
                   : "Set up and generate brackets when the competition entries are ready."}
           </p>
-          {canManageBrackets && hasTournament ? (
+          {canManageBrackets && hasTournament && canFacilitatorManageInTournament ? (
             <button
               type="button"
               onClick={() => setShowBracketSetup(true)}
@@ -2179,8 +2452,14 @@ const CoordinatorBrackets = ({
                 disabled={generationTournamentId <= 0}
               >
                 <option value="" className="bg-[var(--surface)] text-[var(--text-main)]">Select a sport event</option>
-                {generationSportGroups.map((group) => (
-                  <optgroup key={`coord-group-${group.sportId}`} label={group.sportName} className="bg-[var(--surface)] text-[var(--text-main)] font-semibold">
+                {generationSportGroups.map((group) => {
+                  const isAssigned = targetScopedManagement && effectiveAssignedSportIds.includes(group.sportId);
+                  return (
+                    <optgroup
+                      key={`coord-group-${group.sportId}`}
+                      label={`${group.sportName}${isAssigned ? " (Assigned)" : ""}`}
+                      className="bg-[var(--surface)] text-[var(--text-main)] font-semibold"
+                    >
                     {group.targets.map((row) => {
                       const optionLabel = getCleanEventOptionLabel(row);
                       return (
@@ -2189,8 +2468,9 @@ const CoordinatorBrackets = ({
                         </option>
                       );
                     })}
-                  </optgroup>
-                ))}
+                    </optgroup>
+                  );
+                })}
               </select>
               <ChevronDown className="pointer-events-none absolute right-2.5 h-4 w-4 text-[var(--text-muted)]" aria-hidden="true" />
             </div>
@@ -2242,34 +2522,36 @@ const CoordinatorBrackets = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {canManageBrackets && (
+          {canManageCurrentSport ? (
             <>
-              {!isNonBracketEvent(selectedGenerationSport) ? (
-                <button
-                  type="button"
-                  onClick={handleOpenSeedReview}
-                  className="relative inline-flex items-center gap-1.5 rounded-xl bg-[var(--primary)] px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
-                  title={!selectedGenerationSport ? "Select an event category first." : ""}
-                >
-                  <Zap className="h-3.5 w-3.5" />
-                  Generate Bracket
-                  {isManualSeedingMode && manualSeedingValidationErrors.length > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">!</span>
-                  )}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setRaceHeatsModalTrigger((prev) => prev + 1)}
-                  className="relative inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-500 cursor-pointer"
-                  title="Configure preliminary heats and final stage"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Generate Heats &amp; Finals
-                </button>
-              )}
+              {!isSelectedBracketActive ? (
+                !isNonBracketEvent(selectedGenerationSport) ? (
+                  <button
+                    type="button"
+                    onClick={handleOpenSeedReview}
+                    className="relative inline-flex items-center gap-1.5 rounded-xl bg-[var(--primary)] px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
+                    title={!selectedGenerationSport ? "Select an event category first." : ""}
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    Generate Bracket
+                    {isManualSeedingMode && manualSeedingValidationErrors.length > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">!</span>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setRaceHeatsModalTrigger((prev) => prev + 1)}
+                    className="relative inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-500 cursor-pointer"
+                    title="Configure preliminary heats and final stage"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Generate Heats &amp; Finals
+                  </button>
+                )
+              ) : null}
 
-              {canManageGlobalBrackets ? (
+              {hasEligibleBracketsToActivate ? (
                 <button
                   type="button"
                   onClick={handleOpenActivateAll}
@@ -2277,22 +2559,26 @@ const CoordinatorBrackets = ({
                   title={generationTournamentId <= 0 ? "Open this page from an intramural first." : ""}
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  {activationBusy ? "Activating..." : "Activate Brackets"}
+                  {activationBusy
+                    ? "Activating..."
+                    : targetScopedManagement
+                    ? "Activate Sport Brackets"
+                    : "Activate Brackets"}
                 </button>
               ) : null}
 
-              {selectedBracket && (selectedBracketStatus === "DRAFT" || selectedBracketStatus === "GENERATED") ? (
+              {activeTargetBracket && (activeTargetBracketStatus === "DRAFT" || activeTargetBracketStatus === "GENERATED") ? (
                 <button
                   type="button"
-                  onClick={() => handleActivateSingle(selectedBracket.id)}
-                  disabled={singleActivatingId === selectedBracket.id || activationBusy}
+                  onClick={() => handleActivateSingle(activeTargetBracket.id)}
+                  disabled={singleActivatingId === activeTargetBracket.id || activationBusy}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
                 >
-                  {singleActivatingId === selectedBracket.id ? "Activating…" : "Activate This Bracket"}
+                  {singleActivatingId === activeTargetBracket.id ? "Activating…" : "Activate This Bracket"}
                 </button>
               ) : null}
 
-              {canManageGlobalBrackets ? (
+              {canManageGlobalBrackets && !isSelectedBracketActive && !areAllBracketsActive ? (
                 <>
                   <button
                     type="button"
@@ -2313,7 +2599,12 @@ const CoordinatorBrackets = ({
                 </>
               ) : null}
             </>
-          )}
+          ) : targetScopedManagement && !isFacilitatorForSelectedSport && selectedGenerationSport ? (
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-[var(--text-muted)]">
+              <Eye className="h-3.5 w-3.5" />
+              View only
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -2623,11 +2914,11 @@ const CoordinatorBrackets = ({
       </div>
 
       {/* Activation Confirmation Modal */}
-      {canManageGlobalBrackets && (
+      {canManageBrackets && (
         <AppModal
           open={showConfirmAll}
           onClose={() => setShowConfirmAll(false)}
-          title="Confirm Activation"
+          title={targetScopedManagement ? "Confirm Sport Activation" : "Confirm Activation"}
           maxWidthClass="max-w-lg"
           footer={
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end w-full">
@@ -2651,7 +2942,9 @@ const CoordinatorBrackets = ({
         >
           <div className="space-y-4">
             <p className="text-sm text-slate-700 dark:text-slate-300">
-              Eligible draft and generated brackets in this tournament will be activated. Active, completed, and trashed brackets will be skipped.
+              {targetScopedManagement
+                ? "Eligible draft and generated brackets for your assigned sport in this tournament will be activated. Active, completed, and trashed brackets will be skipped."
+                : "Eligible draft and generated brackets in this tournament will be activated. Active, completed, and trashed brackets will be skipped."}
             </p>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -2667,8 +2960,16 @@ const CoordinatorBrackets = ({
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 disabled={activationBusy}
               >
-                <option value="">All Sports in This Tournament</option>
-                {generationSportGroups.map((sport) => (
+                {!targetScopedManagement && (
+                  <option value="">All Sports in This Tournament</option>
+                )}
+                {targetScopedManagement && generationSportGroups.length > 1 && (
+                  <option value="">All Assigned Sports</option>
+                )}
+                {(targetScopedManagement && effectiveAssignedSportIds.length > 0
+                  ? generationSportGroups.filter((sport) => effectiveAssignedSportIds.includes(sport.sportId))
+                  : generationSportGroups
+                ).map((sport) => (
                   <option key={`activate-modal-sport-${sport.sportId}`} value={sport.sportId}>
                     {sport.sportName || "Unassigned sport"}
                   </option>
@@ -2680,7 +2981,7 @@ const CoordinatorBrackets = ({
       )}
 
       <ManualSeedingModal
-        open={canManageBrackets && isManualSeedModalOpen && Boolean(selectedGenerationSport)}
+        open={canManageCurrentSport && isManualSeedModalOpen && Boolean(selectedGenerationSport) && !isSelectedBracketActive}
         sectionRef={manualSeedingSectionRef}
         title={seedModalTitle}
         helpText={seedModeHelpText}

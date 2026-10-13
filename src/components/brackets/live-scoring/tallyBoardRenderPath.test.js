@@ -35,7 +35,7 @@ test("dashboard selects exactly one Basketball primary render branch", () => {
 test("timed-team component declares direct active players, score actions, clock, and compact secondary flow", () => {
   const surface = fs.readFileSync(new URL("./TimedTeamSurface.jsx", import.meta.url), "utf8");
   const shell = fs.readFileSync(new URL("./TallyBoardShell.jsx", import.meta.url), "utf8");
-  assert.match(surface, /Players on court/);
+  assert.match(surface, /Select player/);
   assert.match(surface, /Player from bench/);
   assert.match(surface, /Choose a bench player/);
   assert.match(surface, /Add \$\{control\.points\} point/);

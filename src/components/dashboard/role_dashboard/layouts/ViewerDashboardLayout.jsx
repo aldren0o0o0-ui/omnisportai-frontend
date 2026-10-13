@@ -28,6 +28,7 @@ import {
 } from "./dashboardLayoutUtils";
 import { mapChampionshipLeaderboard, mapChampionshipSportBreakdown } from "./dashboardStandingsUtils.js";
 import { DashboardStageSwitcher, LiveDashboardStage } from "./DashboardLifecycleStages";
+import { useAuth } from "../../../../context/AuthContext";
 import ViewerParticipationDashboard from "./ViewerParticipationDashboard";
 
 
@@ -142,10 +143,12 @@ const ViewerDashboardLayout = ({
   totalApplicationsCount = 0,
   applications = [],
 }) => {
+  const { user } = useAuth();
   const [championship, setChampionship] = useState(null);
   const [championshipUnavailable, setChampionshipUnavailable] = useState(false);
   const [teamRegistrations, setTeamRegistrations] = useState([]);
   const [competitionEntries, setCompetitionEntries] = useState([]);
+  const [allTeams, setAllTeams] = useState([]);
   const [scheduleEvents, setScheduleEvents] = useState([]);
   const [userSelectedStage, setUserSelectedStage] = useState(null);
 
@@ -178,15 +181,14 @@ const ViewerDashboardLayout = ({
       try {
         setChampionship(null);
         setChampionshipUnavailable(false);
-        const [champData, teamPayload, entryPayload, schedulePayload] = await Promise.all([
+        const [champData, teamPayload, entryPayload, schedulePayload, allTeamsPayload] = await Promise.all([
           getChampionshipStandings({ tournamentId }).catch(() => null),
           tournamentId
-            ? getTournamentTeamRegistrations(Number(tournamentId), { status: "ALL", page: 1, limit: 200 }).catch(() =>
-                getTeams(null, Number(tournamentId)).catch(() => [])
-              )
-            : getTeams().catch(() => []),
+            ? getTournamentTeamRegistrations(Number(tournamentId), { status: "ALL", page: 1, limit: 200 }).catch(() => [])
+            : [],
           tournamentId ? listEntries({ tournamentId: Number(tournamentId) }).catch(() => []) : [],
           tournamentId ? getScheduleEvents(Number(tournamentId)).catch(() => ({ events: [] })) : Promise.resolve({ events: [] }),
+          tournamentId ? getTeams(null, Number(tournamentId)).catch(() => []) : getTeams().catch(() => []),
         ]);
         if (!active) return;
         setChampionship(champData || null);
@@ -201,6 +203,13 @@ const ViewerDashboardLayout = ({
                 : []
         );
         setCompetitionEntries(Array.isArray(entryPayload) ? entryPayload : []);
+        setAllTeams(
+          Array.isArray(allTeamsPayload)
+            ? allTeamsPayload
+            : Array.isArray(allTeamsPayload?.items)
+              ? allTeamsPayload.items
+              : []
+        );
         setScheduleEvents(
           Array.isArray(schedulePayload?.events)
             ? schedulePayload.events
@@ -429,10 +438,11 @@ const ViewerDashboardLayout = ({
       buildShowcaseEntries({
         teamRegistrations,
         competitionEntries,
+        teams: allTeams,
         events,
         dashboard,
       }),
-    [teamRegistrations, competitionEntries, events, dashboard]
+    [teamRegistrations, competitionEntries, allTeams, events, dashboard]
   );
 
   return (
@@ -531,7 +541,7 @@ const ViewerDashboardLayout = ({
 
       {/* STAGE 3: Live & Leaderboard */}
       {effectiveStage === "live" && (
-        <LiveDashboardStage events={events} sports={displaySports} entries={showcaseEntries} tournamentId={tournamentId} scheduleHref="/viewer/schedules" scoreBasePath="/viewer/matches" standingsHref="/viewer/standings" entriesHref="/viewer/schedules" departmentRows={olympicLeaderboard} breakdownRows={sportBreakdown} standingsUnavailable={championshipUnavailable}>
+        <LiveDashboardStage events={events} sports={displaySports} entries={showcaseEntries} tournamentId={tournamentId} scheduleHref="/viewer/schedules" scoreBasePath="/viewer/matches" standingsHref="/viewer/standings" entriesHref="/viewer/schedules" departmentRows={olympicLeaderboard} breakdownRows={sportBreakdown} standingsUnavailable={championshipUnavailable} userDepartmentId={user?.department_id}>
           {announcements.length > 0 ? (
             <DashboardCard>
               <PanelHeader icon={Megaphone} title="Latest Announcements" action={{ label: "View all", to: "/viewer/announcements" }} />

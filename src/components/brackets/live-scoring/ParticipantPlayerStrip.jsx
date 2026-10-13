@@ -14,7 +14,7 @@ export default function ParticipantPlayerStrip({ participants = [], selectedTeam
       {participants.map((participant) => {
         const substitutionOpen = Number(substitutionTeamId) === Number(participant.id);
         return (
-          <div key={`players-${participant.id}`} className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-soft)] p-3">
+          <div key={`players-${participant.id}`} className="rounded-xl">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">{participant.shortName || participant.name} players</p>
               {substitutionControl ? (
@@ -27,7 +27,7 @@ export default function ParticipantPlayerStrip({ participants = [], selectedTeam
               {(participant.members || []).map((member) => {
                 const id = memberId(member);
                 const selected = substitutionOpen ? Number(outPlayerId) === id : Number(selectedTeamId) === Number(participant.id) && Number(selectedPlayerId) === id;
-                return <button key={`active-${participant.id}-${id}`} type="button" aria-pressed={selected} onClick={() => { if (substitutionOpen) setOutPlayerId(String(id)); else onSelectPlayer?.({ teamId: participant.id, playerId: id }); }} className={`min-h-9 rounded-full border px-2.5 text-xs font-semibold transition ${selected ? "border-cyan-500 bg-cyan-500/15 text-cyan-800 dark:text-cyan-100" : "border-[var(--border-soft)] bg-[var(--surface)] hover:bg-[var(--surface-muted)]"}`}>{memberName(member)}</button>;
+                return <button key={`active-${participant.id}-${id}`} type="button" aria-pressed={selected} onClick={() => { if (substitutionOpen) setOutPlayerId(String(id)); else onSelectPlayer?.({ teamId: participant.id, playerId: id }); }} className={`min-h-15 rounded-md border px-2.5 py-1 text-xs font-semibold transition ${selected ? "border-cyan-500 bg-cyan-500/15 text-cyan-800 dark:text-cyan-100" : "border-[var(--border-soft)] bg-[var(--surface)] hover:bg-[var(--surface-muted)]"}`}>{memberName(member)}</button>;
               })}
               {(participant.members || []).length === 0 ? <span className="text-xs text-[var(--text-muted)]">No active player list is available.</span> : null}
             </div>

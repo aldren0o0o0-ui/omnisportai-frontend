@@ -14,8 +14,6 @@ const DashboardSection = ({
   bodyClassName = 'mt-4',
 }) => (
   <DashboardCard className={className}>
-    <h1>Hello</h1>
-    <p>lore ipsum dolor sit amet, consectetur adipiscing elit.</p>
     {(title || action) && (
       <div className="flex flex-wrap items-center justify-between gap-2">
         {title ? (

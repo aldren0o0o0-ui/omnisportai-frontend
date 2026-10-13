@@ -40,17 +40,48 @@ const ownedByCoach = (entry, teamIds) => entry?.is_current_user_entry
   || entry?.capabilities?.can_edit_logo
   || (entry?.team_id && teamIds.includes(Number(entry.team_id)));
 
-const rosterRows = (entries) => entries.flatMap((participant) => {
-  const members = Array.isArray(participant.members) ? participant.members : [];
-  return members.map((player) => ({
-    key: `${participant.entry_id}-${player.player_id}`,
-    player,
-    participant,
-    shape: upper(participant.participant_shape, "TEAM"),
-    status: upper(participant.public_status, "APPROVED"),
-    medical: medicalStatusPresentation(player),
-  }));
-});
+const rosterRows = (entries) => {
+  const seen = new Map();
+  for (const participant of entries) {
+    const members = Array.isArray(participant.members) ? participant.members : [];
+    for (const player of members) {
+      const nameKey = String(player.display_name || player.name || "").trim().toLowerCase();
+      const emailKey = String(player.email || "").trim().toLowerCase();
+      const idKey = Number(player.player_id || player.user_id || 0);
+      const athleteKey = emailKey || (idKey > 0 ? `id:${idKey}` : `name:${nameKey}`);
+
+      const item = {
+        key: `${participant.entry_id || participant.team_id || "entry"}-${player.player_id || nameKey}`,
+        player,
+        participant,
+        shape: upper(participant.participant_shape, "TEAM"),
+        status: upper(participant.public_status, "APPROVED"),
+        medical: medicalStatusPresentation(player),
+      };
+
+      if (!seen.has(athleteKey)) {
+        seen.set(athleteKey, item);
+      } else {
+        const existing = seen.get(athleteKey);
+        if (existing.medical.status === "NOT_SUBMITTED" && item.medical.status !== "NOT_SUBMITTED") {
+          if (existing.participant.entry_id !== null && item.participant.entry_id === null) {
+            existing.player = { ...existing.player, ...item.player };
+            existing.medical = item.medical;
+          } else {
+            seen.set(athleteKey, item);
+          }
+        } else if (existing.participant.entry_id === null && item.participant.entry_id !== null) {
+          if (item.medical.status === "NOT_SUBMITTED" && existing.medical.status !== "NOT_SUBMITTED") {
+            item.player = { ...item.player, ...existing.player };
+            item.medical = existing.medical;
+          }
+          seen.set(athleteKey, item);
+        }
+      }
+    }
+  }
+  return Array.from(seen.values());
+};
 
 const HeroMetric = ({ label, value, attention }) => <div className="px-4 py-3 first:pl-0"><p className={`text-xl font-black tabular-nums ${attention ? "text-amber-300" : "text-white"}`}>{value}</p><p className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</p></div>;
 

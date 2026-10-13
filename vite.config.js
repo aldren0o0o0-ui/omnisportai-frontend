@@ -61,6 +61,29 @@ export default defineConfig({
   server: {
     host: true,
     allowedHosts: true,
+    proxy: {
+      '/auth': 'http://localhost:8001',
+      '/users': 'http://localhost:8001',
+      '/admin': 'http://localhost:8001',
+      '/departments': 'http://localhost:8001',
+      '/sports': 'http://localhost:8001',
+      '/teams': 'http://localhost:8001',
+      '/players': 'http://localhost:8001',
+      '/tournaments': 'http://localhost:8001',
+      '/venues': 'http://localhost:8001',
+      '/brackets': 'http://localhost:8001',
+      '/intramurals': 'http://localhost:8001',
+      '/competitions': 'http://localhost:8001',
+      '/competition-entries': 'http://localhost:8001',
+      '/competition-directory': 'http://localhost:8001',
+      '/entry-pools': 'http://localhost:8001',
+      '/api': 'http://localhost:8001',
+      '/static': 'http://localhost:8001',
+      '/ws': {
+        target: 'ws://localhost:8001',
+        ws: true,
+      },
+    },
   },
   build: {
     rollupOptions: {

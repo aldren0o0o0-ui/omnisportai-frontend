@@ -56,7 +56,6 @@ const TournamentCoachAssignments = lazy(() => import('./pages/department/Tournam
 
 const FacilitatorBrackets = lazy(() => import('./pages/sports_facilitator/Brackets'));
 const MatchEventCenter = lazy(() => import('./pages/sports_facilitator/MatchEventCenter'));
-const FacilitatorAssignedStaff = lazy(() => import('./pages/sports_facilitator/AssignedStaff'));
 const FacilitatorSports = lazy(() => import('./pages/sports_facilitator/Sports'));
 const FacilitatorTournaments = lazy(() => import('./pages/sports_facilitator/Tournaments'));
 const LiveScoringPage = lazy(() => import('./pages/shared/LiveScoringPage'));
@@ -71,10 +70,21 @@ const CoachBrackets = lazy(() => import('./pages/coach/Brackets'));
 const CoachSports = lazy(() => import('./pages/coach/Sports'));
 const CoachTournaments = lazy(() => import('./pages/coach/Tournaments'));
 const MyProfile = lazy(() => import('./pages/profile/MyProfile'));
+const EditProfilePage = lazy(() => import('./pages/profile/EditProfilePage'));
+const AccountSecurityPage = lazy(() => import('./pages/profile/AccountSecurityPage'));
 const ProfileRouteRedirect = lazy(() => import('./pages/profile/ProfileRouteRedirect'));
+const ProfileEditRouteRedirect = lazy(() =>
+  import('./pages/profile/ProfileRouteRedirect').then((m) => ({ default: m.ProfileEditRouteRedirect }))
+);
+const ProfileSecurityRouteRedirect = lazy(() =>
+  import('./pages/profile/ProfileRouteRedirect').then((m) => ({ default: m.ProfileSecurityRouteRedirect }))
+);
 const IntelligenceHub = lazy(() => import('./pages/shared/IntelligenceHub'));
-const NotificationsPage = lazy(() => import('./pages/shared/NotificationsPage'));
 const NotificationPreferences = lazy(() => import('./pages/shared/NotificationPreferences'));
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'));
+const AppearancePage = lazy(() => import('./pages/settings/AppearancePage'));
+const AboutPage = lazy(() => import('./pages/settings/AboutPage'));
+const SettingsRouteRedirect = lazy(() => import('./pages/settings/SettingsRouteRedirect'));
 const NotificationRedirector = lazy(() => import('./pages/shared/NotificationRedirector'));
 const SharedStandings = lazy(() => import('./pages/shared/StandingsPage'));
 const ResultCorrectionsPage = lazy(() => import('./pages/shared/ResultCorrectionsPage'));
@@ -118,10 +128,14 @@ function App() {
             {/* Public Routes */}
             <Route path='/' element={renderLazyRoute(LandingPage)} />
             <Route path="/login" element={renderLazyRoute(AuthPage)} />
+            <Route path="/register" element={renderLazyRoute(AuthPage)} />
             <Route path="/auth/postback/github" element={<Navigate to="/login" replace />} />
             <Route path="/notification-redirect" element={renderLazyRoute(NotificationRedirector)} />
             <Route element={<ProtectedRoute />}>
               <Route path="/profile" element={renderLazyRoute(ProfileRouteRedirect)} />
+              <Route path="/profile/edit" element={renderLazyRoute(ProfileEditRouteRedirect)} />
+              <Route path="/profile/security" element={renderLazyRoute(ProfileSecurityRouteRedirect)} />
+              <Route path="/settings" element={renderLazyRoute(SettingsRouteRedirect)} />
             </Route>
 
             {/* Private / Protected Route Logic */}
@@ -130,8 +144,14 @@ function App() {
               <Route path="/coordinator" element={<CoordinatorLayout />}>
                 <Route path="dashboard" element={renderLazyDashboard(CoordinatorDashboard)} />
                 <Route path="profile" element={renderLazyRoute(MyProfile)} />
+                <Route path="profile/edit" element={renderLazyRoute(EditProfilePage)} />
+                <Route path="profile/security" element={renderLazyRoute(AccountSecurityPage)} />
                 <Route path="intelligence" element={renderLazyRoute(IntelligenceHub)} />
-                <Route path="notifications" element={renderLazyRoute(NotificationsPage)} />
+                <Route path="notifications" element={<Navigate to="../dashboard" replace />} />
+                <Route path="settings" element={renderLazyRoute(SettingsPage)} />
+                <Route path="settings/notifications" element={renderLazyRoute(NotificationPreferences)} />
+                <Route path="settings/appearance" element={renderLazyRoute(AppearancePage)} />
+                <Route path="settings/about" element={renderLazyRoute(AboutPage)} />
                 <Route path="notification-settings" element={renderLazyRoute(NotificationPreferences)} />
                 <Route path="announcements" element={renderLazyRoute(AnnouncementsPage)} />
                 <Route path="announcements/new" element={renderLazyRoute(CreateAnnouncementPage)} />
@@ -184,14 +204,21 @@ function App() {
                     globalAllowedRoles={["DEPARTMENT_MANAGER", "SPORTS_COORDINATOR"]}
                     tournamentAllowedModes={["department_manager", "sports_coordinator"]}
                     allowWithoutTournamentSelection
+                    allowViewerSafeFallback
                   />
                 }
               >
                 <Route path="/department" element={<DepartmentManagerLayout />}>
                   <Route path="dashboard" element={renderLazyDashboard(DepartmentDashboard)} />
                   <Route path="profile" element={renderLazyRoute(MyProfile)} />
+                  <Route path="profile/edit" element={renderLazyRoute(EditProfilePage)} />
+                  <Route path="profile/security" element={renderLazyRoute(AccountSecurityPage)} />
                   <Route path="intelligence" element={renderLazyRoute(IntelligenceHub)} />
-                  <Route path="notifications" element={renderLazyRoute(NotificationsPage)} />
+                  <Route path="notifications" element={<Navigate to="../dashboard" replace />} />
+                  <Route path="settings" element={renderLazyRoute(SettingsPage)} />
+                  <Route path="settings/notifications" element={renderLazyRoute(NotificationPreferences)} />
+                  <Route path="settings/appearance" element={renderLazyRoute(AppearancePage)} />
+                  <Route path="settings/about" element={renderLazyRoute(AboutPage)} />
                   <Route path="notification-settings" element={renderLazyRoute(NotificationPreferences)} />
                   <Route path="announcements" element={renderLazyRoute(AnnouncementsPage)} />
                   <Route path="announcements/new" element={renderLazyRoute(CreateAnnouncementPage)} />
@@ -223,6 +250,7 @@ function App() {
                     globalAllowedRoles={["SPORTS_FACILITATOR", "SPORTS_COORDINATOR"]}
                     tournamentAllowedModes={["sports_facilitator", "sports_coordinator"]}
                     allowWithoutTournamentSelection
+                    allowViewerSafeFallback
                   />
                 }
               >
@@ -230,14 +258,20 @@ function App() {
                   <Route index element={renderLazyDashboard(FacilitatorDashboard)} />
                   <Route path="dashboard" element={renderLazyDashboard(FacilitatorDashboard)} />
                   <Route path="profile" element={renderLazyRoute(MyProfile)} />
+                  <Route path="profile/edit" element={renderLazyRoute(EditProfilePage)} />
+                  <Route path="profile/security" element={renderLazyRoute(AccountSecurityPage)} />
                   <Route path="intelligence" element={renderLazyRoute(IntelligenceHub)} />
-                  <Route path="notifications" element={renderLazyRoute(NotificationsPage)} />
+                  <Route path="notifications" element={<Navigate to="../dashboard" replace />} />
+                  <Route path="settings" element={renderLazyRoute(SettingsPage)} />
+                  <Route path="settings/notifications" element={renderLazyRoute(NotificationPreferences)} />
+                  <Route path="settings/appearance" element={renderLazyRoute(AppearancePage)} />
+                  <Route path="settings/about" element={renderLazyRoute(AboutPage)} />
                   <Route path="notification-settings" element={renderLazyRoute(NotificationPreferences)} />
                   <Route path="announcements" element={renderLazyRoute(AnnouncementsPage)} />
                   <Route path="announcements/new" element={renderLazyRoute(CreateAnnouncementPage)} />
                   <Route path="announcements/:announcementId" element={renderLazyRoute(AnnouncementDetailPage)} />
                   <Route path="approvals" element={<Navigate to="/sport-facilitator/teams-and-players?status=PENDING_REVIEW" replace />} />
-                  <Route path="assigned-staff" element={renderLazyRoute(FacilitatorAssignedStaff)} />
+                  <Route path="assigned-staff" element={<Navigate to="/sport-facilitator/dashboard" replace />} />
                   <Route path="teams-and-players" element={renderLazyRoute(CompetitionDirectoryPage)} />
                   <Route path="sports" element={renderLazyRoute(FacilitatorSports)} />
                   <Route path="venues" element={renderLazyRoute(Venues)} />
@@ -254,7 +288,8 @@ function App() {
                   <Route path="matches/:matchId" element={renderLazyRoute(LiveMatchViewerPage)} />
                   <Route path="events/:eventId/stages" element={renderLazyRoute(RaceStageManagementPage)} />
                   <Route path="contests/:contestId/timing" element={renderLazyRoute(RaceFacilitatorConsolePage)} />
-                  <Route path="result-corrections" element={renderLazyRoute(ResultCorrectionsPage)} />
+                  <Route path="results" element={renderLazyRoute(ViewerResults)} />
+                  <Route path="result-corrections" element={<Navigate to="/sport-facilitator/results" replace />} />
                 </Route>
                 <Route path="/facilitator/match/:matchId" element={renderLazyRoute(MatchEventCenter)} />
                 <Route path="/facilitator/matches/:matchId/live-scoring" element={renderLazyRoute(LiveScoringPage)} />
@@ -272,6 +307,7 @@ function App() {
                     globalAllowedRoles={["COACH", "SPORTS_COORDINATOR"]}
                     tournamentAllowedModes={["coach", "assistant_coach", "sports_coordinator"]}
                     allowWithoutTournamentSelection
+                    allowViewerSafeFallback
                   />
                 }
               >
@@ -279,8 +315,14 @@ function App() {
                   <Route index element={renderLazyDashboard(CoachDashboard)} />
                   <Route path="dashboard" element={renderLazyDashboard(CoachDashboard)} />
                   <Route path="profile" element={renderLazyRoute(MyProfile)} />
+                  <Route path="profile/edit" element={renderLazyRoute(EditProfilePage)} />
+                  <Route path="profile/security" element={renderLazyRoute(AccountSecurityPage)} />
                   <Route path="intelligence" element={renderLazyRoute(IntelligenceHub)} />
-                  <Route path="notifications" element={renderLazyRoute(NotificationsPage)} />
+                  <Route path="notifications" element={<Navigate to="../dashboard" replace />} />
+                  <Route path="settings" element={renderLazyRoute(SettingsPage)} />
+                  <Route path="settings/notifications" element={renderLazyRoute(NotificationPreferences)} />
+                  <Route path="settings/appearance" element={renderLazyRoute(AppearancePage)} />
+                  <Route path="settings/about" element={renderLazyRoute(AboutPage)} />
                   <Route path="notification-settings" element={renderLazyRoute(NotificationPreferences)} />
                   <Route path="announcements" element={renderLazyRoute(AnnouncementsPage)} />
                   <Route path="announcements/new" element={renderLazyRoute(CreateAnnouncementPage)} />
@@ -301,6 +343,7 @@ function App() {
                   <Route path="matches/:matchId/live-scoring" element={renderLazyRoute(LiveMatchViewerPage)} />
                   <Route path="matches/:matchId" element={renderLazyRoute(LiveMatchViewerPage)} />
                   <Route path="standings" element={renderLazyRoute(SharedStandings)} />
+                  <Route path="results" element={renderLazyRoute(ViewerResults)} />
                 </Route>
               </Route>
             </Route>
@@ -311,8 +354,14 @@ function App() {
               <Route path="/viewer" element={<ViewerLayout />}>
                 <Route path="dashboard" element={renderLazyDashboard(ViewerDashboard)} />
                 <Route path="profile" element={renderLazyRoute(MyProfile)} />
+                <Route path="profile/edit" element={renderLazyRoute(EditProfilePage)} />
+                <Route path="profile/security" element={renderLazyRoute(AccountSecurityPage)} />
                 <Route path="intelligence" element={renderLazyRoute(IntelligenceHub)} />
-                <Route path="notifications" element={renderLazyRoute(NotificationsPage)} />
+                <Route path="notifications" element={<Navigate to="../dashboard" replace />} />
+                <Route path="settings" element={renderLazyRoute(SettingsPage)} />
+                <Route path="settings/notifications" element={renderLazyRoute(NotificationPreferences)} />
+                <Route path="settings/appearance" element={renderLazyRoute(AppearancePage)} />
+                <Route path="settings/about" element={renderLazyRoute(AboutPage)} />
                 <Route path="notification-settings" element={renderLazyRoute(NotificationPreferences)} />
                 <Route path="announcements" element={renderLazyRoute(AnnouncementsPage)} />
                 <Route path="announcements/:announcementId" element={renderLazyRoute(AnnouncementDetailPage)} />

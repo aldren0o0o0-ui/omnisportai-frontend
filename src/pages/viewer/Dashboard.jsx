@@ -112,6 +112,7 @@ const Dashboard = () => {
     roster: null,
   });
   const [medicalUploadFile, setMedicalUploadFile] = useState(null);
+  const [medicalConfirmOpen, setMedicalConfirmOpen] = useState(false);
 
   const roleType = String(dashboard?.dashboard_type || "VIEWER").trim().toUpperCase();
   const isPlayer =
@@ -270,10 +271,13 @@ const Dashboard = () => {
           pool_id: pool.id,
           application_status: pool.my_application_status,
           player_membership_confirmed: Boolean(pool.my_application_confirmed),
+          health_notes: pool.my_application_health_notes || pool.health_notes || "",
+          medical_certificate_status: pool.my_application_medical_certificate_status || pool.medical_certificate_status || "",
+          medical_certificate_url: pool.my_application_medical_certificate_url || pool.medical_certificate_url || "",
           pool_name: pool.pool_name,
         }));
       const priority = { ACCEPTED_AS_PLAYER: 0, FOR_TRYOUT: 1, REJECTED: 2, CANCELLED: 3 };
-      
+
       const rawApplications = [...teamApps, ...poolApps];
       const approvedCount = new Set(
         rawApplications
@@ -303,39 +307,60 @@ const Dashboard = () => {
         });
       const primary = applications[0] || null;
 
-      const scheduleEntries = await Promise.all(
-        applications.map(async (application) => {
-          const key = applicationLifecycleKey(application);
-          try {
-            if (application.sourceType === "TEAM" && application.team_id) {
-              const res = await getTeamTryoutSchedule(application.team_id, tournamentId);
-              return [key, res?.schedule || null];
+      const [scheduleEntries, rosterEntries] = await Promise.all([
+        Promise.all(
+          applications.map(async (application) => {
+            const key = applicationLifecycleKey(application);
+            try {
+              if (application.sourceType === "TEAM" && application.team_id) {
+                const res = await getTeamTryoutSchedule(application.team_id, tournamentId);
+                return [key, res?.schedule || null];
+              }
+              if (application.sourceType === "POOL" && application.pool_id) {
+                const res = await getEntryPoolTryoutSchedule(application.pool_id);
+                return [key, res?.schedule || null];
+              }
+            } catch {
+              return [key, null];
             }
-            if (application.sourceType === "POOL" && application.pool_id) {
-              const res = await getEntryPoolTryoutSchedule(application.pool_id);
-              return [key, res?.schedule || null];
-            }
-          } catch {
             return [key, null];
-          }
-          return [key, null];
-        })
-      );
+          })
+        ),
+        Promise.all(
+          applications.map(async (application) => {
+            const key = applicationLifecycleKey(application);
+            try {
+              if (application.sourceType === "TEAM" && application.team_id) {
+                const rosterData = await getTeamRoster(application.team_id, tournamentId).catch(() => null);
+                return [key, rosterData];
+              }
+              if (application.sourceType === "POOL") {
+                return [
+                  key,
+                  {
+                    team_name: application.pool_name || application.event_name || "My Entry",
+                    coach: application.coach_name ? { name: application.coach_name } : null,
+                    players: Array.isArray(application.accepted_teammates) ? application.accepted_teammates : [],
+                  },
+                ];
+              }
+            } catch {
+              return [key, null];
+            }
+            return [key, null];
+          })
+        ),
+      ]);
       const schedulesByKey = {};
       for (const [key, value] of scheduleEntries) {
         if (key) schedulesByKey[key] = value;
       }
-      const schedule = primary ? schedulesByKey[applicationLifecycleKey(primary)] || null : null;
-      let roster = null;
-      if (primary?.sourceType === "TEAM" && primary?.team_id) {
-        roster = await getTeamRoster(primary.team_id, tournamentId).catch(() => null);
-      } else if (primary?.sourceType === "POOL") {
-        roster = {
-          team_name: primary.pool_name || primary.event_name || "My Entry",
-          coach: primary.coach_name ? { name: primary.coach_name } : null,
-          players: Array.isArray(primary.accepted_teammates) ? primary.accepted_teammates : [],
-        };
+      const rostersByKey = {};
+      for (const [key, value] of rosterEntries) {
+        if (key) rostersByKey[key] = value;
       }
+      const schedule = primary ? schedulesByKey[applicationLifecycleKey(primary)] || null : null;
+      const roster = primary ? rostersByKey[applicationLifecycleKey(primary)] || null : null;
 
       setApplicationLifecycle({
         loading: false,
@@ -343,6 +368,7 @@ const Dashboard = () => {
         primary,
         items: applications,
         schedulesByKey,
+        rostersByKey,
         schedule,
         tryoutDone: schedule?.scheduled_date
           ? new Date(schedule.scheduled_date).getTime() <= Date.now()
@@ -360,6 +386,7 @@ const Dashboard = () => {
         primary: null,
         items: [],
         schedulesByKey: {},
+        rostersByKey: {},
         schedule: null,
         tryoutDone: false,
         hasGeneratedBracket: false,
@@ -382,9 +409,16 @@ const Dashboard = () => {
     if (!application?.id) return;
 
     // The participation limit is two distinct sports, not two event entries.
-    const currentApprovedCount = Number(applicationLifecycle.approvedCount || 0);
+    const approvedSportKeys = new Set(
+      (applicationLifecycle?.items || [])
+        .filter((app) => toUpper(app.application_status) === "ACCEPTED_AS_PLAYER" || Boolean(app.player_membership_confirmed))
+        .map((app) => String(app.sport_id || app.sport_name || app.sport_label || "").trim().toLowerCase())
+        .filter(Boolean)
+    );
+    const thisSportKey = String(application.sport_id || application.sport_name || application.sport_label || "").trim().toLowerCase();
+    const isAlreadyInApprovedSports = thisSportKey && approvedSportKeys.has(thisSportKey);
     const isAlreadyConfirmed = Boolean(application?.player_membership_confirmed || application?.my_application_confirmed);
-    if (!isAlreadyConfirmed && currentApprovedCount >= 2) {
+    if (!isAlreadyConfirmed && !isAlreadyInApprovedSports && approvedSportKeys.size >= 2) {
       setRosterModal((prev) => ({
         ...prev,
         error: "Participation limit reached: you are already participating in 2 sports for this Intramural.",
@@ -449,12 +483,12 @@ const Dashboard = () => {
         ...prev,
         application: prev.application
           ? {
-              ...prev.application,
-              health_notes: `Medical Certificate Attachment: ${fileUrl}\nMedical Certificate Status: PENDING`,
-              medical_certificate_url: fileUrl,
-              medical_certificate_status: "PENDING",
-              medical_certificate_submitted: true,
-            }
+            ...prev.application,
+            health_notes: `Medical Certificate Attachment: ${fileUrl}\nMedical Certificate Status: PENDING`,
+            medical_certificate_url: fileUrl,
+            medical_certificate_status: "PENDING",
+            medical_certificate_submitted: true,
+          }
           : prev.application,
       }));
       await loadApplicationLifecycle();
@@ -532,10 +566,10 @@ const Dashboard = () => {
   ).trim().toUpperCase();
   const statusLabel =
     rawStatus === "ARCHIVED" ||
-    rawStatus === "COMPLETED" ||
-    rawStatus === "FINISHED" ||
-    rawStatus === "FINALIZED" ||
-    rawStatus === "CLOSED"
+      rawStatus === "COMPLETED" ||
+      rawStatus === "FINISHED" ||
+      rawStatus === "FINALIZED" ||
+      rawStatus === "CLOSED"
       ? "Tournament Finished"
       : rawStatus === "ACTIVE" ||
         rawStatus === "STARTED" ||
@@ -554,24 +588,15 @@ const Dashboard = () => {
   return (
     <RoleDashboardShell
       role="viewer"
-      eyebrow={isPlayer ? playerEyebrow : undefined}
-      title={headerTournamentName}
+      eyebrow={isPlayer ? "" : undefined}
+      title={""}
       subtitle={isPlayer ? "" : headerSubtitle}
       showOverviewCard={false}
       loading={loading || !dashboard || isResolvingTournamentRole}
       error={error || (!isPlayer ? bracketsError : "")}
 
       headerAction={
-        isPlayer ? (
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-            <Link to="/viewer/results" className="os-btn-ghost-soft inline-flex min-h-[var(--control-height-md)] flex-1 items-center justify-center gap-2 px-3 text-sm font-semibold sm:flex-none">
-              Check Results
-            </Link>
-            <Link to="/viewer/schedules" className="os-btn-primary-soft inline-flex min-h-[var(--control-height-md)] flex-1 items-center justify-center gap-2 px-4 text-sm font-semibold sm:flex-none">
-              View Schedules
-            </Link>
-          </div>
-        ) : null
+        ""
       }
     >
       {isResolvingTournamentRole ? null : isPlayer ? (
@@ -580,6 +605,9 @@ const Dashboard = () => {
           lifecycle={applicationLifecycle}
           currentUser={user}
           onOpenRoster={handleOpenRoster}
+          startedTournament={startedTournament}
+          brackets={bracketSummaryRows}
+          sportsList={sportsList}
         />
       ) : (
         <ViewerDashboardLayout
@@ -606,161 +634,213 @@ const Dashboard = () => {
         }
         maxWidthClass="max-w-2xl"
       >
-            {rosterModal.loading ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400">Loading team information...</p>
-            ) : rosterModal.error ? (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300">
-                {rosterModal.error}
-              </div>
-            ) : !rosterModal.application?.player_membership_confirmed ? (
-              <div className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
-                <p>
-                  {rosterModal.application?.sourceType === "POOL"
-                    ? `You were accepted for ${rosterModal.application?.pool_name || rosterModal.application?.team_name || "this entry"}. Review the event before confirming your final decision.`
-                    : `You were accepted for ${rosterModal.application?.team_name || "this team"}. Review the selected team before confirming your final decision.`}
+        {rosterModal.loading ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Loading team information...</p>
+        ) : rosterModal.error ? (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300">
+            {rosterModal.error}
+          </div>
+        ) : !rosterModal.application?.player_membership_confirmed ? (
+          <div className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
+            <p>
+              {rosterModal.application?.sourceType === "POOL"
+                ? `You were accepted for ${rosterModal.application?.pool_name || rosterModal.application?.team_name || "this entry"}. Review the event before confirming your final decision.`
+                : `You were accepted for ${rosterModal.application?.team_name || "this team"}. Review the selected team before confirming your final decision.`}
+            </p>
+            {rosterModal.application?.sourceType === "POOL" ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/60">
+                <p className="font-semibold text-slate-900 dark:text-white">
+                  {rosterModal.application?.participant_shape === "DUO" ? "Duo entry" : "Solo entry"}
                 </p>
-                {rosterModal.application?.sourceType === "POOL" ? (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/60">
-                    <p className="font-semibold text-slate-900 dark:text-white">
-                      {rosterModal.application?.participant_shape === "DUO" ? "Duo entry" : "Solo entry"}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      {[
-                        rosterModal.application?.sport_name,
-                        rosterModal.application?.event_name,
-                        rosterModal.application?.department_name,
-                      ].filter(Boolean).join(" • ") || "Entry details"}
-                    </p>
-                    {rosterModal.application?.participant_shape === "DUO" ? (
-                      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                        Your pair will be finalized by the coach based on the accepted duo entry.
-                      </p>
-                    ) : null}
-                  </div>
-                ) : Array.isArray(rosterModal.application?.accepted_teammates) && rosterModal.application.accepted_teammates.length > 0 ? (
-                  <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
-                    {rosterModal.application.accepted_teammates.map((player) => (
-                      <li key={player.application_id || player.user_id} className="px-4 py-3">
-                        <p className="font-semibold text-slate-900 dark:text-white">
-                          {player.name || player.email || "Accepted player"}
-                          {player.is_me ? <span className="ml-2 text-xs font-semibold text-blue-600 dark:text-blue-300">(You)</span> : null}
-                        </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          {player.position || "Roster"}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
-                    Teammate details are not available yet. You can still confirm if you want to join this team.
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {[
+                    rosterModal.application?.sport_name,
+                    rosterModal.application?.event_name,
+                    rosterModal.application?.department_name,
+                  ].filter(Boolean).join(" • ") || "Entry details"}
+                </p>
+                {rosterModal.application?.participant_shape === "DUO" ? (
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    Your pair will be finalized by the coach based on the accepted duo entry.
                   </p>
-                )}
-                <p className="font-medium text-slate-900 dark:text-white">
-                  {rosterModal.application?.sourceType === "POOL"
-                    ? "Do you accept joining this entry?"
-                    : "Do you accept being part of this team?"}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => handleConfirmPlayer(rosterModal.application)}
-                  disabled={rosterModal.confirming}
-                  className="os-btn-primary-soft px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {rosterModal.confirming ? "Confirming..." : "Accept as player"}
-                </button>
+                ) : null}
               </div>
+            ) : Array.isArray(rosterModal.application?.accepted_teammates) && rosterModal.application.accepted_teammates.length > 0 ? (
+              <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+                {rosterModal.application.accepted_teammates.map((player) => (
+                  <li key={player.application_id || player.user_id} className="px-4 py-3">
+                    <p className="font-semibold text-slate-900 dark:text-white">
+                      {player.name || player.email || "Accepted player"}
+                      {player.is_me ? <span className="ml-2 text-xs font-semibold text-blue-600 dark:text-blue-300">(You)</span> : null}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {player.position || "Roster"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
             ) : (
-              (() => {
-                const application = rosterModal.application || {};
-                const isPool = application.sourceType === "POOL";
-                const medicalStatus = getMedicalCertificateStatus(application);
-                const needsUpload = medicalStatus === "NOT_SUBMITTED" || medicalStatus === "REJECTED";
-                return (
-                  <div className="space-y-4">
-                    {isPool ? (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
-                        <p className="text-lg font-bold text-slate-900 dark:text-white">
-                          {application.participant_shape === "DUO" ? "Duo entry confirmed" : "Solo entry confirmed"}
-                        </p>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          {[application.pool_name || application.team_name, getSportDisplayName(application), application.event_name].filter(Boolean).join(" • ") || "Entry details"}
-                        </p>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
-                          <p className="text-lg font-bold text-slate-900 dark:text-white">
-                            {rosterModal.roster?.team_name || application.team_name || "Team"}
-                          </p>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">
-                            {[rosterModal.roster?.department_name, getSportDisplayName(rosterModal.roster)].filter(Boolean).join(" • ")}
-                          </p>
-                        </div>
-                        <div>
-                          <h3 className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">Team members</h3>
-                          {Array.isArray(rosterModal.roster?.players) && rosterModal.roster.players.length > 0 ? (
-                            <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
-                              {rosterModal.roster.players.map((player) => (
-                                <li key={player.id || player.player_id} className="px-4 py-3 text-sm">
-                                  <p className="font-semibold text-slate-900 dark:text-white">
-                                    {[player.first_name, player.last_name].filter(Boolean).join(" ") || player.name || "Player"}
-                                  </p>
-                                  <p className="text-xs text-slate-500 dark:text-slate-400">{player.position || "Roster"}</p>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="text-sm text-slate-500 dark:text-slate-400">No teammate list is available yet.</p>
-                          )}
-                        </div>
-                      </>
-                    )}
-
-                    <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 dark:border-blue-900/40 dark:bg-blue-950/20">
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">Medical certificate</h3>
-                      {needsUpload ? (
-                        <div className="mt-3 space-y-3">
-                          <p className="text-sm text-slate-600 dark:text-slate-300">
-                            {medicalStatus === "REJECTED"
-                              ? "Your previous certificate needs resubmission. Please upload a valid or clearer file."
-                              : "Please attach your medical certificate before the Intramural starts."}
-                          </p>
-                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
-                            Medical certificate file
-                            <input
-                              type="file"
-                              accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
-                              disabled={applicationLifecycle.uploading}
-                              onChange={(event) => setMedicalUploadFile(event.target.files?.[0] || null)}
-                              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                            />
-                          </label>
-                          <button
-                            type="button"
-                            disabled={applicationLifecycle.uploading || !medicalUploadFile}
-                            onClick={() => handleUploadCertificate(application, medicalUploadFile)}
-                            className="os-btn-primary-soft inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            <FileUp size={15} />
-                            {applicationLifecycle.uploading ? "Submitting..." : "Submit medical certificate"}
-                          </button>
-                        </div>
-                      ) : medicalStatus === "RECEIVED" ? (
-                        <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-300">
-                          Your coach marked your medical certificate as received.
-                        </p>
+              <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
+                Teammate details are not available yet. You can still confirm if you want to join this team.
+              </p>
+            )}
+            <p className="font-medium text-slate-900 dark:text-white">
+              {rosterModal.application?.sourceType === "POOL"
+                ? "Do you accept joining this entry?"
+                : "Do you accept being part of this team?"}
+            </p>
+            <button
+              type="button"
+              onClick={() => handleConfirmPlayer(rosterModal.application)}
+              disabled={rosterModal.confirming}
+              className="os-btn-primary-soft px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {rosterModal.confirming ? "Confirming..." : "Accept as player"}
+            </button>
+          </div>
+        ) : (
+          (() => {
+            const application = rosterModal.application || {};
+            const isPool = application.sourceType === "POOL";
+            const medicalStatus = getMedicalCertificateStatus(application);
+            const needsUpload = medicalStatus === "NOT_SUBMITTED" || medicalStatus === "REJECTED";
+            return (
+              <div className="space-y-4">
+                {isPool ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+                    <p className="text-lg font-bold text-slate-900 dark:text-white">
+                      {application.participant_shape === "DUO" ? "Duo entry confirmed" : "Solo entry confirmed"}
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      {[application.pool_name || application.team_name, getSportDisplayName(application), application.event_name].filter(Boolean).join(" • ") || "Entry details"}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+                      <p className="text-lg font-bold text-slate-900 dark:text-white">
+                        {rosterModal.roster?.team_name || application.team_name || "Team"}
+                      </p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {[rosterModal.roster?.department_name, getSportDisplayName(rosterModal.roster)].filter(Boolean).join(" • ")}
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">Team members</h3>
+                      {Array.isArray(rosterModal.roster?.players) && rosterModal.roster.players.length > 0 ? (
+                        <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+                          {rosterModal.roster.players.map((player) => (
+                            <li key={player.id || player.player_id} className="px-4 py-3 text-sm">
+                              <p className="font-semibold text-slate-900 dark:text-white">
+                                {[player.first_name, player.last_name].filter(Boolean).join(" ") || player.name || "Player"}
+                              </p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">{player.position || "Roster"}</p>
+                            </li>
+                          ))}
+                        </ul>
                       ) : (
-                        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                          Your certificate was submitted. Please wait for your coach to review it.
-                        </p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">No teammate list is available yet.</p>
                       )}
                     </div>
-                  </div>
-                );
-              })()
-            )}
-          </AppModal>
+                  </>
+                )}
+
+                <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 dark:border-blue-900/40 dark:bg-blue-950/20">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Medical certificate</h3>
+                  {needsUpload ? (
+                    <div className="mt-3 space-y-3">
+                      <p className="text-sm text-slate-600 dark:text-slate-300">
+                        {medicalStatus === "REJECTED"
+                          ? "Your previous certificate needs resubmission. Please upload a valid or clearer file."
+                          : "Please attach your medical certificate before the Intramural starts."}
+                      </p>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        Medical certificate file
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                          disabled={applicationLifecycle.uploading}
+                          onChange={(event) => setMedicalUploadFile(event.target.files?.[0] || null)}
+                          className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        disabled={applicationLifecycle.uploading || !medicalUploadFile}
+                        onClick={() => medicalUploadFile && setMedicalConfirmOpen(true)}
+                        className="os-btn-primary-soft inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <FileUp size={15} />
+                        {applicationLifecycle.uploading ? "Submitting..." : "Submit medical certificate"}
+                      </button>
+                    </div>
+                  ) : medicalStatus === "RECEIVED" ? (
+                    <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-300">
+                      Your coach marked your medical certificate as received.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                      Your certificate was submitted. Please wait for your coach to review it.
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })()
+        )}
+      </AppModal>
+
+      {/* Medical certificate submission confirmation */}
+      <AppModal
+        open={medicalConfirmOpen && Boolean(rosterModal.application)}
+        onClose={() => {
+          if (applicationLifecycle.uploading) return;
+          setMedicalConfirmOpen(false);
+        }}
+        title="Submit medical certificate?"
+        subtitle="Please confirm this is the correct file before sending it to your coach."
+        maxWidthClass="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-700 dark:text-slate-300">
+            You are about to submit:
+          </p>
+          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800">
+            <FileUp size={15} className="shrink-0 text-blue-500" />
+            <span className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+              {medicalUploadFile?.name || "—"}
+            </span>
+            <span className="ml-auto shrink-0 text-xs text-slate-500 dark:text-slate-400">
+              {medicalUploadFile ? `${(medicalUploadFile.size / 1024).toFixed(0)} KB` : ""}
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Once submitted, your coach will review the certificate. If it is rejected you can re-upload.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              disabled={applicationLifecycle.uploading}
+              onClick={() => setMedicalConfirmOpen(false)}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={applicationLifecycle.uploading}
+              onClick={async () => {
+                setMedicalConfirmOpen(false);
+                await handleUploadCertificate(rosterModal.application, medicalUploadFile);
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
+            >
+              <FileUp size={14} />
+              {applicationLifecycle.uploading ? "Submitting..." : "Yes, submit"}
+            </button>
+          </div>
+        </div>
+      </AppModal>
 
     </RoleDashboardShell>
   );

@@ -120,6 +120,52 @@ export const formatScheduledLabel = (schedule) => {
 };
 
 /**
+ * Registration window status helpers.
+ * In backend, registrations are only accepted while workspace status is PLANNING ("Registration Open").
+ * While in DRAFT, the intramural is in Planning phase (registration not open yet).
+ * In READY, ACTIVE, COMPLETED, ARCHIVED, or historical mode, registration is closed.
+ */
+export const isRegistrationOpenStatus = (status, isHistorical = false) => {
+  if (isHistorical) return false;
+  const normalized = String(status || "").trim().toUpperCase();
+  return normalized === "PLANNING";
+};
+
+export const getRegistrationWindowStatus = (status, isHistorical = false) => {
+  if (isHistorical) {
+    return {
+      isOpen: false,
+      isPlanning: false,
+      isClosed: true,
+      reason: "This intramural is archived or completed. Registrations cannot be submitted.",
+    };
+  }
+  const normalized = String(status || "").trim().toUpperCase();
+  if (normalized === "PLANNING") {
+    return {
+      isOpen: true,
+      isPlanning: false,
+      isClosed: false,
+      reason: "",
+    };
+  }
+  if (normalized === "DRAFT") {
+    return {
+      isOpen: false,
+      isPlanning: true,
+      isClosed: false,
+      reason: "This intramural is currently in the Planning phase. Registration has not opened yet.",
+    };
+  }
+  return {
+    isOpen: false,
+    isPlanning: false,
+    isClosed: true,
+    reason: "Registration is closed for this intramural. Teams and entries can no longer be submitted.",
+  };
+};
+
+/**
  * Build the normalized workspace object the rest of this module consumes, from
  * the pieces the page already has: a grouped team/pool, its tryout schedule,
  * and (for teams) the backend readiness payload. This is the single place that
@@ -128,9 +174,17 @@ export const formatScheduledLabel = (schedule) => {
  * @param {object} group        — grouped team/pool from the page (acceptedTeamGroups shape)
  * @param {object|null} schedule — tryout schedule for the group, or null
  * @param {object|null} readiness — backend readiness payload (teams only), or null
+ * @param {object|null} registrationWindow — registration window status object, or null
  */
-export const buildWorkspace = (group, schedule, readiness) => {
+export const buildWorkspace = (group, schedule, readiness, registrationWindow = null) => {
   if (!group) return null;
+
+  const regWindow = registrationWindow || {
+    isOpen: true,
+    isPlanning: false,
+    isClosed: false,
+    reason: "",
+  };
 
   const counts = group.counts || {};
   const tryoutDone = isTryoutDone(schedule);
@@ -156,6 +210,20 @@ export const buildWorkspace = (group, schedule, readiness) => {
     // Pools have no medical-certificate or team-info gate; readiness is the
     // pool's own validity. Auto-complete those stages so the stepper flows
     // Applicants → Tryout → Selection → Ready.
+    const poolReasons = [
+      ...(!group.isValid ? [group.requirementLabel || "Select the required accepted players first."] : []),
+      ...(!allAcceptedCertificatesReceived
+        ? [
+            playersMissingReceivedCertificate.length > 0
+              ? `Medical certificate must be received for: ${playersMissingReceivedCertificate
+                  .map((player) => player.name)
+                  .join(", ")}.`
+              : "Every accepted player must have a medical certificate marked as received.",
+          ]
+        : []),
+      ...(!regWindow.isOpen && regWindow.reason ? [regWindow.reason] : []),
+    ];
+
     return {
       groupKey: group.groupKey,
       groupType: "pool",
@@ -174,21 +242,13 @@ export const buildWorkspace = (group, schedule, readiness) => {
       teamInfoComplete: true,
       certsComplete: allAcceptedCertificatesReceived,
       missingCertPlayers: playersMissingReceivedCertificate,
-      missingReasons: [
-        ...(!group.isValid ? [group.requirementLabel || "Select the required accepted players first."] : []),
-        ...(!allAcceptedCertificatesReceived
-          ? [
-              playersMissingReceivedCertificate.length > 0
-                ? `Medical certificate must be received for: ${playersMissingReceivedCertificate
-                    .map((player) => player.name)
-                    .join(", ")}.`
-                : "Every accepted player must have a medical certificate marked as received.",
-            ]
-          : []),
-      ],
-      isReady: Boolean(group.isValid) && allAcceptedCertificatesReceived && !isLocked,
+      missingReasons: poolReasons,
+      isReady: Boolean(group.isValid) && allAcceptedCertificatesReceived && !isLocked && regWindow.isOpen,
       isLocked,
       currentStatus,
+      registrationWindow: regWindow,
+      isRegistrationOpen: regWindow.isOpen,
+      registrationBlockReason: regWindow.reason,
     };
   }
 
@@ -215,6 +275,9 @@ export const buildWorkspace = (group, schedule, readiness) => {
       .join(", ")}.`;
     if (!missingReasons.includes(certificateMessage)) missingReasons.push(certificateMessage);
   }
+  if (!regWindow.isOpen && regWindow.reason && !missingReasons.includes(regWindow.reason)) {
+    missingReasons.push(regWindow.reason);
+  }
 
   return {
     groupKey: group.groupKey,
@@ -235,9 +298,12 @@ export const buildWorkspace = (group, schedule, readiness) => {
     certsComplete,
     missingCertPlayers,
     missingReasons,
-    isReady: Boolean(readiness?.is_ready) && certsComplete,
+    isReady: Boolean(readiness?.is_ready) && certsComplete && regWindow.isOpen,
     isLocked,
     currentStatus,
+    registrationWindow: regWindow,
+    isRegistrationOpen: regWindow.isOpen,
+    registrationBlockReason: regWindow.reason,
   };
 };
 
@@ -280,6 +346,25 @@ export const computeNextAction = (workspace) => {
       title: "Submitted for review",
       description: "Your team has been sent to the sports facilitator. You'll be notified when a decision is made.",
       buttonLabel: "View Submission",
+      targetSection: SECTION_IDS.submit,
+      disabled: true,
+    };
+  }
+
+  if (workspace.registrationWindow && !workspace.isRegistrationOpen) {
+    if (workspace.registrationWindow.isPlanning) {
+      return {
+        title: "Registration not open yet",
+        description: "This intramural is currently in the Planning phase. Team submission will unlock once registration opens.",
+        buttonLabel: "Planning Phase",
+        targetSection: SECTION_IDS.submit,
+        disabled: true,
+      };
+    }
+    return {
+      title: "Registration closed",
+      description: "Registration is closed for this intramural. Teams can no longer be submitted to the sports facilitator.",
+      buttonLabel: "Registration Closed",
       targetSection: SECTION_IDS.submit,
       disabled: true,
     };
@@ -368,6 +453,18 @@ export const buildChecklist = (workspace) => {
     const items = [
       { ok: Boolean(workspace.minSatisfied), label: "Required entries selected" },
       { ok: Boolean(workspace.maxOk), label: "Within entry limit" },
+      ...(workspace.registrationWindow
+        ? [
+            {
+              ok: Boolean(workspace.isRegistrationOpen),
+              label: workspace.registrationWindow.isPlanning
+                ? "Registration open (currently in Planning phase)"
+                : workspace.registrationWindow.isClosed
+                  ? "Registration open (currently closed)"
+                  : "Registration open",
+            },
+          ]
+        : []),
     ];
     return items.sort((a, b) => Number(a.ok) - Number(b.ok));
   }
@@ -379,6 +476,18 @@ export const buildChecklist = (workspace) => {
     { ok: true, label: "Coach assigned" },
     { ok: Boolean(workspace.certsComplete), label: "Medical certificates completed" },
     { ok: true, label: "Eligibility confirmed" },
+    ...(workspace.registrationWindow
+      ? [
+          {
+            ok: Boolean(workspace.isRegistrationOpen),
+            label: workspace.registrationWindow.isPlanning
+              ? "Registration open (currently in Planning phase)"
+              : workspace.registrationWindow.isClosed
+                ? "Registration open (currently closed)"
+                : "Registration open",
+          },
+        ]
+      : []),
   ];
 
   // Unmet requirements first (spec: "Display unmet requirements first").

@@ -42,7 +42,7 @@ const FEATURE_OPTIONS = [
   { key: "table_set", label: "Table Set" },
   { key: "swimming_pool", label: "Swimming Pool" },
   { key: "running_track", label: "Running Track" },
-  { key: "baseball_diamond", label: "Baseball Diamond" },
+  // { key: "baseball_diamond", label: "Baseball Diamond" },
   { key: "cricket_pitch", label: "Cricket Pitch" },
   { key: "tennis_court_lines", label: "Tennis Court Lines" },
   { key: "badminton_court_lines", label: "Badminton Court Lines" },

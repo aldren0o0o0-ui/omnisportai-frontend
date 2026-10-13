@@ -3,8 +3,10 @@ import { createPortal } from "react-dom";
 import { X, User, AlertCircle, RefreshCw } from "lucide-react";
 import { motion as Motion, useReducedMotion } from "framer-motion";
 import { useProfileDrawer } from "./ProfileDrawerContext";
-import { getUserProfile } from "../../services/userService";
+import { useWorkspace } from "../../context/WorkspaceContext";
+import { getUserProfile, getUserByPlayerId } from "../../services/userService";
 import ProfileHeader from "./ProfileHeader";
+import ProfileContextBanner from "./ProfileContextBanner";
 import PlayerProfileContent from "./PlayerProfileContent";
 import {
   CoachSection,
@@ -17,6 +19,9 @@ import { hasRole, normalizeRoles } from "./profileUtils";
 
 export const UniversalProfileDrawer = () => {
   const { isOpen, closeProfile, profileTarget } = useProfileDrawer();
+  const ws = useWorkspace();
+  const selectedIntramural = ws?.selectedIntramural || null;
+  const isViewingHistorical = ws?.isViewingHistorical || false;
   const panelRef = useRef(null);
   const returnFocusRef = useRef(null);
   const reduceMotion = useReducedMotion();
@@ -28,7 +33,21 @@ export const UniversalProfileDrawer = () => {
   const fetchProfile = useCallback(async () => {
     if (!profileTarget) return;
 
-    if (!profileTarget.userId && profileTarget.playerId) {
+    let targetUserId = profileTarget.userId;
+
+    if (!targetUserId && profileTarget.playerId) {
+      setLoading(true);
+      try {
+        const resolved = await getUserByPlayerId(profileTarget.playerId);
+        if (resolved?.user_id) {
+          targetUserId = resolved.user_id;
+        }
+      } catch (err) {
+        // Player has no linked user account
+      }
+    }
+
+    if (!targetUserId && profileTarget.playerId) {
       setLoading(false);
       setProfile(null);
       setError({
@@ -38,7 +57,7 @@ export const UniversalProfileDrawer = () => {
       return;
     }
 
-    if (!profileTarget.userId) {
+    if (!targetUserId) {
       setLoading(false);
       setProfile(null);
       setError({
@@ -48,12 +67,15 @@ export const UniversalProfileDrawer = () => {
       return;
     }
 
+    const effectiveTournamentId =
+      profileTarget.tournamentId || selectedIntramural?.id || null;
+
     setLoading(true);
     setError(null);
 
     try {
-      const data = await getUserProfile(profileTarget.userId, {
-        tournamentId: profileTarget.tournamentId,
+      const data = await getUserProfile(profileTarget.userId || targetUserId, {
+        tournamentId: effectiveTournamentId,
       });
       setProfile(data);
     } catch (err) {
@@ -66,7 +88,7 @@ export const UniversalProfileDrawer = () => {
     } finally {
       setLoading(false);
     }
-  }, [profileTarget]);
+  }, [profileTarget, selectedIntramural?.id]);
 
   useEffect(() => {
     if (isOpen) {
@@ -199,7 +221,7 @@ export const UniversalProfileDrawer = () => {
         role="dialog"
         aria-modal="true"
         aria-labelledby="universal-profile-drawer-title"
-        className="relative flex h-full w-full max-w-full flex-col border-l border-[var(--border-soft)] bg-[var(--surface)] text-[var(--text-main)] shadow-[var(--shadow-lg)] outline-none sm:w-[500px] sm:max-w-[540px]"
+        className="relative flex h-full w-full max-w-full flex-col border-l border-[var(--border-soft)] bg-[var(--surface)] text-[var(--text-main)] shadow-[var(--shadow-lg)] outline-none sm:w-[520px] sm:max-w-[540px]"
         onMouseDown={(event) => event.stopPropagation()}
         data-testid="universal-profile-drawer"
       >
@@ -216,13 +238,6 @@ export const UniversalProfileDrawer = () => {
               >
                 Profile Details
               </h2>
-              <p className="text-xs text-[var(--text-muted)]">
-                {profileTarget?.userId
-                  ? `User #${profileTarget.userId}`
-                  : profileTarget?.playerId
-                  ? `Player #${profileTarget.playerId}`
-                  : "Overview"}
-              </p>
             </div>
           </div>
           <button
@@ -304,6 +319,16 @@ export const UniversalProfileDrawer = () => {
                 visibility={profile.visibility}
                 likes={profile.likes}
               />
+
+              {/* Selected Intramural Scoping Banner */}
+              {(profile?.intramural_context?.name || selectedIntramural?.name || selectedIntramural?.tournament_name) ? (
+                <ProfileContextBanner
+                  intramuralName={profile?.intramural_context?.name || selectedIntramural?.name || selectedIntramural?.tournament_name}
+                  academicYear={profile?.intramural_context?.academic_year || selectedIntramural?.academic_year}
+                  semester={profile?.intramural_context?.semester || selectedIntramural?.semester}
+                  isHistorical={Boolean(profile?.intramural_context?.is_historical || isViewingHistorical)}
+                />
+              ) : null}
 
               {/* Player Content (Richest Experience) */}
               {isPlayer ? (

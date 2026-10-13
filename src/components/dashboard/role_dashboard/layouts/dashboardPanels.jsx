@@ -846,21 +846,23 @@ export const AnnouncementFeed = ({ items = [], emptyTitle, emptyDescription, act
       {safeItems.map((item, index) => (
         <div
           key={item?.id || `${item?.title}-${index}`}
-          className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-3"
+          className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-soft)] p-3"
         >
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-3">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-[var(--text-main)]">{item?.title || "Announcement"}</p>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="truncate text-xs sm:text-sm font-semibold text-[var(--text-main)]">{item?.title || "Announcement"}</p>
+                {item?.timestamp ? (
+                  <span className="shrink-0 text-[10px] sm:text-[11px] text-[var(--text-soft)]">{item.timestamp}</span>
+                ) : null}
+              </div>
+              <p className="mt-1 line-clamp-2 text-xs text-[var(--text-muted)] break-words">
                 {item?.message || item?.detail || "Relevant updates will appear here."}
               </p>
               {item?.meta ? (
-                <p className="mt-2 text-[11px] text-[var(--text-soft)]">{item.meta}</p>
+                <p className="mt-1.5 text-[10px] sm:text-[11px] text-[var(--text-soft)]">{item.meta}</p>
               ) : null}
             </div>
-            {item?.timestamp ? (
-              <span className="shrink-0 text-[11px] text-[var(--text-soft)]">{item.timestamp}</span>
-            ) : null}
           </div>
         </div>
       ))}
@@ -1107,27 +1109,27 @@ export const AnnouncementTimeline = ({
 
   return (
     <div className="space-y-3">
-      <ol className="relative ml-2 space-y-4 border-l border-[var(--border-soft)] pl-5">
+      <ol className="relative ml-2 space-y-4 border-l border-[var(--border-soft)] pl-4 sm:pl-5">
         {safeItems.map((item, index) => (
           <li key={item?.id || `timeline-${index}`} className="relative">
-            <span className="absolute -left-[26px] top-1 flex h-3 w-3 items-center justify-center rounded-full border-2 border-[var(--primary)] bg-[var(--surface)]" />
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-soft)]">
+            <span className="absolute -left-[21px] sm:-left-[25px] top-1 flex h-2.5 w-2.5 sm:h-3 sm:w-3 items-center justify-center rounded-full border-2 border-[var(--primary)] bg-[var(--surface)]" />
+            <div className="flex flex-wrap items-baseline justify-between gap-1.5 sm:gap-2">
+              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-[var(--text-soft)]">
                 {item?.group || "Update"}
               </p>
               {item?.timestamp ? (
-                <span className="text-[11px] text-[var(--text-soft)]">{item.timestamp}</span>
+                <span className="text-[10px] sm:text-[11px] text-[var(--text-soft)]">{item.timestamp}</span>
               ) : null}
             </div>
-            <p className="mt-1 text-sm font-semibold text-[var(--text-main)]">{item?.title || "Announcement"}</p>
+            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm font-semibold text-[var(--text-main)] break-words">{item?.title || "Announcement"}</p>
             {item?.message ? (
-              <p className="mt-1 line-clamp-2 text-xs text-[var(--text-muted)]">{item.message}</p>
+              <p className="mt-1 line-clamp-2 text-xs text-[var(--text-muted)] break-words leading-relaxed">{item.message}</p>
             ) : null}
           </li>
         ))}
       </ol>
       {action?.label && action?.to ? (
-        <div className="flex justify-end">
+        <div className="flex justify-end pt-1">
           <Link to={action.to} className="text-xs font-semibold text-[var(--primary)] hover:underline">
             {action.label}
           </Link>

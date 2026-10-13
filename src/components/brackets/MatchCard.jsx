@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Trophy } from 'lucide-react';
 import { initialsFromLabel, resolveMediaUrl } from "../../utils/media";
 import { bracketDensitySettings } from './utils/bracketGeometry';
 
@@ -25,11 +26,13 @@ const colorForName = (name) => {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 };
 
-const NodeAvatar = ({ name, logoUrl }) => {
+const NodeAvatar = ({ name, logoUrl, size = "sm" }) => {
   const [failed, setFailed] = useState(false);
   const src = logoUrl ? resolveMediaUrl(logoUrl) : null;
+  const dim = size === "lg" ? "h-10 w-10" : "h-6 w-6 max-h-6 max-w-6";
+  const textSize = size === "lg" ? "text-sm" : "text-[9px]";
   return (
-    <div className="relative flex h-6 w-6 max-h-6 max-w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/80 dark:bg-slate-700 dark:ring-slate-600/80">
+    <div className={`relative flex ${dim} shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/80 dark:bg-slate-700 dark:ring-slate-600/80`}>
       {src && !failed ? (
         <img
           src={src}
@@ -39,7 +42,7 @@ const NodeAvatar = ({ name, logoUrl }) => {
         />
       ) : (
         <span
-          className={`flex h-full w-full items-center justify-center rounded-full text-[9px] font-bold text-white ${colorForName(name)}`}
+          className={`flex h-full w-full items-center justify-center rounded-full ${textSize} font-bold text-white ${colorForName(name)}`}
         >
           {initialsFromLabel(name, "?")}
         </span>
@@ -48,32 +51,44 @@ const NodeAvatar = ({ name, logoUrl }) => {
   );
 };
 
-const TeamRow = ({ team, isUpcoming }) => {
+const TeamRow = ({ team, isUpcoming, isChampionMatch }) => {
   const rightValue = isUpcoming ? "—" : team.score;
   return (
     <div
-      className={`flex min-h-0 flex-1 items-center gap-2.5 overflow-hidden rounded-lg px-2.5 py-1.5 transition-all shadow-2xs ${team.isWinner
-        ? "bg-emerald-50 text-emerald-950 border border-emerald-300/80 ring-1 ring-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200 dark:border-emerald-500/40"
-        : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:border-slate-600"
-        }`}
+      className={`flex min-h-0 flex-1 items-center gap-2.5 overflow-hidden rounded-lg px-2.5 py-1.5 transition-all shadow-2xs ${
+        team.isWinner && isChampionMatch
+          ? "border border-amber-400/70 bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 text-amber-950 ring-1 ring-amber-400/50 dark:from-amber-500/20 dark:via-yellow-500/10 dark:to-amber-500/20 dark:border-amber-400/50 dark:text-amber-100"
+          : team.isWinner
+          ? "bg-emerald-50 text-emerald-950 border border-emerald-300/80 ring-1 ring-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200 dark:border-emerald-500/40"
+          : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:border-slate-600"
+      }`}
     >
       <NodeAvatar name={team.name} logoUrl={team.logoUrl} />
       <span
-        className={`line-clamp-1 min-w-0 flex-1 text-[12.5px] font-medium leading-tight ${team.isWinner
-          ? "font-bold text-slate-900 dark:text-emerald-100"
-          : "text-slate-700 dark:text-slate-200"
-          }`}
+        className={`line-clamp-1 min-w-0 flex-1 text-[12.5px] leading-tight ${
+          team.isWinner && isChampionMatch
+            ? "font-extrabold text-amber-900 dark:text-amber-100"
+            : team.isWinner
+            ? "font-bold text-slate-900 dark:text-emerald-100"
+            : "font-medium text-slate-700 dark:text-slate-200"
+        }`}
         title={team.name}
       >
         {team.displayName || team.name || "TBD"}
       </span>
+      {team.isWinner && isChampionMatch ? (
+        <Trophy size={13} className="shrink-0 text-amber-500 dark:text-amber-400" aria-hidden="true" />
+      ) : null}
       <span
-        className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold tabular-nums ${team.isWinner
-          ? "bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950"
-          : isUpcoming
+        className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold tabular-nums ${
+          team.isWinner && isChampionMatch
+            ? "bg-amber-400 text-amber-950 dark:bg-amber-500 dark:text-amber-950"
+            : team.isWinner
+            ? "bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950"
+            : isUpcoming
             ? "text-slate-400 dark:text-slate-500"
             : "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
-          }`}
+        }`}
       >
         {rightValue}
       </span>
@@ -81,17 +96,22 @@ const TeamRow = ({ team, isUpcoming }) => {
   );
 };
 
-const MatchCard = ({ match, isSelected, onClick, density = "regular", cardHeight: customHeight, dataBracketRole, children }) => {
+/* ─── MatchCard ───────────────────────────────────────────────────────── */
+const MatchCard = ({ match, isSelected, onClick, density = "regular", cardHeight: customHeight, dataBracketRole, isChampionMatch, children }) => {
   const isUpcoming = match.statusCategory === "upcoming";
   const geo = bracketDensitySettings[density] || bracketDensitySettings.regular;
   const cardHeight = customHeight || geo.cardHeight;
+  const isCompleted = match.statusCategory === "completed";
+  const champion = isChampionMatch && isCompleted
+    ? (match.team1.isWinner ? match.team1 : match.team2.isWinner ? match.team2 : null)
+    : null;
 
   return (
     <div
       className="flex w-full flex-col select-none"
       style={{
         height: `${geo.slotHeight}px`,
-        gap: `${geo.labelGap}px`
+        gap: `${geo.labelGap}px`,
       }}
       data-match-id={match.id}
       data-bracket-role={dataBracketRole || undefined}
@@ -114,11 +134,12 @@ const MatchCard = ({ match, isSelected, onClick, density = "regular", cardHeight
           className={`
             group relative flex w-full flex-col justify-center border-0 bg-transparent text-left transition-colors duration-150 rounded-xl
             ${isSelected ? "ring-2 ring-sky-500 shadow-sm" : "hover:brightness-95 dark:hover:brightness-110"}
+            ${champion ? "ring-2 ring-amber-400/60 shadow-md shadow-amber-200/40 dark:ring-amber-400/40 dark:shadow-amber-900/30" : ""}
           `}
         >
           <div className="flex h-full w-full flex-col justify-between gap-1.5">
-            <TeamRow team={match.team1} isUpcoming={isUpcoming} />
-            <TeamRow team={match.team2} isUpcoming={isUpcoming} />
+            <TeamRow team={match.team1} isUpcoming={isUpcoming} isChampionMatch={isChampionMatch} />
+            <TeamRow team={match.team2} isUpcoming={isUpcoming} isChampionMatch={isChampionMatch} />
           </div>
         </button>
         {children}

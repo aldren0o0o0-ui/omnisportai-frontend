@@ -34,27 +34,64 @@ const CompetitionShowcase = ({
     return false;
   };
 
-  const items = view === "sports" ? sports : entries;
+  const uniqueItems = useMemo(() => {
+    const rawList = view === "sports" ? sports : entries;
+    if (!Array.isArray(rawList)) return [];
+
+    const seen = new Set();
+    const result = [];
+
+    for (const item of rawList) {
+      if (!item) continue;
+      let key = "";
+      if (view === "sports") {
+        key = item.id ? `sport-id-${item.id}` : `sport-name-${String(item.name || "").trim().toLowerCase()}`;
+      } else {
+        const teamId = item.teamId ?? (item.type === "team" ? item.id : null);
+        const entryId = item.entryId ?? (item.type === "entry" ? item.id : null);
+        const normName = String(item.name || "").trim().toLowerCase();
+        const normSport = String(item.sport || item.sport_name || "").trim().toLowerCase();
+        const normDept = String(item.department_id || item.department_name || item.department_code || "").trim().toLowerCase();
+
+        if (teamId) {
+          key = `team-${teamId}`;
+        } else if (entryId) {
+          key = `entry-${entryId}`;
+        } else {
+          key = `identity-${normName}|${normSport}|${normDept}`;
+        }
+      }
+
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(item);
+    }
+
+    return result;
+  }, [view, sports, entries]);
 
   // Determine if we need the marquee (items overflow the container)
   const [needsMarquee, setNeedsMarquee] = useState(false);
   useEffect(() => {
     const track = trackRef.current;
-    if (!track) return;
+    if (!track || uniqueItems.length <= 2) {
+      setNeedsMarquee(false);
+      return;
+    }
     // Measure only the first set of items (half of children if duplicated)
     const measure = () => {
       const singleSetWidth = Array.from(track.children)
-        .slice(0, items.length)
+        .slice(0, uniqueItems.length)
         .reduce((sum, child) => sum + child.offsetWidth, 0);
       const gap = parseFloat(getComputedStyle(track).columnGap || "0") || 0;
-      const totalWidth = singleSetWidth + gap * Math.max(0, items.length - 1);
+      const totalWidth = singleSetWidth + gap * Math.max(0, uniqueItems.length - 1);
       setNeedsMarquee(totalWidth > track.parentElement.clientWidth + 2);
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(track.parentElement);
     return () => observer.disconnect();
-  }, [items, view]);
+  }, [uniqueItems, view]);
 
   // Calculate the animation duration based on content width for consistent speed
   const [animDuration, setAnimDuration] = useState(30);
@@ -62,14 +99,14 @@ const CompetitionShowcase = ({
     const track = trackRef.current;
     if (!track || !needsMarquee) return;
     const singleSetWidth = Array.from(track.children)
-      .slice(0, items.length)
+      .slice(0, uniqueItems.length)
       .reduce((sum, child) => sum + child.offsetWidth, 0);
     const gap = parseFloat(getComputedStyle(track).columnGap || "0") || 0;
-    const totalWidth = singleSetWidth + gap * items.length;
+    const totalWidth = singleSetWidth + gap * uniqueItems.length;
     // ~30px per second → slow, gentle scroll
     const duration = Math.max(15, totalWidth / 30);
     setAnimDuration(duration);
-  }, [items, needsMarquee, view]);
+  }, [uniqueItems, needsMarquee, view]);
 
   // Render a single card
   const renderCard = useCallback((item, index, setPrefix = "") => {
@@ -178,7 +215,7 @@ const CompetitionShowcase = ({
         </div>
       </div>
 
-      {items.length === 0 ? (
+      {uniqueItems.length === 0 ? (
         <div className="mt-3 rounded-xl border border-dashed border-[var(--border-soft)] px-4 py-8 text-center text-sm text-[var(--text-muted)]">
           {view === "sports"
             ? "No sports configured for this intramural yet."
@@ -206,10 +243,10 @@ const CompetitionShowcase = ({
             aria-live="polite"
           >
             {/* Original set */}
-            {items.map((item, index) => renderCard(item, index, "a-"))}
+            {uniqueItems.map((item, index) => renderCard(item, index, "a-"))}
 
-            {/* Duplicate set for seamless infinite loop */}
-            {needsMarquee && items.map((item, index) => renderCard(item, index, "b-"))}
+            {/* Duplicate set for seamless infinite loop only when marquee is active and items overflow */}
+            {needsMarquee && uniqueItems.map((item, index) => renderCard(item, index, "b-"))}
           </div>
 
           {/* Soft edge fades for polish */}

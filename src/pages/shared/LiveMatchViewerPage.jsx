@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -10,12 +10,11 @@ import {
 import { MatchRealtimeClient } from "../../services/realtime/realtimeClient";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import MatchPresentation from "../../components/live-match-viewer/MatchPresentation";
+import SportMatchAnalytics from "../../components/brackets/live-scoring/SportMatchAnalytics";
 import {
   LiveSummaryAnnouncer,
   MatchContextHeader,
-  RecentActions,
   SegmentBreakdown,
-  ViewerMatchTabs,
   ViewerStateNotice,
 } from "../../components/live-match-viewer/ViewerPanels";
 
@@ -65,7 +64,6 @@ const LiveMatchViewerPage = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [connectionStatus, setConnectionStatus] = useState("connecting");
-  const [activeTab, setActiveTab] = useState("overview");
   const mountedRef = useRef(true);
   const refreshPromiseRef = useRef(null);
   const viewerVersionRef = useRef(0);
@@ -176,6 +174,44 @@ const LiveMatchViewerPage = () => {
       .finally(() => setIsLoading(false));
   };
 
+  const viewerPlayerStats = useMemo(() => {
+    if (viewer?.player_stats && Object.keys(viewer.player_stats).length > 0) {
+      return viewer.player_stats;
+    }
+    const res = {};
+    for (const row of viewer?.statistics?.rows || []) {
+      if (row.player_id && Array.isArray(row.values)) {
+        const map = {};
+        for (const val of row.values) {
+          if (val.metric_key && val.value != null) {
+            map[val.metric_key] = val.value;
+          }
+        }
+        res[String(row.player_id)] = map;
+      }
+    }
+    return res;
+  }, [viewer?.player_stats, viewer?.statistics?.rows]);
+
+  const viewerTimeline = useMemo(() => {
+    if (Array.isArray(viewer?.timeline) && viewer.timeline.length > 0) {
+      return viewer.timeline;
+    }
+    return Array.isArray(actions) && actions.length > 0
+      ? actions
+      : (viewer?.actions_page?.actions || viewer?.recent_actions || []);
+  }, [viewer?.timeline, viewer?.actions_page?.actions, viewer?.recent_actions, actions]);
+
+  const handleBack = useCallback(() => {
+    if (location.state?.from) {
+      navigate(location.state.from);
+    } else if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate(resolveBackPath(location.pathname));
+    }
+  }, [location.pathname, location.state?.from, navigate]);
+
   if (isLoading && !viewer) {
     return <div className="os-page-shell min-h-[calc(100dvh-5rem)]"><ViewerLoadingState /></div>;
   }
@@ -186,7 +222,7 @@ const LiveMatchViewerPage = () => {
         <section className="mx-auto max-w-xl rounded-3xl border border-rose-200 bg-rose-50 p-6 text-rose-800 dark:border-rose-900 dark:bg-rose-950/35 dark:text-rose-200">
           <h1 className="text-xl font-black">Live Match unavailable</h1>
           <p className="mt-2 text-sm">{error || "The Match could not be found."}</p>
-          <div className="mt-5 flex flex-wrap gap-3"><button type="button" onClick={retry} className="inline-flex items-center gap-2 rounded-full border border-rose-300 px-4 py-2 text-sm font-bold hover:bg-white/70"><RefreshCw size={16} aria-hidden="true" />Retry</button><button type="button" onClick={() => navigate(resolveBackPath(location.pathname))} className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700">Back to Matches</button></div>
+          <div className="mt-5 flex flex-wrap gap-3"><button type="button" onClick={retry} className="inline-flex items-center gap-2 rounded-full border border-rose-300 px-4 py-2 text-sm font-bold hover:bg-white/70"><RefreshCw size={16} aria-hidden="true" />Retry</button><button type="button" onClick={handleBack} className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700">Back to Matches</button></div>
         </section>
       </div>
     );
@@ -194,26 +230,24 @@ const LiveMatchViewerPage = () => {
 
   return (
     <article className="os-page-shell min-h-[calc(100dvh-5rem)] space-y-7 pb-12 sm:space-y-8" aria-labelledby="live-match-viewer-title">
-      <MatchContextHeader match={viewer.match} connectionStatus={connectionStatus} onBack={() => navigate(resolveBackPath(location.pathname))} />
+      <MatchContextHeader match={viewer.match} connectionStatus={connectionStatus} onBack={handleBack} />
       <span id="live-match-viewer-title" className="sr-only">{viewer.match?.sport?.name} live Match viewer</span>
       {error ? <div role="status" className="flex items-center justify-between gap-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950/35 dark:text-amber-100"><span>{error}</span><button type="button" onClick={() => setError("")} className="font-bold">Dismiss</button></div> : null}
       <ViewerStateNotice match={viewer.match} result={viewer.result} />
       <MatchPresentation presentation={viewer.presentation} participants={viewer.participants} rules={viewer.rules} result={viewer.result} />
       <LiveSummaryAnnouncer match={viewer.match} presentation={viewer.presentation} result={viewer.result} />
       <SegmentBreakdown segments={viewer.segment_history} />
-      <RecentActions actions={viewer.recent_actions} onViewAll={() => setActiveTab("plays")} />
-      <ViewerMatchTabs
-        match={viewer.match}
-        result={viewer.result}
-        rules={viewer.rules}
-        statistics={viewer.statistics}
+      <SportMatchAnalytics
+        sportKey={viewer.match?.sport?.key || viewer.match?.sport?.name || viewer.presentation?.sport_key || ""}
         participants={viewer.participants}
-        actions={actions}
-        hasMore={hasMore}
-        isLoadingMore={isLoadingMore}
-        onLoadMore={loadMore}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
+        scores={[
+          viewer.presentation?.score?.participant1 ?? 0,
+          viewer.presentation?.score?.participant2 ?? 0,
+        ]}
+        timeline={viewerTimeline}
+        currentPeriod={viewer.presentation?.period?.current || viewer.presentation?.set_state?.current_set || null}
+        playerStats={viewerPlayerStats}
+        teamStats={viewer?.team_stats}
       />
     </article>
   );

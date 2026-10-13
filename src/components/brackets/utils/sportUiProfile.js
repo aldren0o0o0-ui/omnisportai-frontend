@@ -170,14 +170,14 @@ const resolveStateLabel = ({ scoringMode, sportKey, matchType, displayEnabled, h
   return STATE_LABEL.NONE;
 };
 
-const resolveLineupAndSubstitution = ({ scoringMode, sportKey }) => {
-  if (scoringMode === SPORT_MODE.MULTI_PARTICIPANT_RESULT || scoringMode === SPORT_MODE.BOARD_GAME || scoringMode === SPORT_MODE.COMBAT) {
+const resolveLineupAndSubstitution = ({ scoringMode, sportKey, isSolo = false }) => {
+  if (isSolo || scoringMode === SPORT_MODE.MULTI_PARTICIPANT_RESULT || scoringMode === SPORT_MODE.BOARD_GAME || scoringMode === SPORT_MODE.COMBAT) {
     return {
       supportsLineup: false,
       supportsBench: false,
       supportsSubstitution: false,
       activePlayersPerSide: 0,
-      lineupLabel: "Participants",
+      lineupLabel: isSolo ? "Participant" : "Participants",
     };
   }
 
@@ -247,7 +247,18 @@ export const getSportUiProfile = (sportKeyInput, ruleSnapshot = null, eventConfi
     // Compatibility only: old unlocked snapshots may not carry runtime engine metadata.
     || resolveScoringMode({ sportKey, matchType, sportProfile, winConditions });
   const participantModel = resolveParticipantModel({ scoringMode, sportKey });
-  const lineup = resolveLineupAndSubstitution({ scoringMode, sportKey });
+  const isSolo = [
+    eventConfig?.participant_profile?.participant_model,
+    eventConfig?.participant_profile?.unit_type,
+    eventConfig?.sport_definition?.participant_type,
+    eventConfig?.tournament_sport_event?.participant_shape,
+    ruleSnapshot?.participant_shape,
+    ruleSnapshot?.participant_type,
+  ].some((v) => {
+    const s = String(v || "").toUpperCase();
+    return s === "SOLO" || s === "INDIVIDUAL" || s === "SINGLE";
+  }) || Number(eventConfig?.tournament_sport_event?.players_per_entry || 0) === 1;
+  const lineup = resolveLineupAndSubstitution({ scoringMode, sportKey, isSolo });
 
   const participantProfile = eventConfig?.participant_profile && typeof eventConfig.participant_profile === "object"
     ? eventConfig.participant_profile

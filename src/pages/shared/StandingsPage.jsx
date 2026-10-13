@@ -165,11 +165,10 @@ const ChampionshipChart = ({ rows, departmentRows = [] }) => {
               type="button"
               id="chart-metric-wins-btn"
               onClick={() => setChartMetric("wins")}
-              className={`rounded-md px-2.5 py-1 transition ${
-                chartMetric === "wins"
-                  ? "bg-[var(--surface)] text-emerald-600 shadow-sm dark:text-emerald-300"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-              }`}
+              className={`rounded-md px-2.5 py-1 transition ${chartMetric === "wins"
+                ? "bg-[var(--surface)] text-emerald-600 shadow-sm dark:text-emerald-300"
+                : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                }`}
             >
               Progress by wins
             </button>
@@ -177,11 +176,10 @@ const ChampionshipChart = ({ rows, departmentRows = [] }) => {
               type="button"
               id="chart-metric-champ-btn"
               onClick={() => setChartMetric("championship")}
-              className={`rounded-md px-2.5 py-1 transition ${
-                chartMetric === "championship"
-                  ? "bg-[var(--surface)] text-amber-600 shadow-sm dark:text-amber-400"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-              }`}
+              className={`rounded-md px-2.5 py-1 transition ${chartMetric === "championship"
+                ? "bg-[var(--surface)] text-amber-600 shadow-sm dark:text-amber-400"
+                : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                }`}
             >
               Championship points
             </button>
@@ -206,26 +204,25 @@ const ChampionshipChart = ({ rows, departmentRows = [] }) => {
 
           return (
             <div key={row.department_id} className="grid grid-cols-[minmax(80px,160px)_1fr] items-center gap-3">
-              <div className="flex min-w-0 items-center gap-2">
+              <div className="flex min-w-0 items-center gap-1">
                 <TeamLogo imageUrl={row.logo_url} label={row.department_code || row.department_name} scale="sm" />
                 <span className="truncate text-sm font-bold">{row.department_code || row.department_name}</span>
               </div>
-              <div className="relative h-9 overflow-hidden rounded-lg bg-[var(--surface-muted)]">
+              <div className="relative h-5 overflow-hidden rounded-lg bg-[var(--surface-muted)]">
                 <Motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.max(barPercent, 4)}%` }}
                   transition={{ duration: 0.55, delay: index * 0.05 }}
-                  className={`h-full rounded-lg ${
-                    chartMetric === "wins"
-                      ? index === 0
-                        ? "bg-gradient-to-r from-emerald-500 to-teal-400"
-                        : "bg-gradient-to-r from-[var(--primary)] to-emerald-500/80"
-                      : index === 0 && totalPts > 0
-                        ? "bg-gradient-to-r from-amber-500 to-amber-400"
-                        : "bg-[var(--primary)]"
-                  }`}
+                  className={`h-full rounded-lg ${chartMetric === "wins"
+                    ? index === 0
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-400"
+                      : "bg-gradient-to-r from-[var(--primary)] to-emerald-500/80"
+                    : index === 0 && totalPts > 0
+                      ? "bg-gradient-to-r from-amber-500 to-amber-400"
+                      : "bg-[var(--primary)]"
+                    }`}
                 />
-                <div className="absolute inset-y-0 right-3 flex items-center gap-2 text-xs tabular-nums font-bold">
+                {/* <div className="absolute inset-y-0 right-3 flex items-center gap-2 text-xs tabular-nums font-bold">
                   {chartMetric === "wins" ? (
                     <>
                       <span className="font-extrabold text-[var(--text-main)]">{wins} wins</span>
@@ -238,7 +235,7 @@ const ChampionshipChart = ({ rows, departmentRows = [] }) => {
                   ) : (
                     <span className="font-extrabold text-[var(--text-main)]">{pointsLabel(totalPts)}</span>
                   )}
-                </div>
+                </div> */}
               </div>
             </div>
           );

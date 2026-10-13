@@ -17,8 +17,9 @@ export const useRoleDashboardData = ({
   autoRefreshOnTournamentChange = false,
   liveRefresh = true,
 } = {}) => {
-  const { selectedIntramural } = useWorkspace();
-  const selectedWorkspaceId = selectedIntramural?.id ?? null;
+  const { selectedIntramural, workspace } = useWorkspace();
+  const effectiveIntramural = selectedIntramural || workspace || null;
+  const selectedWorkspaceId = effectiveIntramural?.id ?? null;
 
   const [dashboard, setDashboard] = useState(null);
   const [selectedTournamentId, setSelectedTournamentId] = useState("");

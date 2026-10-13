@@ -72,7 +72,7 @@ const ManualSeedingModal = ({
     >
       <div className="flex flex-col max-h-[80vh]">
         <div className="flex-1 overflow-y-auto px-1 py-2 sm:px-2" ref={sectionRef}>
-          <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/50">
               <p className="text-slate-500 dark:text-slate-400">Bracket Target</p>
               <p className="font-semibold text-slate-800 dark:text-slate-100">{targetLabel || "Unassigned sport"}</p>
@@ -81,10 +81,10 @@ const ManualSeedingModal = ({
               <p className="text-slate-500 dark:text-slate-400">Competition Type</p>
               <p className="font-semibold text-slate-800 dark:text-slate-100">{participantShapeLabel || "Bracket target"}</p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/50">
+            {/* <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/50">
               <p className="text-slate-500 dark:text-slate-400">Seeding</p>
               <p className="font-semibold text-slate-800 dark:text-slate-100">{seedingModeLabel}</p>
-            </div>
+            </div> */}
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/50">
               <p className="text-slate-500 dark:text-slate-400">Teams</p>
               <p className="font-semibold text-slate-800 dark:text-slate-100">{manualCandidates.length}</p>
@@ -109,11 +109,10 @@ const ManualSeedingModal = ({
                 return (
                   <label
                     key={`bracket-format-${format}`}
-                    className={`flex min-h-20 cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${
-                      checked
-                        ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-500/10"
-                        : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900"
-                    } ${selectedSportGenerationLocked ? "cursor-not-allowed opacity-60" : ""}`}
+                    className={`flex min-h-20 cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${checked
+                      ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-500/10"
+                      : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+                      } ${selectedSportGenerationLocked ? "cursor-not-allowed opacity-60" : ""}`}
                   >
                     <input
                       type="radio"
@@ -156,7 +155,7 @@ const ManualSeedingModal = ({
             ) : null}
           </section>
 
-          <div className="flex flex-wrap gap-2">
+          {/* <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={onResetSeedOrder}
@@ -185,7 +184,7 @@ const ManualSeedingModal = ({
                 {manualSeedingSaveBusy ? "Saving..." : "Save Seed Order"}
               </button>
             ) : null}
-          </div>
+          </div> */}
 
           {manualSeedingBusy ? <p className="mt-3 text-xs text-blue-700 dark:text-blue-300">Loading eligible teams...</p> : null}
           {manualSeedingError ? <p className="mt-3 text-xs text-rose-700 dark:text-rose-300">{manualSeedingError}</p> : null}
@@ -263,14 +262,32 @@ const ManualSeedingModal = ({
           {manualConfigSeedIds.length > 0 ? <p className="mt-4 text-[11px] text-slate-500 dark:text-slate-400">Saved configuration includes {manualConfigSeedIds.length} seeded team(s).</p> : null}
         </div>
 
-        <div className="flex flex-col-reverse gap-2 border-t border-[var(--border-soft)] pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end">
+        <div className="flex flex-col-reverse items-center gap-2 border-t border-[var(--border-soft)] pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end">
+          {selectedSportGenerationLocked ? (
+            <span className="mr-auto text-xs font-medium text-amber-600 dark:text-amber-400">
+              {generationControlHint || "Bracket is already active. Regeneration is locked."}
+            </span>
+          ) : null}
           <button type="button" onClick={onClose} className="min-h-10 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-soft)] px-4 py-2 text-sm font-semibold text-[var(--text-main)] hover:bg-[var(--surface-muted)] transition-colors">Cancel</button>
-          {showSeedSaveActions ? (
+          {showSeedSaveActions && !selectedSportGenerationLocked ? (
             <button type="button" onClick={onSaveSeedOrder} disabled={manualSeedingSaveBusy || manualSeedingBusy || manualSeedingValidationErrors.length > 0} className="min-h-10 rounded-xl border border-[var(--primary)]/30 bg-[var(--surface)] px-4 py-2 text-sm font-semibold text-[var(--primary)] hover:bg-[var(--primary-soft)] disabled:opacity-60 transition-colors">{manualSeedingSaveBusy ? "Saving..." : "Save Seed Order"}</button>
           ) : null}
-          <button type="button" onClick={onGenerate} disabled={generationBusy || bracketPreviewBusy || !bracketPreview?.can_generate || manualSeedingBusy || selectedSportGenerationLocked || manualSeedingValidationErrors.length > 0} className="min-h-10 rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60 transition-opacity" title={selectedSportGenerationLocked ? generationControlHint || "Generation is disabled for this sport." : ""}>
-            {generationBusy ? "Generating..." : selectedSportGenerationLocked ? "Generate Disabled" : generationReady ? "Generate Final Bracket" : "Generate Draft Plan"}
-          </button>
+          {!selectedSportGenerationLocked ? (
+            <button
+              type="button"
+              onClick={onGenerate}
+              disabled={
+                generationBusy ||
+                bracketPreviewBusy ||
+                !bracketPreview?.can_generate ||
+                manualSeedingBusy ||
+                manualSeedingValidationErrors.length > 0
+              }
+              className="min-h-10 rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60 transition-opacity"
+            >
+              {generationBusy ? "Generating..." : generationReady ? "Generate Final Bracket" : "Generate Draft Plan"}
+            </button>
+          ) : null}
         </div>
       </div>
     </AppModal>

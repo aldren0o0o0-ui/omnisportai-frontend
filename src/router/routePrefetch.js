@@ -41,8 +41,6 @@ const loadSportFacilitatorBrackets = () =>
   import("../pages/sports_facilitator/Brackets");
 const loadSportFacilitatorMatchCenter = () =>
   import("../pages/sports_facilitator/MatchEventCenter");
-const loadSportFacilitatorAssignedStaff = () =>
-  import("../pages/sports_facilitator/AssignedStaff");
 const loadSportFacilitatorSchedules = () =>
   import("../pages/sports_facilitator/Schedules");
 const loadSportFacilitatorSports = () =>
@@ -59,12 +57,17 @@ const loadCoachBrackets = () => import("../pages/coach/Brackets");
 const loadCoachSports = () => import("../pages/coach/Sports");
 const loadCoachTournaments = () => import("../pages/coach/Tournaments");
 
-const loadProfilePage = () => import("../pages/shared/ProfilePage");
+const loadMyProfilePage = () => import("../pages/profile/MyProfile");
+// Canonical profile page loader targeting MyProfile
+const loadProfilePage = loadMyProfilePage;
+// Legacy profile loader preserved for backwards compatibility
+const loadLegacyProfilePage = () => import("../pages/shared/ProfilePage");
 const loadIntelligenceHub = () => import("../pages/shared/IntelligenceHub");
 
 const routeLoaderByPath = new Map([
   ["/", loadLandingPage],
   ["/login", loadAuthPage],
+  ["/profile", loadMyProfilePage],
 
   ["/dashboard", loadCoordinatorDashboard],
   ["/coordinator/dashboard", loadCoordinatorDashboard],
@@ -113,9 +116,9 @@ const routeLoaderByPath = new Map([
   ["/sport-facilitator/tournaments", loadSportFacilitatorTournaments],
   ["/sport-facilitator/brackets", loadSportFacilitatorBrackets],
   ["/sport-facilitator/schedules", loadSportFacilitatorSchedules],
+  ["/sport-facilitator/results", loadViewerResults],
   ["/sport-facilitator/brackets/trash", loadSportFacilitatorBrackets],
   ["/sport-facilitator/match/:matchId", loadSportFacilitatorMatchCenter],
-  ["/sport-facilitator/assigned-staff", loadSportFacilitatorAssignedStaff],
   ["/facilitator/match/:matchId", loadSportFacilitatorMatchCenter],
   ["/sport-facilitator/profile", loadProfilePage],
   ["/sport-facilitator/intelligence", loadIntelligenceHub],
@@ -129,6 +132,7 @@ const routeLoaderByPath = new Map([
   ["/coach/tournaments", loadCoachTournaments],
   ["/coach/brackets", loadCoachBrackets],
   ["/coach/schedules", loadCoachSchedules],
+  ["/coach/results", loadViewerResults],
   ["/coach/profile", loadProfilePage],
   ["/coach/intelligence", loadIntelligenceHub],
 

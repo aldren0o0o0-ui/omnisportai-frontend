@@ -41,11 +41,10 @@ const ScheduleStatusBadge = ({ badge }) => {
 
   return (
     <span
-      className={`inline-flex min-h-7 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
-        legacyTone || preset.className
-      }`}
+      className={`inline-flex min-h-7 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${legacyTone || preset.className
+        }`}
     >
-      <Icon size={12} aria-hidden="true" />
+      {/* <Icon size={12} aria-hidden="true" /> */}
       {badge.label}
     </span>
   );
@@ -101,6 +100,13 @@ const VenueScheduleHeader = ({
             <h1 className="truncate text-2xl font-bold tracking-tight text-slate-950 dark:text-slate-50 md:text-[1.75rem]">
               {resolvedTitle}
             </h1>
+            {statusBadges.length > 0 ? (
+              <div className="mt-2.5 flex flex-wrap gap-2" aria-label="Schedule status">
+                {statusBadges.map((badge) => (
+                  <ScheduleStatusBadge key={badge.key || badge.label} badge={badge} />
+                ))}
+              </div>
+            ) : null}
           </div>
           {statusText ? (
             <p className="mt-1.5 text-sm font-medium text-slate-500 dark:text-slate-400">
@@ -112,22 +118,12 @@ const VenueScheduleHeader = ({
               {subtitle}
             </p>
           ) : null}
-          {statusBadges.length > 0 ? (
-            <div className="mt-2.5 flex flex-wrap gap-2" aria-label="Schedule status">
-              {statusBadges.map((badge) => (
-                <ScheduleStatusBadge key={badge.key || badge.label} badge={badge} />
-              ))}
-            </div>
-          ) : null}
         </div>
 
         <div
           className="flex flex-col gap-1.5 sm:items-start xl:items-end"
           aria-label="Schedule management actions"
         >
-          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
-            Schedule actions
-          </span>
           <div className="flex flex-wrap items-center gap-2 xl:justify-end">
             {resolvedPrimaryAction ? (
               <button
@@ -152,22 +148,22 @@ const VenueScheduleHeader = ({
 
             {resolvedSecondaryActions.length > 0 ? (
               <div className="flex flex-wrap gap-2">
-              {resolvedSecondaryActions.map((action) => {
-                const Icon = action.icon || null;
-                return (
-                  <button
-                    key={action.key || action.label}
-                    type="button"
-                    onClick={action.onClick}
-                    disabled={action.disabled}
-                    title={action.disabled ? action.disabledReason || action.label : action.title || action.label}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-slate-700"
-                  >
-                    {Icon ? <Icon size={14} /> : null}
-                    {action.label}
-                  </button>
-                );
-              })}
+                {resolvedSecondaryActions.map((action) => {
+                  const Icon = action.icon || null;
+                  return (
+                    <button
+                      key={action.key || action.label}
+                      type="button"
+                      onClick={action.onClick}
+                      disabled={action.disabled}
+                      title={action.disabled ? action.disabledReason || action.label : action.title || action.label}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-slate-700"
+                    >
+                      {Icon ? <Icon size={14} /> : null}
+                      {action.label}
+                    </button>
+                  );
+                })}
               </div>
             ) : null}
 

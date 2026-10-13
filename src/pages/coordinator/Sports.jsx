@@ -1,9 +1,18 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
-import { ClipboardList, Settings2, ShieldCheck, Trophy } from "lucide-react";
+import {
+  ClipboardList,
+  Search,
+  Settings2,
+  ShieldCheck,
+  Trophy,
+  X,
+} from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
+import useTournamentAccess from "../../hooks/useTournamentAccess";
+import { getRoleDashboardData } from "../../services/dashboardService";
 import { getSportDisplayName } from "../../utils/tournamentEventCategories";
 import {
   createSport,
@@ -17,13 +26,16 @@ import {
   uploadSportImage,
 } from "../../services/sportService";
 import AppModal from "../../components/common/AppModal";
-import CollapsibleFilterPanel from "../../components/common/CollapsibleFilterPanel";
 import PageHeaderCard from "../../components/common/PageHeaderCard";
 import Breadcrumbs from "../../components/common/Breadcrumbs";
 import { SportIcon } from "../../components/common/IdentityImage";
-import RuleGovernancePage from "../shared/RuleGovernancePage";
 import InstitutionalSportRulesPanel from "../shared/InstitutionalSportRulesPanel";
 import GlobalSportTemplatePanel from "../../components/sports/GlobalSportTemplatePanel";
+import {
+  ReadOnlySportDetailsContent,
+  ReadOnlySportDetailsModal,
+} from "../../components/sports/ReadOnlySportDetailsModal";
+import { isHiddenSport } from "../../utils/sportVisibility";
 
 const TEMPLATE_STEPS = [
   "Choose Sport",
@@ -366,12 +378,14 @@ const Sports = ({
 }) => {
   const { user, isSportsCoordinator } = useAuth();
   const location = useLocation();
+  const tournamentAccess = useTournamentAccess();
 
   const [sports, setSports] = useState([]);
   const [templates, setTemplates] = useState([]);
 
-  const showMineOnly = false;
-  const showArchived = false;
+  const [showArchived, setShowArchived] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [extraAssignedIds, setExtraAssignedIds] = useState([]);
 
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -389,6 +403,7 @@ const Sports = ({
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState("");
   const [ruleSport, setRuleSport] = useState(null);
+  const [viewDetailsSport, setViewDetailsSport] = useState(null);
   const [templateSport, setTemplateSport] = useState(null);
   const [templateDefaultsDirty, setTemplateDefaultsDirty] = useState(false);
 
@@ -414,7 +429,54 @@ const Sports = ({
     }
     return "coordinator";
   }, [location.pathname]);
-  const isCoordinatorView = rolePrefix === "coordinator" && !readOnly && departmentId == null;
+
+  const isCoordinator = Boolean(
+    isSportsCoordinator && (rolePrefix === "coordinator" || !readOnly) && departmentId == null
+  );
+
+  const isFacilitator = Boolean(
+    rolePrefix === "sport-facilitator" ||
+    tournamentAccess?.hasRoleContext("sports_facilitator") ||
+    (user?.roles || []).some((r) =>
+      String(r?.role_name || r || "").toUpperCase().includes("FACILITATOR")
+    )
+  );
+
+  useEffect(() => {
+    if (isFacilitator) {
+      getRoleDashboardData()
+        .then((res) => {
+          if (Array.isArray(res?.scope?.sport_ids)) {
+            setExtraAssignedIds(res.scope.sport_ids.map(Number).filter(Number.isFinite));
+          }
+        })
+        .catch(() => { });
+    }
+  }, [isFacilitator]);
+
+  const assignedSportIds = useMemo(() => {
+    const ids = new Set(extraAssignedIds);
+    (tournamentAccess?.roleContexts || []).forEach((c) => {
+      if (
+        String(c?.role || "").trim().toLowerCase() === "sports_facilitator" &&
+        c?.sport_id
+      ) {
+        ids.add(Number(c.sport_id));
+      }
+    });
+    (user?.assignment_contexts || []).forEach((c) => {
+      const r = String(c?.role || c?.type || "").trim().toLowerCase();
+      if (r === "sports_facilitator" && (c?.sport_id || c?.entity_id)) {
+        ids.add(Number(c.sport_id || c.entity_id));
+      }
+    });
+    return ids;
+  }, [extraAssignedIds, tournamentAccess?.roleContexts, user?.assignment_contexts]);
+
+  const isSportAssignedToUser = useCallback(
+    (sportId) => assignedSportIds.has(Number(sportId)),
+    [assignedSportIds]
+  );
 
   const loadSports = async () => {
     const data = await getSports(departmentId, { includeArchived: showArchived });
@@ -447,19 +509,48 @@ const Sports = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [departmentId, readOnly, showArchived]);
 
-  const visibleSports = useMemo(() => {
-    const filteredByStatus = sports.filter((sport) => {
+  const filteredAndSortedSports = useMemo(() => {
+    let list = sports.filter((sport) => {
+      if (isHiddenSport(sport)) return false;
       const archived = isArchivedStatus(sport.status);
       return showArchived ? archived : !archived;
     });
 
-    if (!showMineOnly || !user?.id) return filteredByStatus;
-    return filteredByStatus.filter((sport) => sport.created_by === user.id);
-  }, [showArchived, showMineOnly, sports, user]);
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((sport) => {
+        const name = String(getSportDisplayName(sport) || "").toLowerCase();
+        const category = String(sport.category || "").toLowerCase();
+        const partType = String(participantLabelForSport(sport) || "").toLowerCase();
+        const desc = String(sport.description || "").toLowerCase();
+        return name.includes(q) || category.includes(q) || partType.includes(q) || desc.includes(q);
+      });
+    }
+
+    if (isFacilitator && assignedSportIds.size > 0) {
+      list = [...list].sort((a, b) => {
+        const aAssigned = isSportAssignedToUser(a.id) ? 1 : 0;
+        const bAssigned = isSportAssignedToUser(b.id) ? 1 : 0;
+        if (aAssigned !== bAssigned) {
+          return bAssigned - aAssigned;
+        }
+        return String(a.name || "").localeCompare(String(b.name || ""));
+      });
+    } else {
+      list = [...list].sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+    }
+
+    return list;
+  }, [sports, showArchived, searchQuery, isFacilitator, assignedSportIds, isSportAssignedToUser]);
+
+  const visibleTemplates = useMemo(
+    () => templates.filter((template) => !isHiddenSport(template)),
+    [templates]
+  );
 
   const selectedTemplate = useMemo(
-    () => templates.find((row) => row.template_id === selectedTemplateId) || null,
-    [templates, selectedTemplateId]
+    () => visibleTemplates.find((row) => row.template_id === selectedTemplateId) || null,
+    [visibleTemplates, selectedTemplateId]
   );
 
   const openTemplateWizard = () => {
@@ -815,63 +906,9 @@ const Sports = ({
           subtitle={directorySubtitle}
           breadcrumbs={<Breadcrumbs trail={[{ label: "Intramural" }, { label: "Sports" }]} />}
           icon={Trophy}
-          action={isCoordinatorView ? (
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={openTemplateWizard}
-                className="rounded-sm mr-10 bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-500"
-              >
-                Add Supported Sport
-              </button>
-            </div>
-          ) : null}
+          action={""}
         />
       }
-
-      {/* {isCoordinatorView && (
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-blue-500/10 p-2 text-blue-500 dark:text-blue-300">
-                <ClipboardList size={18} />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Template-first setup</h3>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Register sports from approved templates so scoring, widgets, and event behavior stay consistent.
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-500 dark:text-emerald-300">
-                <Settings2 size={18} />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Scheduling profile control</h3>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Adjust match duration, setup, and cleanup buffers so bracketing and scheduling use realistic slot lengths.
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-violet-500/10 p-2 text-violet-500 dark:text-violet-300">
-                <ShieldCheck size={18} />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Lifecycle management</h3>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Review active sports, archive unused ones safely, and preserve linked teams, matches, and analytics.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )} */}
 
       {!readOnly && isTemplateWizardOpen && (
         <ModalShell onClose={closeTemplateWizard} busy={templateBusy}>
@@ -913,7 +950,7 @@ const Sports = ({
             {templateStep === 1 && (
               <div className="space-y-4">
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {templates.map((template) => {
+                  {visibleTemplates.map((template) => {
                     const isSelected = selectedTemplateId === template.template_id;
                     return (
                       <button
@@ -1252,77 +1289,93 @@ const Sports = ({
 
       {introContent}
 
-      <div className="">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-
-          {!readOnly && !isCoordinatorView && (
-            <div className="flex flex-wrap gap-2">
+      {/* Modern Clean Toolbar: Search & Contextual Badges */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search
+              size={16}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+              aria-hidden="true"
+            />
+            <input
+              type="text"
+              placeholder="Search sports by name, category, or type..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-9 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[var(--surface)] text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs"
+            />
+            {searchQuery && (
               <button
-                onClick={openTemplateWizard}
-                className="rounded-sm mr-10 bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                aria-label="Clear search"
               >
-                Add Supported Sport
+                <X size={14} />
               </button>
-            </div>
-          )}
-        </div>
-
-        {/* <CollapsibleFilterPanel
-          title="Sport Filters"
-          activeCount={activeSportsFilterCount}
-          summaryText={
-            activeSportsFilterCount > 0
-              ? `Filtered by: ${sportsFilterSummary.join(" · ")}`
-              : "No active filters"
-          }
-          onClear={clearSportsFilters}
-          compact
-        >
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setShowArchived((value) => !value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-            >
-              {showArchived ? "Show Active" : "Show Archived"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowMineOnly((value) => !value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-            >
-              {showMineOnly ? "Show All" : "Show Mine"}
-            </button>
+            )}
           </div>
-        </CollapsibleFilterPanel> */}
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {isFacilitator && assignedSportIds.size > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-3 py-1.5 text-xs font-semibold shadow-xs">
+                <ShieldCheck size={14} className="text-blue-600 dark:text-blue-400" />
+                <span>{assignedSportIds.size} Assigned Sport{assignedSportIds.size === 1 ? "" : "s"} Pinned at Top</span>
+              </span>
+            )}
+
+            {isCoordinator && (
+              <button
+                type="button"
+                onClick={() => setShowArchived((prev) => !prev)}
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold border transition cursor-pointer ${showArchived
+                    ? "bg-amber-500 text-white border-amber-600 shadow-xs"
+                    : "border-slate-200 dark:border-slate-800 bg-white dark:bg-[var(--surface)] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  }`}
+              >
+                {showArchived ? "Showing Archived" : "Show Archived"}
+              </button>
+            )}
+          </div>
+        </div>
 
         {(notice || error) && (
           <div
-            className={`rounded-lg border px-3 py-2 text-sm ${error
-              ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300"
-              : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300"
+            className={`rounded-xl border px-4 py-3 text-sm font-medium ${error
+                ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300"
+                : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300"
               }`}
           >
             {error || notice}
           </div>
         )}
 
-        {visibleSports.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center dark:border-slate-700 dark:bg-slate-950/30">
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-              {showArchived ? "No archived sports found." : "No active sports found."}
+        {filteredAndSortedSports.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-[var(--surface)]/50 p-10 text-center">
+            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400">
+              <Trophy size={24} />
+            </div>
+            <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              {searchQuery
+                ? "No sports match your search"
+                : showArchived
+                  ? "No archived sports found"
+                  : "No sports available"}
             </p>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              {isCoordinatorView
-                ? "As Sports Coordinator, you can create a sport, review its template-backed rules, tune scheduling buffers, and open its teams view once departments start using it."
-                : "Sports will appear here once they are configured for your current scope."}
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+              {searchQuery
+                ? "Try searching for a different name, category, or participation type."
+                : isCoordinator
+                  ? "As Sports Coordinator, add supported sports using templates to begin scheduling."
+                  : "Sports will appear here once configured for this tournament."}
             </p>
-            {isCoordinatorView && !showArchived && (
+            {isCoordinator && !showArchived && !searchQuery && (
               <div className="mt-4 flex justify-center">
                 <button
                   type="button"
                   onClick={openTemplateWizard}
-                  className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+                  className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition shadow-xs cursor-pointer"
                 >
                   Add First Supported Sport
                 </button>
@@ -1330,142 +1383,208 @@ const Sports = ({
             )}
           </div>
         ) : (
-          <div className="overflow-hidden mr-5 mt-7 ml-1 rounded-sm border border-slate-200 bg-white dark:border-slate-800 dark:bg-[var(--surface)]">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[var(--surface)] shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left ">
+              <table className="w-full border-collapse text-left">
                 <thead>
-                  <tr className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 dark:bg-[var(--surface-soft)] dark:text-[var(--text-soft)]">
-                    <th className="px-4 py-3 font-semibold">Sport</th>
-                    <th className="px-4 py-3 font-semibold">Competition Types</th>
-                    <th className="px-4 py-3 font-semibold">Default Events</th>
-                    <th className="px-4 py-3 font-semibold">Player Setup</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 text-right font-semibold">Actions</th>
+                  <tr className="bg-slate-50/80 dark:bg-[var(--surface-soft)] text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+                    <th className="px-5 py-3.5 font-bold">Sport</th>
+                    <th className="px-5 py-3.5 font-bold">Competition Types</th>
+                    <th className="px-5 py-3.5 font-bold">Default Events</th>
+                    <th className="px-5 py-3.5 font-bold">Player Setup</th>
+                    <th className="px-5 py-3.5 font-bold">Status</th>
+                    <th className="px-5 py-3.5 text-right font-bold">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 text-sm dark:divide-[var(--border-soft)] dark:bg-[var(--surface)]">
-                  {visibleSports.map((sport) => {
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-sm">
+                  {filteredAndSortedSports.map((sport) => {
                     const archived = isArchivedStatus(sport.status);
-                    const globalTemplate = templates.find((template) => Number(template.sport_id) === Number(sport.id));
+                    const globalTemplate = templates.find((t) => Number(t.sport_id) === Number(sport.id));
                     const defaultEvents = globalTemplate?.default_event_categories || [];
-                    const enabledEvents = defaultEvents.filter((event) => event.is_default_enabled !== false);
+                    const enabledEvents = defaultEvents.filter((e) => e.is_default_enabled !== false);
+                    const isAssigned = isFacilitator && isSportAssignedToUser(sport.id);
+                    const canManage = isCoordinator || isAssigned;
 
                     return (
-                      <tr key={sport.id} className="hover:bg-slate-50 dark:hover:bg-[var(--surface-soft)]">
-                        <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
-                          <div className="flex items-center gap-2">
+                      <tr
+                        key={sport.id}
+                        className={`transition-colors ${isAssigned
+                            ? "bg-blue-50/50 hover:bg-blue-100/60 dark:bg-blue-950/20 dark:hover:bg-blue-950/35 border-l-4 border-l-blue-600"
+                            : "hover:bg-slate-50/80 dark:hover:bg-[var(--surface-soft)]/60 border-l-4 border-l-transparent"
+                          }`}
+                      >
+                        <td className="px-5 py-4 font-medium text-slate-900 dark:text-slate-100">
+                          <div className="flex items-center gap-3">
                             <SportIcon imageUrl={sport.image_url} label={getSportDisplayName(sport)} scale="sm" />
-                            <span>{getSportDisplayName(sport)}</span>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-900 dark:text-white">
+                                  {getSportDisplayName(sport)}
+                                </span>
+                                {isAssigned && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase">
+                                    <ShieldCheck size={11} className="text-blue-600 dark:text-blue-400" />
+                                    <span>Assigned to You</span>
+                                  </span>
+                                )}
+                              </div>
+                              {sport.category && (
+                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                                  {sport.category}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{participantLabelForSport(sport)}</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{enabledEvents.length} event{enabledEvents.length === 1 ? "" : "s"} enabled</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{playerSetupForSport(sport)}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-5 py-4 text-slate-600 dark:text-slate-300 font-medium">
+                          {participantLabelForSport(sport)}
+                        </td>
+                        <td className="px-5 py-4 text-slate-600 dark:text-slate-300">
+                          {enabledEvents.length} event{enabledEvents.length === 1 ? "" : "s"} enabled
+                        </td>
+                        <td className="px-5 py-4 text-slate-600 dark:text-slate-300">
+                          {playerSetupForSport(sport)}
+                        </td>
+                        <td className="px-5 py-4">
                           <span
-                            className={`rounded-sm px-2 py-0.5 text-xs font-semibold ${archived
-                              ? "bg-amber-100 text-amber-700 dark:bg-amber-700/30 dark:text-amber-300"
-                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-700/30 dark:text-emerald-300"
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${archived
+                                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                                : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
                               }`}
                           >
                             {formatStatusLabel(sport.status)}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex justify-end gap-2">
-                            {isSportsCoordinator && !archived ? <button type="button" onClick={() => setTemplateSport(sport)} className="os-btn-primary-soft min-h-10 text-xs">Configure Sport</button> : null}
-                            {readOnly ? <button
-                              type="button"
-                              onClick={() => setRuleSport(sport)}
-                              className="rounded border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                            >
-                              View Rules
-                            </button> : null}
+                        <td className="px-5 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {/* Coordinator actions */}
+                            {isCoordinator && !archived && (
+                              <button
+                                type="button"
+                                onClick={() => setTemplateSport(sport)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-3 py-1.5 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition cursor-pointer"
+                              >
+                                <Settings2 size={13} />
+                                <span>Configure</span>
+                              </button>
+                            )}
 
-                            {!readOnly && (
-                              <>
+                            {/* Facilitator on assigned sport: Manage Rules */}
+                            {isAssigned && (
+                              <button
+                                type="button"
+                                onClick={() => setRuleSport(sport)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 text-white px-3 py-1.5 text-xs font-semibold hover:bg-blue-700 transition cursor-pointer shadow-xs"
+                              >
+                                <ShieldCheck size={13} />
+                                <span>Manage Rules</span>
+                              </button>
+                            )}
 
-                                <ActionPopover
-                                  label="•••"
-                                  buttonClassName="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-                                  panelClassName="grid gap-1 absolute right-0 top-full z-20 mt-1 w-40 rounded-sm border border-slate-200 bg-white p-2 shadow-lg shadow-slate-300/20 dark:border-slate-700 dark:bg-slate-900 dark:shadow-none"
-                                >
-                                  {() => (
-                                    <>
-                                      {isSportsCoordinator ? (
+                            {/* Read-only roles or Facilitator on unassigned sport: View Rules */}
+                            {!isCoordinator && !isAssigned && (
+                              <button
+                                type="button"
+                                onClick={() => setViewDetailsSport(sport)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[var(--surface-soft)] px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer"
+                              >
+                                <ClipboardList size={13} />
+                                <span>View Rules</span>
+                              </button>
+                            )}
+
+                            {/* Action Popover: available for Coordinator OR Facilitator on their assigned sport */}
+                            {canManage && (
+                              <ActionPopover
+                                label="•••"
+                                buttonClassName="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[var(--surface)] text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer"
+                                panelClassName="grid gap-1 absolute right-0 top-full z-20 mt-1.5 w-48 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[var(--surface)] p-1.5 shadow-xl backdrop-blur-md"
+                              >
+                                {() => (
+                                  <>
+                                    {isCoordinator && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => setViewDetailsSport(sport)}
+                                          className="w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                                        >
+                                          View rules & details
+                                        </button>
                                         <button
                                           type="button"
                                           onClick={() => setRuleSport(sport)}
-                                          className="rounded-sm px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700"
+                                          className="w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
                                         >
                                           Rules for future Intramurals
                                         </button>
-                                      ) : null}
+                                      </>
+                                    )}
 
-                                      <label className="cursor-pointer rounded-sm px-2 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-700">
+                                    <label className="cursor-pointer w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 flex items-center justify-between">
+                                      <span>
                                         {imageActionBySportId[sport.id]?.loading
                                           ? "Uploading..."
                                           : sport.image_url
                                             ? "Change Image"
                                             : "Upload Image"}
-                                        <input
-                                          type="file"
-                                          accept=".jpg,.jpeg,.png,.webp"
-                                          className="hidden"
-                                          disabled={Boolean(imageActionBySportId[sport.id]?.loading)}
-                                          onChange={(event) => {
-                                            const file = event.target.files?.[0] || null;
-                                            event.target.value = "";
-                                            handleUploadSportImage(sport.id, file);
-                                          }}
-                                        />
-                                      </label>
-                                      {sport.image_url ? (
+                                      </span>
+                                      <input
+                                        type="file"
+                                        accept=".jpg,.jpeg,.png,.webp"
+                                        className="hidden"
+                                        disabled={Boolean(imageActionBySportId[sport.id]?.loading)}
+                                        onChange={(event) => {
+                                          const file = event.target.files?.[0] || null;
+                                          event.target.value = "";
+                                          handleUploadSportImage(sport.id, file);
+                                        }}
+                                      />
+                                    </label>
+
+                                    {sport.image_url && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveSportImage(sport.id)}
+                                        disabled={Boolean(imageActionBySportId[sport.id]?.loading)}
+                                        className="w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30 cursor-pointer disabled:opacity-50"
+                                      >
+                                        Remove Image
+                                      </button>
+                                    )}
+
+                                    {!archived && (
+                                      <button
+                                        type="button"
+                                        onClick={() => openEditModal(sport.id)}
+                                        className="w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                                      >
+                                        Edit details
+                                      </button>
+                                    )}
+
+                                    {isCoordinator && (
+                                      !archived ? (
                                         <button
                                           type="button"
-                                          onClick={() => handleRemoveSportImage(sport.id)}
-                                          disabled={Boolean(imageActionBySportId[sport.id]?.loading)}
-                                          className="rounded-sm w-28 cursor-pointer py-2 text-sm font-semibold text-slate-700 dark:bg-slate-900 hover:bg-slate-50 disabled:opacity-50 "
+                                          onClick={() => openStatusModal(sport.id, "archive")}
+                                          className="w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30 cursor-pointer"
                                         >
-                                          Remove Image
+                                          Archive
                                         </button>
-                                      ) : null}
-
-                                      {!archived ? (
-                                        <>
-                                          <button
-                                            type="button"
-                                            onClick={() => openEditModal(sport.id)}
-                                            className="rounded-sm w-10 cursor-pointer border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-200"
-                                          >
-                                            Edit details
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => openStatusModal(sport.id, "archive")}
-                                            className="rounded-sm cursor-pointer w-17 border-rose-200 bg-white px-2.5 py-1 text-sm font-semibold text-rose-700 hover:bg-rose-50 hover:text-rose-900 dark:bg-slate-900 dark:text-rose-300"
-                                          >
-                                            Archive
-                                          </button>
-                                        </>
                                       ) : (
                                         <button
                                           type="button"
                                           onClick={() => openStatusModal(sport.id, "restore")}
-                                          className="rounded-sm cursor-pointer bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+                                          className="w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30 cursor-pointer"
                                         >
                                           Restore
                                         </button>
-                                      )}
-
-                                    </>
-                                  )}
-
-
-                                </ActionPopover>
-
-
-                              </>
+                                      )
+                                    )}
+                                  </>
+                                )}
+                              </ActionPopover>
                             )}
                           </div>
                         </td>
@@ -1498,7 +1617,7 @@ const Sports = ({
         title={ruleSport ? `${getSportDisplayName(ruleSport)} Rules` : "Rules for Future Intramurals"}
         subtitle={isSportsCoordinator
           ? "Set the rule version used when this sport is added to future Intramurals."
-          : "Review the rules for this sport and event."}
+          : "Review the rules and configuration for this sport."}
         maxWidthClass="max-w-4xl"
         bodyClassName="p-4 sm:p-6"
       >
@@ -1509,15 +1628,21 @@ const Sports = ({
               sportId={ruleSport.id}
             />
           ) : (
-            <RuleGovernancePage
+            <ReadOnlySportDetailsContent
               key={`sport-rules-${ruleSport.id}`}
-              embedded
-              lockSportSelection
-              initialSportId={ruleSport.id}
+              sport={ruleSport}
+              sportId={ruleSport.id}
+              onClose={() => setRuleSport(null)}
             />
           )
         ) : null}
       </AppModal>
+      <ReadOnlySportDetailsModal
+        open={Boolean(viewDetailsSport)}
+        onClose={() => setViewDetailsSport(null)}
+        sport={viewDetailsSport}
+        sportId={viewDetailsSport?.id}
+      />
       <AppModal
         open={statusModal.open}
         onClose={() => {

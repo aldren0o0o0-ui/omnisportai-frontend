@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Activity,
   ArrowLeft,
   ArrowRight,
   ChevronDown,
@@ -12,7 +10,6 @@ import {
   Lock,
   Mail,
   Moon,
-  Sparkles,
   Sun,
   User,
   Users,
@@ -32,37 +29,18 @@ const resolveDefaultRoleRoute = ({ roleNames = [], isViewerOnly = false } = {}) 
   return '/viewer/dashboard';
 };
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 18 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
-  },
-};
-
-const stagger = {
-  hidden: {},
-  show: {
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.05,
-    },
-  },
-};
-
-const MotionSection = motion.section;
-const MotionDiv = motion.div;
-
 const AuthPage = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
+
+  const isRegisterRoute = location.pathname.includes('register');
+  const [isLogin, setIsLogin] = useState(!isRegisterRoute);
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState([]);
   const [deptLoading, setDeptLoading] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', message: '' });
-  const navigate = useNavigate();
-  const { login } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -73,11 +51,17 @@ const AuthPage = () => {
   });
 
   useEffect(() => {
+    setIsLogin(!location.pathname.includes('register'));
+  }, [location.pathname]);
+
+  useEffect(() => {
     const loadDepartments = async () => {
       setDeptLoading(true);
       try {
         const data = await getDepartments();
-        setDepartments(data);
+        setDepartments(Array.isArray(data) ? data : []);
+      } catch (err) {
+        setDepartments([]);
       } finally {
         setDeptLoading(false);
       }
@@ -131,7 +115,7 @@ const AuthPage = () => {
         const departmentId = Number(formData.department_id);
 
         if (!departmentId || Number.isNaN(departmentId)) {
-          setFeedback({ type: 'error', message: 'Department is required.' });
+          setFeedback({ type: 'error', message: 'Department selection is required.' });
           return;
         }
 
@@ -151,7 +135,7 @@ const AuthPage = () => {
 
         setFeedback({
           type: 'success',
-          message: 'Account created. You can sign in now.',
+          message: 'Account successfully registered. You can sign in now.',
         });
         setIsLogin(true);
         setFormData({
@@ -165,7 +149,7 @@ const AuthPage = () => {
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: error.response?.data?.detail || 'Authentication failed.',
+        message: error.response?.data?.detail || 'Authentication failed. Please verify your credentials.',
       });
     } finally {
       setLoading(false);
@@ -173,257 +157,261 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="auth-shell relative min-h-screen min-h-[100dvh] w-full overflow-x-hidden bg-[var(--auth-bg)] text-[var(--auth-text)]">
-      <div className="auth-orb auth-orb-primary" />
-      <div className="auth-orb auth-orb-secondary" />
-      <div className="auth-grid-overlay" />
-
-      <nav className="fixed inset-x-0 top-0 z-50 border-b border-[var(--auth-border)] bg-[color-mix(in_srgb,var(--auth-surface)_82%,transparent)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3.5 py-3 sm:px-6 sm:py-4 lg:px-8">
+    <div className="auth-shell flex flex-col justify-between">
+      {/* Top Header - Uniform with AppTopHeader */}
+      <header className="sticky top-0 z-50 border-b border-[var(--border-soft)] bg-[var(--surface)]/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="flex min-w-0 items-center gap-2.5 sm:gap-3 text-left focus:outline-none"
-            aria-label="Go to OmniSport AI home"
+            className="flex items-center gap-3 text-left focus:outline-none"
+            aria-label="Back to home"
           >
-            <span className="auth-brand-mark flex-shrink-0">
-              <Activity size={20} className="sm:h-[22px] sm:w-[22px]" />
-            </span>
-            <span className="min-w-0">
-              <span className="auth-eyebrow block">OmniSport AI</span>
-              <span className="auth-brand-title truncate">Tournament access</span>
-            </span>
+            <div className="auth-brand-mark">
+              OA
+            </div>
+            <div>
+              <span className="text-sm font-bold tracking-tight text-[var(--text-main)] sm:text-base">
+                OmniSport AI
+              </span>
+              <span className="hidden text-xs text-[var(--text-muted)] sm:block">
+                Intramural Access Portal
+              </span>
+            </div>
           </button>
 
-          <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => navigate('/')}
               className="auth-secondary-button"
-              aria-label="Back to home"
             >
-              <ArrowLeft size={16} />
-              <span className="hidden sm:inline">Back to home</span>
+              <ArrowLeft size={15} />
+              <span className="hidden sm:inline">Back to Overview</span>
             </button>
+
             <button
               type="button"
               onClick={toggleTheme}
               aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
-              aria-pressed={isDark}
               className="auth-icon-button"
             >
               {isDark ? <Sun size={17} /> : <Moon size={17} />}
             </button>
           </div>
         </div>
-      </nav>
-      <main className="relative z-10 flex min-h-[100dvh] w-full items-center justify-center px-4 pt-20 pb-8 sm:px-6 sm:pt-24 sm:pb-12 lg:px-8">
-        <div className="flex w-full justify-center">
-          <MotionSection
-            initial="hidden"
-            animate="show"
-            variants={stagger}
-            className="auth-panel"
-          >
-            <MotionDiv variants={fadeUp} className="auth-panel-inner">
-              <div className="flex flex-col gap-4 sm:gap-5">
-                <div className="flex items-center gap-3">
-                  <div className="auth-panel-mark">
-                    <Activity size={22} className="sm:h-6 sm:w-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-semibold tracking-tight text-[var(--auth-text)] sm:text-2xl">
-                      {isLogin ? 'Welcome back' : 'Create your account'}
-                    </h2>
+      </header>
+
+      {/* Main Authentication Card Container */}
+      <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6 sm:py-14">
+        <div className="auth-panel">
+          <div className="auth-panel-inner">
+            <div className="mb-6 flex flex-col items-center text-center">
+              <div className="auth-brand-mark mb-3 h-10 w-10 text-base">
+                OA
+              </div>
+              <h1 className="text-xl font-bold tracking-tight text-[var(--text-main)] sm:text-2xl">
+                {isLogin ? 'Sign in to OmniSport AI' : 'Create an account'}
+              </h1>
+              <p className="mt-1 text-xs text-[var(--text-muted)] sm:text-sm">
+                {isLogin
+                  ? 'Access your tournament coordinator, coach, or official dashboard'
+                  : 'Register your profile under your university department'}
+              </p>
+            </div>
+
+            {/* Segmented Mode Switch */}
+            <div className="auth-mode-toggle mb-5" role="tablist">
+              <button
+                type="button"
+                className={isLogin ? 'active' : ''}
+                onClick={() => switchMode(true)}
+                aria-selected={isLogin}
+              >
+                Sign in
+              </button>
+              <button
+                type="button"
+                className={!isLogin ? 'active' : ''}
+                onClick={() => switchMode(false)}
+                aria-selected={!isLogin}
+              >
+                Create account
+              </button>
+            </div>
+
+            {/* Feedback Alert */}
+            {feedback.message && (
+              <div
+                className={`auth-feedback mb-4 ${feedback.type === 'error' ? 'is-error' : 'is-success'}`}
+                role="status"
+              >
+                {feedback.message}
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleAuth} className="space-y-4">
+              {!isLogin && (
+                <div className="space-y-1.5">
+                  <label className="auth-field-label">Full Name</label>
+                  <div className="auth-input-shell">
+                    <div className="auth-input-icon">
+                      <User size={16} />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={formData.name}
+                      placeholder="e.g. Alex Morgan"
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="auth-input"
+                    />
                   </div>
                 </div>
+              )}
 
-                <p className="text-xs leading-relaxed text-[var(--auth-muted)] sm:text-sm sm:leading-6">
-                  {isLogin
-                    ? 'Sign in to continue to your role-based dashboard.'
-                    : 'Register your account and connect it to the right department.'}
-                </p>
-
-                <div className="auth-mode-toggle" role="tablist" aria-label="Authentication mode">
-                  <button
-                    type="button"
-                    className={isLogin ? 'active' : ''}
-                    onClick={() => switchMode(true)}
-                    aria-selected={isLogin}
-                  >
-                    Sign in
-                  </button>
-                  <button
-                    type="button"
-                    className={!isLogin ? 'active' : ''}
-                    onClick={() => switchMode(false)}
-                    aria-selected={!isLogin}
-                  >
-                    Sign up
-                  </button>
-                </div>
-
-                {feedback.message ? (
-                  <div
-                    className={`auth-feedback ${feedback.type === 'error' ? 'is-error' : 'is-success'}`}
-                    role="status"
-                  >
-                    {feedback.message}
+              <div className="space-y-1.5">
+                <label className="auth-field-label">Email Address</label>
+                <div className="auth-input-shell">
+                  <div className="auth-input-icon">
+                    <Mail size={16} />
                   </div>
-                ) : null}
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    placeholder="user@university.edu"
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="auth-input"
+                  />
+                </div>
               </div>
 
-              <form onSubmit={handleAuth} className="mt-5 space-y-3.5 sm:mt-6 sm:space-y-4">
-                {!isLogin ? (
-                  <AuthInput
-                    label="Name"
-                    value={formData.name}
-                    icon={<User size={18} />}
-                    placeholder="Your full name"
-                    onChange={(value) => setFormData({ ...formData, name: value })}
-                  />
-                ) : null}
-
-                <AuthInput
-                  label="Email"
-                  type="email"
-                  value={formData.email}
-                  icon={<Mail size={18} />}
-                  placeholder="coach@omnisport.ai"
-                  onChange={(value) => setFormData({ ...formData, email: value })}
-                />
-
-                <AuthInput
-                  label="Password"
-                  type="password"
+              <div className="space-y-1.5">
+                <label className="auth-field-label">Password</label>
+                <PasswordInput
                   value={formData.password}
-                  icon={<Lock size={18} />}
+                  onChange={(val) => setFormData({ ...formData, password: val })}
                   placeholder="Enter your password"
-                  onChange={(value) => setFormData({ ...formData, password: value })}
                 />
+              </div>
 
-                {!isLogin ? (
-                  <div className="space-y-3.5 sm:space-y-4">
-                    <div className="space-y-1.5 sm:space-y-2">
-                      <label className="auth-field-label">Department</label>
+              {!isLogin && (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="auth-field-label">University Department</label>
+                    <div className="auth-input-shell">
+                      <div className="auth-input-icon">
+                        <Users size={16} />
+                      </div>
+                      <select
+                        required
+                        value={formData.department_id}
+                        onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
+                        className="auth-select"
+                        disabled={deptLoading}
+                      >
+                        <option value="">
+                          {deptLoading ? 'Loading departments...' : 'Select your department'}
+                        </option>
+                        {departments.map((dept) => (
+                          <option key={dept.id} value={dept.id}>
+                            {dept.department_name} ({dept.department_code})
+                          </option>
+                        ))}
+                      </select>
+                      <div className="auth-select-arrow">
+                        <ChevronDown size={16} />
+                      </div>
+                    </div>
+                    <p className="auth-helper-text">
+                      Connect your account to the department you represent.
+                    </p>
+                  </div>
+
+                  {requiresInvite && (
+                    <div className="space-y-1.5">
+                      <label className="auth-field-label">Sports Office Invite Code</label>
                       <div className="auth-input-shell">
                         <div className="auth-input-icon">
-                          <Users size={18} />
+                          <KeyRound size={16} />
                         </div>
-                        <select
-                          value={formData.department_id}
-                          onChange={(event) =>
-                            setFormData({ ...formData, department_id: event.target.value })
-                          }
-                          className="auth-select"
-                          disabled={deptLoading}
-                        >
-                          <option value="">
-                            {deptLoading ? 'Loading departments...' : 'Select department'}
-                          </option>
-                          {departments.map((department) => (
-                            <option key={department.id} value={department.id}>
-                              {department.department_name}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="auth-select-arrow" aria-hidden="true">
-                          <ChevronDown size={18} />
-                        </div>
+                        <input
+                          type="text"
+                          required
+                          value={formData.invite_code}
+                          placeholder="Enter authorization invite code"
+                          onChange={(e) => setFormData({ ...formData, invite_code: e.target.value })}
+                          className="auth-input"
+                        />
                       </div>
                       <p className="auth-helper-text">
-                        Pick the department your role belongs to before you continue.
+                        Sports Office registrations require an administrator-issued code.
                       </p>
                     </div>
+                  )}
+                </>
+              )}
 
-                    {requiresInvite ? (
-                      <div className="space-y-1.5 sm:space-y-2">
-                        <AuthInput
-                          label="Sports Office Invite Code"
-                          type="text"
-                          value={formData.invite_code}
-                          icon={<KeyRound size={18} />}
-                          placeholder="Enter invite code"
-                          onChange={(value) =>
-                            setFormData({ ...formData, invite_code: value })
-                          }
-                        />
-                        <p className="auth-helper-text">
-                          Sports Office registrations require an approved invite code.
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
+              <button
+                type="submit"
+                disabled={loading}
+                className="auth-primary-button mt-2 w-full"
+              >
+                <span>{loading ? 'Authenticating...' : isLogin ? 'Sign In to Dashboard' : 'Complete Registration'}</span>
+                <ArrowRight size={16} />
+              </button>
+            </form>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="auth-primary-button w-full"
-                >
-                  <span>{loading ? 'Processing...' : isLogin ? 'Continue to dashboard' : 'Create account'}</span>
-                  <ArrowRight size={18} />
-                </button>
-              </form>
-
-              <p className="mt-5 text-center text-xs text-[var(--auth-muted)] sm:mt-6 sm:text-sm">
-                {isLogin ? 'Need an account?' : 'Already registered?'}{' '}
+            <div className="mt-5 border-t border-[var(--border-soft)] pt-4 text-center">
+              <p className="text-xs text-[var(--text-muted)]">
+                {isLogin ? "Don't have an account yet?" : 'Already registered with a department?'}{' '}
                 <button
                   type="button"
                   onClick={() => switchMode(!isLogin)}
-                  className="font-semibold text-[var(--auth-accent)] transition-opacity hover:opacity-80 underline-offset-4 hover:underline"
+                  className="font-semibold text-[var(--primary)] hover:underline"
                 >
-                  {isLogin ? 'Create one here' : 'Sign in here'}
+                  {isLogin ? 'Register here' : 'Sign in here'}
                 </button>
               </p>
-            </MotionDiv>
-          </MotionSection>
+            </div>
+          </div>
         </div>
       </main>
+
+      {/* Uniform Footer */}
+      <footer className="border-t border-[var(--border-soft)] bg-[var(--surface)] px-4 py-4 text-center text-xs text-[var(--text-muted)]">
+        OmniSport AI · Secure Role-Based Authentication
+      </footer>
     </div>
   );
 };
 
-const AuthInput = ({ label, type = 'text', icon, placeholder, onChange, value }) => (
-  <AuthInputInner
-    label={label}
-    type={type}
-    icon={icon}
-    placeholder={placeholder}
-    onChange={onChange}
-    value={value}
-  />
-);
-
-const AuthInputInner = ({ label, type = 'text', icon, placeholder, onChange, value }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const isPasswordField = type === 'password';
-  const inputType = isPasswordField && isVisible ? 'text' : type;
+const PasswordInput = ({ value, onChange, placeholder }) => {
+  const [show, setShow] = useState(false);
 
   return (
-    <div className="space-y-1.5 sm:space-y-2">
-      <label className="auth-field-label">{label}</label>
-      <div className="auth-input-shell">
-        <div className="auth-input-icon">{icon}</div>
-        <input
-          type={inputType}
-          value={value}
-          placeholder={placeholder}
-          onChange={(event) => onChange(event.target.value)}
-          className={`auth-input ${isPasswordField ? 'pr-10 sm:pr-12' : ''}`}
-        />
-        {isPasswordField ? (
-          <button
-            type="button"
-            onClick={() => setIsVisible((current) => !current)}
-            className="auth-password-toggle"
-            aria-label={isVisible ? 'Hide password' : 'Show password'}
-            aria-pressed={isVisible}
-          >
-            {isVisible ? <EyeOff size={18} /> : <Eye size={18} />}
-          </button>
-        ) : null}
+    <div className="auth-input-shell">
+      <div className="auth-input-icon">
+        <Lock size={16} />
       </div>
+      <input
+        type={show ? 'text' : 'password'}
+        required
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className="auth-input pr-9"
+      />
+      <button
+        type="button"
+        onClick={() => setShow(!show)}
+        className="auth-password-toggle"
+        aria-label={show ? 'Hide password' : 'Show password'}
+      >
+        {show ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
     </div>
   );
 };

@@ -1,20 +1,24 @@
 import api from "../api/axios";
 import { cacheTimes, queryClient, queryKeys } from "../query/queryClient";
+import { filterVisibleSports } from "../utils/sportVisibility";
 
 export const getSports = async (departmentId = null, options = {}) => {
   const params = {};
   if (departmentId) params.department_id = departmentId;
   if (options.includeArchived) params.include_archived = true;
-  return queryClient.fetchQuery({
+  const result = await queryClient.fetchQuery({
     queryKey: queryKeys.sports(departmentId, options.includeArchived),
     staleTime: cacheTimes.reference,
     queryFn: async ({ signal }) => (await api.get("/sports", { params, signal })).data,
   });
+  if (options.includeHidden) return result;
+  return Array.isArray(result) ? filterVisibleSports(result) : result;
 };
 
-export const getSportTemplates = async () => {
+export const getSportTemplates = async (options = {}) => {
   const res = await api.get("/sports/templates");
-  return res.data;
+  if (options.includeHidden) return res.data;
+  return Array.isArray(res.data) ? filterVisibleSports(res.data) : res.data;
 };
 
 export const getSportById = async (sportId) => {

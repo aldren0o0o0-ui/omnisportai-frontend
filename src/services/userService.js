@@ -19,10 +19,12 @@ export const getMyRoleProfile = async ({ roleContext = null } = {}) => {
   return res.data;
 };
 
-export const getMyProfile = async () => {
-  const res = await api.get("/users/me/profile", {
-    params: { profile_mode: "user" },
-  });
+export const getMyProfile = async (options = {}) => {
+  const params = { profile_mode: "user" };
+  if (options?.tournamentId) {
+    params.tournament_id = options.tournamentId;
+  }
+  const res = await api.get("/users/me/profile", { params });
   return res.data;
 };
 
@@ -37,6 +39,11 @@ export const getUserProfile = async (userId, options = {}) => {
     params.tournament_id = options.tournamentId;
   }
   const res = await api.get(`/users/${userId}/profile`, { params });
+  return res.data;
+};
+
+export const getUserByPlayerId = async (playerId) => {
+  const res = await api.get(`/users/by-player/${playerId}`);
   return res.data;
 };
 
@@ -61,3 +68,9 @@ export const removeUserProfileImage = async (userId) => {
   const res = await api.delete(`/users/${userId}/profile-image`);
   return res.data;
 };
+
+export const changeMyPassword = async (payload) => {
+  const res = await api.post("/auth/change-password", payload);
+  return res.data;
+};
+

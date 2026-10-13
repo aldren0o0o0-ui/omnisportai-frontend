@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, CalendarDays, Megaphone, Radio, ShieldCheck, Sparkles, Trophy, Users } from "lucide-react";
+import { ArrowRight, CalendarDays, Megaphone, Radio, Sparkles, Trophy, Users } from "lucide-react";
 import DashboardCard from "../../../common/DashboardCard";
 import StatusBadge from "../../../common/StatusBadge";
 import { getChampionshipStandings } from "../../../../services/standingsService";
@@ -49,6 +49,7 @@ const FacilitatorDashboardLayout = ({
   const [brackets, setBrackets] = useState([]);
   const [teamRegistrations, setTeamRegistrations] = useState([]);
   const [competitionEntries, setCompetitionEntries] = useState([]);
+  const [allTeams, setAllTeams] = useState([]);
   const [userSelectedStage, setUserSelectedStage] = useState(null);
 
   const tournament = useMemo(
@@ -90,16 +91,15 @@ const FacilitatorDashboardLayout = ({
       try {
         setChampionship(null);
         setChampionshipUnavailable(false);
-        const [champData, bracketsData, teamPayload, entryPayload, schedulePayload] = await Promise.all([
+        const [champData, bracketsData, teamPayload, entryPayload, schedulePayload, allTeamsPayload] = await Promise.all([
           getChampionshipStandings({ tournamentId }).catch(() => null),
           getBrackets().catch(() => []),
           tournamentId
-            ? getTournamentTeamRegistrations(Number(tournamentId), { status: "ALL", page: 1, limit: 200 }).catch(() =>
-                getTeams(null, Number(tournamentId)).catch(() => [])
-              )
-            : getTeams().catch(() => []),
+            ? getTournamentTeamRegistrations(Number(tournamentId), { status: "ALL", page: 1, limit: 200 }).catch(() => [])
+            : [],
           tournamentId ? listEntries({ tournamentId: Number(tournamentId) }).catch(() => []) : [],
           tournamentId ? getScheduleEvents(Number(tournamentId)).catch(() => ({ events: [] })) : Promise.resolve({ events: [] }),
+          tournamentId ? getTeams(null, Number(tournamentId)).catch(() => []) : getTeams().catch(() => []),
         ]);
         if (!active) return;
         setChampionship(champData || null);
@@ -115,6 +115,13 @@ const FacilitatorDashboardLayout = ({
                 : []
         );
         setCompetitionEntries(Array.isArray(entryPayload) ? entryPayload : []);
+        setAllTeams(
+          Array.isArray(allTeamsPayload)
+            ? allTeamsPayload
+            : Array.isArray(allTeamsPayload?.items)
+              ? allTeamsPayload.items
+              : []
+        );
         setScheduleEvents(
           Array.isArray(schedulePayload?.events)
             ? schedulePayload.events
@@ -144,16 +151,6 @@ const FacilitatorDashboardLayout = ({
   );
   const pendingApprovalCount = toPositiveInt(
     dashboard?.meta?.pending_approval_count ?? pendingApprovalRows.length
-  );
-
-  // Assigned Staff and Officials
-  const staffTable = useMemo(
-    () => tables.find((table) => /assigned_staff|staff|official|referee/i.test(String(table?.id || table?.title || ""))),
-    [tables]
-  );
-  const staffRows = useMemo(
-    () => (Array.isArray(staffTable?.rows) ? staffTable.rows.slice(0, 6) : []),
-    [staffTable]
   );
 
   // Announcements
@@ -383,8 +380,8 @@ const FacilitatorDashboardLayout = ({
   // The active Entries & Approvals dashboard intentionally does not consume
   // this merged compatibility view.
   const showcaseEntries = useMemo(
-    () => buildShowcaseEntries({ teamRegistrations, competitionEntries, events, dashboard }),
-    [teamRegistrations, competitionEntries, events, dashboard]
+    () => buildShowcaseEntries({ teamRegistrations, competitionEntries, teams: allTeams, events, dashboard }),
+    [teamRegistrations, competitionEntries, allTeams, events, dashboard]
   );
 
   return (
@@ -396,7 +393,6 @@ const FacilitatorDashboardLayout = ({
           sports={displaySports}
           tournament={tournament || startedTournament}
           entries={competitionEntries}
-          staffRows={staffRows}
           announcements={announcements}
           events={events}
           brackets={scopedBrackets}
@@ -514,55 +510,10 @@ const FacilitatorDashboardLayout = ({
               />
             </DashboardCard>
 
-            <div className="space-y-4">
-              <DashboardCard>
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
-                    <h2 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-[var(--text-main)]">
-                      <ShieldCheck size={16} className="text-[var(--primary)]" aria-hidden="true" />
-                      Assigned Staff & Officials
-                    </h2>
-                    <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                      Referees and table officials on duty
-                    </p>
-                  </div>
-                  <Link
-                    to="/sport-facilitator/assigned-staff"
-                    className="text-xs font-semibold text-[var(--primary)] hover:underline"
-                  >
-                    Manage Staff →
-                  </Link>
-                </div>
-
-                {staffRows.length === 0 ? (
-                  <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-soft)] p-4 text-center text-xs text-[var(--text-muted)]">
-                    No staff assigned to your sports yet.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {staffRows.slice(0, 4).map((staff, idx) => (
-                      <div
-                        key={`staff-reg-${staff?.id || idx}`}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-bold text-[var(--text-main)]">{staff?.name || `Staff ${idx + 1}`}</p>
-                          <p className="text-[10px] text-[var(--text-muted)]">
-                            {[staff?.role, staff?.sport].filter(Boolean).join(" • ") || "Official"}
-                          </p>
-                        </div>
-                        <StatusBadge status={staff?.status || "ASSIGNED"} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </DashboardCard>
-
-              <DashboardCard>
-                <PanelHeader icon={CalendarDays} title="Registration Timeline" />
-                <TournamentUpdatesPanel milestones={preMilestones} />
-              </DashboardCard>
-            </div>
+            <DashboardCard>
+              <PanelHeader icon={CalendarDays} title="Registration Timeline" />
+              <TournamentUpdatesPanel milestones={preMilestones} />
+            </DashboardCard>
           </section>
         </>
       )}
@@ -570,54 +521,11 @@ const FacilitatorDashboardLayout = ({
       {/* STAGE 3: Live Center & Leaderboard */}
       {effectiveStage === "live" && (
         <LiveDashboardStage events={events} sports={displaySports} entries={showcaseEntries} tournamentId={tournamentId} scheduleHref="/sport-facilitator/schedules" scoreBasePath="/sport-facilitator/matches" standingsHref="/sport-facilitator/standings" entriesHref="/sport-facilitator/schedules" departmentRows={olympicLeaderboard} breakdownRows={sportBreakdown} standingsUnavailable={championshipUnavailable} matchCenterProps={{ roleTitle: "Live Match Center", emptyTitle: "No matches scheduled right now", emptyDescription: "Your next assigned match will appear here once fixtures are scheduled." }}>
-          <section aria-label="Staff and updates" className="grid gap-4 xl:grid-cols-[minmax(0,6fr)_minmax(0,6fr)]">
-            <DashboardCard>
-              <div className="mb-3 flex items-center justify-between">
-                <div>
-                  <h2 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-[var(--text-main)]">
-                    <Users size={16} className="text-[var(--primary)]" aria-hidden="true" />
-                    Officials on Duty
-                  </h2>
-                  <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                    Active staff and referees assigned for this tournament
-                  </p>
-                </div>
-                <Link
-                  to="/sport-facilitator/assigned-staff"
-                  className="text-xs font-semibold text-[var(--primary)] hover:underline"
-                >
-                  View All →
-                </Link>
-              </div>
-
-              {staffRows.length === 0 ? (
-                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-soft)] p-4 text-center text-xs text-[var(--text-muted)]">
-                  No assigned officials listed yet.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {staffRows.map((staff, idx) => (
-                    <div
-                      key={`staff-live-${staff?.id || idx}`}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-bold text-[var(--text-main)]">{staff?.name || `Staff ${idx + 1}`}</p>
-                        <p className="text-[10px] text-[var(--text-muted)]">
-                          {[staff?.role, staff?.sport].filter(Boolean).join(" • ") || "Official"}
-                        </p>
-                      </div>
-                      <StatusBadge status={staff?.status || "ACTIVE"} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </DashboardCard>
-
-            <DashboardCard>
+          <section aria-label="Updates and announcements">
+            {/* <DashboardCard>
               <PanelHeader icon={Megaphone} title="Operations Announcements" action={{ label: "View all", to: "/sport-facilitator/announcements" }} />
               <AnnouncementTimeline items={announcements} />
-            </DashboardCard>
+            </DashboardCard> */}
           </section>
         </LiveDashboardStage>
       )}

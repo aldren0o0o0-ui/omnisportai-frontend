@@ -23,7 +23,7 @@ const ActionButton = ({ control, disabledReason, busy, onAction, secondary = fal
       aria-label={displayLabel}
       className={secondary
         ? "min-h-11 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-soft)] px-3 py-2 text-left text-sm font-semibold text-[var(--text-main)] transition hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
-        : "min-h-14 rounded-xl bg-cyan-600 px-4 py-3 text-left text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-cyan-500 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"}
+        : "min-h-14 rounded-xl border border-[var(--border-soft)] px-4 py-3 text-left text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-cyan-500 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"}
     >
       <span className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate">{displayLabel}</span>
@@ -50,26 +50,27 @@ export default function SportActionPanel({
   getDisabledReason,
   onAction,
   onOpenDetailedControls,
+  isSoloSport = false,
 }) {
   const rows = useMemo(() => buildParticipantPresentation(participants), [participants]);
   const groups = useMemo(() => partitionSportActions(config, sportCode), [config, sportCode]);
-  const isDirectRallySport = ["VOLLEYBALL", "TAKRAW", "SEPAK_TAKRAW"].some((code) =>
+  const isDirectPlayerActionSport = ["VOLLEYBALL", "TAKRAW", "SEPAK_TAKRAW", "BADMINTON", "BASKETBALL"].some((code) =>
     String(sportCode || "").toUpperCase().includes(code)
   );
-  
+
   const primary = groups.primary.filter((control) => {
     if (actionCode(control) === "SUBSTITUTION") return false;
     if (control?.provides_value && control?.value === undefined) return false;
-    if (isDirectRallySport) return true;
+    if (isDirectPlayerActionSport) return true;
     return !needsDetailedComposer(control);
   });
   const secondary = groups.secondary.filter((control) => {
     if (actionCode(control) === "SUBSTITUTION") return false;
     if (control?.provides_value && control?.value === undefined) return false;
-    if (isDirectRallySport) return true;
+    if (isDirectPlayerActionSport) return true;
     return !needsDetailedComposer(control);
   });
-  const detailed = isDirectRallySport
+  const detailed = isDirectPlayerActionSport
     ? []
     : [...groups.primary, ...groups.secondary].filter(needsDetailedComposer);
   const readiness = getScoringReadinessPresentation(config, sportCode);
@@ -90,7 +91,7 @@ export default function SportActionPanel({
 
   const renderControl = (control, secondaryStyle) => {
     const isPlayerRequired = control?.requires_player;
-    const reason = getDisabledReason?.(control)
+    const reason = getDisabledReason?.(control, selectedParticipantId)
       || (control?.requires_team && !selectedParticipantId ? "Select a team or player first." : "")
       || (isPlayerRequired && !selectedPlayerId ? "Select an active player above first." : "");
     return (
@@ -107,16 +108,6 @@ export default function SportActionPanel({
 
   return (
     <section aria-labelledby="scoring-actions-title" className="space-y-4 py-2">
-      {selectedParticipant ? (
-        <p className="rounded-lg bg-cyan-50 px-3 py-2 text-sm font-medium text-cyan-900 dark:bg-cyan-500/10 dark:text-cyan-100" aria-live="polite">
-          Actions apply to <strong>{selectedPlayerLabel || selectedParticipant.label}</strong>
-          {selectedPlayerLabel ? <span className="text-cyan-700 dark:text-cyan-200"> · {selectedParticipant.label}</span> : null}
-        </p>
-      ) : isDirectRallySport ? (
-        <p className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-          Tip: Click an on-court player in the lineup above to credit skills like Service Aces, Kills, and Roll Spikes directly.
-        </p>
-      ) : null}
       {primary.length > 0 ? (
         <div>
           <h2 id="scoring-actions-title" className="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">Scoring</h2>
@@ -128,7 +119,7 @@ export default function SportActionPanel({
           {secondary.length > 0 ? (
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{secondary.map((control) => renderControl(control, true))}</div>
           ) : null}
-          {detailed.length > 0 ? (
+          {detailed.length > 0 && !isSoloSport ? (
             <button type="button" onClick={onOpenDetailedControls} className="mt-3 min-h-11 rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--text-main)] transition hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">
               Lineup and substitutions
             </button>

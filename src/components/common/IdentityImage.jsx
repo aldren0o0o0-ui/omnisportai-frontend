@@ -10,7 +10,7 @@ const sizeClassByScale = {
   sm: "h-8 w-8 text-xs",
   md: "h-10 w-10 text-sm",
   lg: "h-14 w-14 text-base",
-  xl: "h-20 w-20 text-xl",
+  xl: "h-20 w-20 text-xl rounded-full",
 };
 
 const IdentityImage = ({
@@ -18,7 +18,7 @@ const IdentityImage = ({
   label,
   kind = "avatar",
   scale = "md",
-  className = "",
+  className = "rounded-full",
 }) => {
   const [hasError, setHasError] = useState(false);
   const src = useMemo(() => resolveMediaUrl(imageUrl), [imageUrl]);

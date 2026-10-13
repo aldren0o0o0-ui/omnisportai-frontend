@@ -17,7 +17,7 @@ const useIntramuralList = () => {
     try {
       const [wsData, tournamentData] = await Promise.all([
         getWorkspaces({ includeArchived: true }).catch(() => []),
-        getTournaments({ includeArchived: true }).catch(() => []),
+        getTournaments({ includeArchived: true, allWorkspaces: true }).catch(() => []),
       ]);
       const list = Array.isArray(wsData?.workspaces)
         ? wsData.workspaces

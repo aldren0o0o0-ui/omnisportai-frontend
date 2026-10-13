@@ -72,7 +72,7 @@ test("venue navigation safely falls back when no Intramural is selected", () => 
 
 test("unknown notification context falls back to viewer-safe navigation", () => {
   assert.equal(resolveRoleKeyFromRoles({ roleNames: [] }), "viewer");
-  assert.equal(buildFallbackNotificationPath(), "/viewer/notifications");
+  assert.equal(buildFallbackNotificationPath(), "/viewer/dashboard");
 });
 
 test("medical certificate submission routes the Coach to recruitment", () => {

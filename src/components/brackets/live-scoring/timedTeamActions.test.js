@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { classifyTimedTeamControls, findTimedTeamControl, getTimedTeamActionControls } from "./timedTeamActions.js";
+import { classifyTimedTeamControls, findTimedTeamControl, getTimedTeamActionControls, resolvePeriodAdvancePresentation } from "./timedTeamActions.js";
 import { buildEventPayload } from "../eventComposer/core/buildEventPayload.js";
 
 const controls = [
@@ -75,4 +75,43 @@ test("required-player scoring remains blocked by the canonical payload builder",
   });
   assert.equal(result.payload, null);
   assert.equal(result.error, "Please select a player.");
+});
+
+test("resolvePeriodAdvancePresentation correctly handles regulation Q1-Q3, Q4 completion, and Overtime", () => {
+  // Q1-Q3 advance normally
+  const q1 = resolvePeriodAdvancePresentation({ periodLabel: "Quarter 1", scores: [20, 18], totalPeriods: 4 });
+  assert.equal(q1.label, "Next Quarter");
+  assert.equal(q1.variant, "next");
+  assert.equal(q1.isFinal, false);
+
+  const q3 = resolvePeriodAdvancePresentation({ periodLabel: "Quarter 3", scores: [65, 60], totalPeriods: 4 });
+  assert.equal(q3.label, "Next Quarter");
+  assert.equal(q3.variant, "next");
+  assert.equal(q3.isFinal, false);
+
+  // Q4 with unequal score finishes the game
+  const q4Win = resolvePeriodAdvancePresentation({ periodLabel: "Quarter 4", scores: [88, 82], totalPeriods: 4 });
+  assert.equal(q4Win.label, "Finish Game (End Q4)");
+  assert.equal(q4Win.variant, "finish");
+  assert.equal(q4Win.isFinal, true);
+  assert.ok(q4Win.className.includes("bg-emerald-600"));
+
+  // Q4 with tie score transitions to Overtime
+  const q4Tie = resolvePeriodAdvancePresentation({ periodLabel: "Quarter 4", scores: [80, 80], totalPeriods: 4 });
+  assert.equal(q4Tie.label, "End Q4 (Tie → Overtime)");
+  assert.equal(q4Tie.variant, "overtime");
+  assert.equal(q4Tie.isFinal, false);
+  assert.ok(q4Tie.className.includes("border-amber-400"));
+
+  // OT 1 with unequal score finishes the game
+  const otWin = resolvePeriodAdvancePresentation({ periodLabel: "OT 1", scores: [95, 90], totalPeriods: 4 });
+  assert.equal(otWin.label, "Finish Game (End OT 1)");
+  assert.equal(otWin.variant, "finish");
+  assert.equal(otWin.isFinal, true);
+
+  // OT 1 with tie score starts next Overtime
+  const otTie = resolvePeriodAdvancePresentation({ periodLabel: "OT 1", scores: [92, 92], totalPeriods: 4 });
+  assert.equal(otTie.label, "End OT 1 (Tie → Next OT)");
+  assert.equal(otTie.variant, "overtime");
+  assert.equal(otTie.isFinal, false);
 });

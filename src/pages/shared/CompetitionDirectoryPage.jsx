@@ -225,6 +225,7 @@ export const CompetitionDirectoryPage = () => {
       registrationId: entry.registration_id,
       source_type: entry.source_type,
       teamId: entry.team_id,
+      tournamentId: tournamentId || entry.tournament_id,
       sportId: entry.sport_id,
       eventId: entry.tournament_sport_event_id,
       name: entry.display_name || entry.entry_name,
@@ -236,6 +237,7 @@ export const CompetitionDirectoryPage = () => {
       status: entry.public_status || entry.status || "APPROVED",
       can_review: Boolean(entry.can_review || entry.capabilities?.can_review),
       participant_shape: entry.participant_shape,
+      members: Array.isArray(entry.members) ? entry.members : [],
       groupEntries: [entry],
     });
   };
@@ -283,12 +285,12 @@ export const CompetitionDirectoryPage = () => {
         />
       ) : (
         <>
-          {!identityHeaderOwnsPageTitle ? (
+          {/* {!identityHeaderOwnsPageTitle ? (
             <div>
               <h1 className="text-xl font-bold text-[var(--text-main)]">Teams &amp; Entries</h1>
               <p className="mt-1 text-sm text-[var(--text-muted)]">{effectiveMode === "sports_facilitator" ? "Review and manage entries across your assigned sports." : "Track configured events and department participation across this Intramural."}</p>
             </div>
-          ) : null}
+          ) : null} */}
           {/* 2. Scope Tabs (Role Navigation) */}
           {scopeTabs.length > 0 ? (
             <div className="flex items-center gap-2 border-b border-[var(--border-soft)] pb-1">
@@ -297,11 +299,10 @@ export const CompetitionDirectoryPage = () => {
                   key={tab.id}
                   type="button"
                   onClick={() => setScopeTab(tab.id)}
-                  className={`relative px-4 py-2 text-xs font-bold transition rounded-xl ${
-                    scopeTab === tab.id
-                      ? "bg-[var(--surface-soft)] text-[var(--primary)] shadow-sm"
-                      : "text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--surface-muted)]"
-                  }`}
+                  className={`relative px-4 py-2 text-xs font-bold transition rounded-xl ${scopeTab === tab.id
+                    ? "bg-[var(--surface-soft)] text-[var(--primary)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--surface-muted)]"
+                    }`}
                 >
                   {tab.label}
                 </button>

@@ -1,17 +1,16 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
+  Activity,
   ArrowRight,
   BarChart3,
-  CalendarRange,
-  Clock3,
-  Cpu,
-  GitBranch,
-  Layers3,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  Layers,
   Moon,
-  ShieldCheck,
-  Sparkles,
+  Shield,
   Sun,
   Trophy,
   Users,
@@ -19,491 +18,480 @@ import {
 import { useTheme } from '../../context/ThemeContext';
 import './LandingPage.css';
 
-const featureCards = [
+const platformFeatures = [
   {
-    icon: Layers3,
-    title: 'Conflict-aware scheduling',
+    icon: Calendar,
+    title: 'Conflict-Aware Scheduling',
     description:
-      'Builds match calendars around venue limits, rest windows, and shared player availability without manual reshuffling.',
-  },
-  {
-    icon: GitBranch,
-    title: 'Adaptive bracket control',
-    description:
-      'Keeps elimination paths, standings, and progression rules synchronized as results come in from multiple sports.',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Role-safe operations',
-    description:
-      'Separates coordinator, facilitator, coach, and viewer permissions so the right people can act without exposing everything.',
-  },
-  {
-    icon: Clock3,
-    title: 'Live operational visibility',
-    description:
-      'Surfaces bottlenecks, overlaps, and underused venues before they become same-day schedule problems.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Clean tournament analytics',
-    description:
-      'Turns participation, fairness, and performance signals into readable dashboards for quick event decisions.',
+      'Generates match calendars respecting court capacity, rest windows, venue limits, and official availability without scheduling overlaps.',
   },
   {
     icon: Trophy,
-    title: 'Multi-sport continuity',
+    title: 'Dynamic Bracket Progression',
     description:
-      'Connects registration, scheduling, scoring, and standings into one system so every event feels coordinated.',
+      'Supports single elimination, double elimination, and round-robin structures with automated winner advancement and bye handling.',
+  },
+  {
+    icon: Activity,
+    title: 'Real-Time Tally Boards',
+    description:
+      'Synchronized court-side live scoring, period clocks, possession trackers, and direct shortcut winner finalization across every sport.',
+  },
+  {
+    icon: Layers,
+    title: 'Multi-Sport Governance',
+    description:
+      'Configured rule models for Basketball, Volleyball, Football, Badminton, Sepak Takraw, and Boxing with official scoring policies.',
+  },
+  {
+    icon: Users,
+    title: 'Department & Roster Management',
+    description:
+      'Manage student-athlete rosters, medical clearances, jersey numbers, and team registrations across all collegiate departments.',
+  },
+  {
+    icon: Shield,
+    title: 'Role-Safe Access Control',
+    description:
+      'Granular permissions for Sports Coordinators, Department Managers, Facilitators, Coaches, and public campus Viewers.',
   },
 ];
 
-const workflowSteps = [
+const roleWorkflows = [
   {
-    step: '01',
-    title: 'Collect',
-    description: 'Capture teams, venues, staff, and player commitments in one place.',
+    role: 'Sports Coordinator',
+    tag: 'Full Administration',
+    description:
+      'Oversees the entire intramural lifecycle: create tournament structures, generate brackets, assign venues, resolve conflicts, and certify official standings.',
+    highlights: ['Tournament Setup Wizard', 'Conflict-Free Scheduler', 'Official Match Certification'],
   },
   {
-    step: '02',
-    title: 'Resolve',
-    description: 'Let the engine remove clashes and balance schedules automatically.',
+    role: 'Sports Facilitator / Official',
+    tag: 'Match Operations',
+    description:
+      'Operates courtside scoring during games: real-time period clocks, score actions, player fouls, timeouts, and shortcut winner finalization.',
+    highlights: ['Live Tally Boards', 'Synchronized Game Clocks', 'Possession & Violation Tracking'],
   },
   {
-    step: '03',
-    title: 'Run',
-    description: 'Monitor match-day execution with bracket, venue, and staffing context.',
+    role: 'Department Manager & Coach',
+    tag: 'Team Management',
+    description:
+      'Submits and manages department rosters, monitors upcoming schedules, reviews player availability, and tracks pool standings.',
+    highlights: ['Team Lineup Submissions', 'Player Eligibility Tracking', 'Department Match Calendar'],
   },
   {
-    step: '04',
-    title: 'Improve',
-    description: 'Review operational insights to tighten the next tournament cycle.',
+    role: 'Student Athlete & Viewer',
+    tag: 'Campus Community',
+    description:
+      'Follows university tournament action live: check upcoming match dates, view live scores, inspect tournament brackets, and view leaderboard rankings.',
+    highlights: ['Real-Time Live Scores', 'Interactive Tournament Brackets', 'Public Division Standings'],
   },
 ];
 
-const roleCards = [
-  {
-    title: 'Coordinators',
-    description: 'Steer tournament logic, approvals, venues, and exception handling from a single command layer.',
-  },
-  {
-    title: 'Facilitators',
-    description: 'Manage sport-day delivery with clearer assignments, live updates, and less manual follow-up.',
-  },
-  {
-    title: 'Coaches and Viewers',
-    description: 'Track schedules, brackets, and standings through a simpler interface that stays readable on mobile.',
-  },
+const metricStats = [
+  { label: 'Supported Sports', value: '6+ Canonical Sports' },
+  { label: 'Schedule Engine', value: '100% Conflict-Aware' },
+  { label: 'Live Scoring Sync', value: 'Real-Time WebSockets' },
+  { label: 'Role Governance', value: '5 Distinct Roles' },
 ];
-
-const heroHighlights = [
-  'Conflict-free venue planning',
-  'Faster bracket updates',
-  'Readable on phones, tablets, and desktops',
-];
-
-const heroStats = [
-  { label: 'Shared schedule visibility', value: '24/7' },
-  { label: 'Planning layers unified', value: '6+' },
-  { label: 'Key operations screens', value: '1 hub' },
-];
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
-  },
-};
-
-const stagger = {
-  hidden: {},
-  show: {
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.05,
-    },
-  },
-};
 
 const LandingPage = () => {
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
 
   return (
-    <div className="landing-shell relative min-h-screen overflow-x-clip bg-[var(--landing-bg)] text-[var(--landing-text)] transition-colors duration-300">
-      <div className="landing-orb landing-orb-primary" />
-      <div className="landing-orb landing-orb-secondary" />
-      <div className="landing-grid-overlay" />
+    <div className="landing-shell flex flex-col">
+      {/* Top Navigation Bar - Uniform with AppTopHeader */}
+      <header className="sticky top-0 z-50 border-b border-[var(--border-soft)] bg-[var(--surface)]/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <div className="landing-brand-mark">
+              OA
+            </div>
+            <div>
+              <span className="text-sm font-bold tracking-tight text-[var(--text-main)] sm:text-base">
+                OmniSport AI
+              </span>
+              <span className="hidden text-xs text-[var(--text-muted)] sm:block">
+                Intramural & Tournament Command Center
+              </span>
+            </div>
+          </div>
 
-      <nav className="fixed inset-x-0 top-0 z-50 border-b border-[var(--landing-border)] bg-[color-mix(in_srgb,var(--landing-surface)_82%,transparent)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="flex items-center gap-3 text-left"
-            aria-label="Go to OmniSport AI home"
-          >
-            <span className="landing-brand-mark">
-              <Cpu size={22} />
-            </span>
-            <span>
-              <span className="landing-eyebrow">OmniSport AI</span>
-              <span className="landing-brand-title">Intramural command center</span>
-            </span>
-          </button>
-
-          <div className="hidden items-center gap-6 md:flex">
+          <nav className="hidden items-center gap-1 md:flex">
             <a href="#features" className="landing-nav-link">
-              Features
+              Capabilities
             </a>
-            <a href="#workflow" className="landing-nav-link">
-              Workflow
+            <a href="#showcase" className="landing-nav-link">
+              Live Operations
             </a>
             <a href="#roles" className="landing-nav-link">
-              Roles
+              Roles & Access
             </a>
-          </div>
+          </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={toggleTheme}
               aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
-              aria-pressed={isDark}
               className="landing-icon-button"
             >
-              {isDark ? <Sun size={18} /> : <Moon size={18} />}
+              {isDark ? <Sun size={17} /> : <Moon size={17} />}
             </button>
 
             <button
               type="button"
               onClick={() => navigate('/login')}
-              className="landing-primary-button px-4 py-3 text-sm sm:px-5"
+              className="landing-secondary-button hidden sm:inline-flex"
             >
-              <span className="hidden sm:inline">Open Admin Portal</span>
-              <span className="sm:hidden">Portal</span>
+              Sign In
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              className="landing-primary-button"
+            >
+              <span>Open Portal</span>
+              <ArrowRight size={15} />
             </button>
           </div>
         </div>
-      </nav>
+      </header>
 
-      <main className="relative z-10">
-        <section className="px-4 pb-14 pt-28 sm:px-6 sm:pb-20 sm:pt-32 lg:px-8 lg:pt-36">
-          <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)] lg:gap-14">
-            <motion.div
-              initial="hidden"
-              animate="show"
-              variants={stagger}
-              className="max-w-3xl"
-            >
-              <motion.div variants={fadeUp} className="landing-pill mb-5">
-                <Sparkles size={14} />
-                AI-assisted tournament operations
-              </motion.div>
+      {/* Main Content */}
+      <main className="flex-1">
+        {/* Hero Section */}
+        <section className="px-4 pt-12 pb-16 sm:px-6 sm:pt-16 sm:pb-20 lg:px-8 lg:pt-20">
+          <div className="mx-auto max-w-4xl text-center">
+            <div className="mb-4 inline-flex items-center">
+              <span className="landing-pill">
+                <Trophy size={14} />
+                Intramural & Athletic Tournament Platform
+              </span>
+            </div>
 
-              <motion.h1
-                variants={fadeUp}
-                className="landing-display max-w-4xl text-4xl leading-none sm:text-5xl lg:text-7xl"
+            <h1 className="text-3xl font-extrabold tracking-tight text-[var(--text-main)] sm:text-5xl lg:text-6xl">
+              Tournament operations and match scheduling, unified.
+            </h1>
+
+            <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-[var(--text-muted)] sm:text-lg">
+              Designed for athletic coordinators, department managers, sports officials, coaches, and student-athletes.
+              Generate conflict-free schedules, manage dynamic brackets, and operate courtside tally boards in real time.
+            </p>
+
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/login')}
+                className="landing-primary-button px-6 py-3 text-sm sm:text-base"
               >
-                Better intramurals start with calmer scheduling.
-              </motion.h1>
-
-              <motion.p
-                variants={fadeUp}
-                className="mt-6 max-w-2xl text-base leading-8 text-[var(--landing-muted)] sm:text-lg"
+                <span>Access Management Portal</span>
+                <ArrowRight size={17} />
+              </button>
+              <a
+                href="#showcase"
+                className="landing-secondary-button px-6 py-3 text-sm sm:text-base"
               >
-                OmniSport AI brings scheduling, brackets, staffing, and standings into one
-                responsive workspace so your events feel organized before the first match
-                starts.
-              </motion.p>
+                <span>View Live Dashboard Preview</span>
+              </a>
+            </div>
 
-              <motion.div
-                variants={fadeUp}
-                className="mt-6 flex flex-wrap gap-3 text-sm text-[var(--landing-soft)]"
-              >
-                {heroHighlights.map((highlight) => (
-                  <span key={highlight} className="landing-chip">
-                    {highlight}
-                  </span>
-                ))}
-              </motion.div>
-
-              <motion.div variants={fadeUp} className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => navigate('/login')}
-                  className="landing-primary-button justify-center px-6 py-4"
+            {/* Metrics Bar */}
+            <div className="mt-12 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+              {metricStats.map((stat) => (
+                <div
+                  key={stat.label}
+                  className="landing-card p-4 text-center sm:p-5"
                 >
-                  Launch the system
-                  <ArrowRight size={18} />
-                </button>
-                <a
-                  href="#features"
-                  className="landing-secondary-button px-6 py-4 text-center"
-                >
-                  Explore the experience
-                </a>
-              </motion.div>
-
-              <motion.div
-                variants={stagger}
-                className="mt-10 grid gap-3 sm:grid-cols-3"
-              >
-                {heroStats.map((stat) => (
-                  <motion.div key={stat.label} variants={fadeUp} className="landing-stat-card">
-                    <div className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                      {stat.value}
-                    </div>
-                    <div className="mt-2 text-sm text-[var(--landing-muted)]">{stat.label}</div>
-                  </motion.div>
-                ))}
-              </motion.div>
-            </motion.div>
-
-            <motion.div
-              initial="hidden"
-              animate="show"
-              variants={stagger}
-              className="w-full"
-            >
-              <motion.div variants={fadeUp} className="landing-preview-shell">
-                <div className="landing-preview-top">
-                  <div>
-                    <p className="landing-section-label">Operations pulse</p>
-                    <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-                      Cleaner coordination across venues, staff, and brackets.
-                    </h2>
-                  </div>
-                  <span className="landing-status-badge">System ready</span>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                    {stat.label}
+                  </p>
+                  <p className="mt-1.5 text-base font-bold text-[var(--text-main)] sm:text-lg">
+                    {stat.value}
+                  </p>
                 </div>
-
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
-                  <div className="landing-preview-card">
-                    <div className="flex items-center justify-between">
-                      <span className="landing-preview-title">Schedule health</span>
-                      <CalendarRange size={18} className="text-[var(--landing-accent)]" />
-                    </div>
-                    <div className="mt-5 space-y-4">
-                      <ProgressRow label="Venue utilization" value="92%" width="92%" tone="accent" />
-                      <ProgressRow label="Conflict clearance" value="100%" width="100%" tone="secondary" />
-                      <ProgressRow label="Rest-window coverage" value="88%" width="88%" tone="accent" />
-                    </div>
-                  </div>
-
-                  <div className="landing-preview-card">
-                    <span className="landing-preview-title">Today&apos;s flow</span>
-                    <div className="mt-5 space-y-3">
-                      <TimelineRow time="08:00" title="Venue check-in opens" subtitle="Staff and officials assigned" />
-                      <TimelineRow time="10:30" title="Bracket sync refresh" subtitle="Quarterfinal seeding validated" />
-                      <TimelineRow time="14:00" title="Standings update window" subtitle="Live results reflected across roles" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-4 md:grid-cols-[1.15fr_0.85fr]">
-                  <div className="landing-preview-card">
-                    <span className="landing-preview-title">What teams experience</span>
-                    <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                      <MiniMetric label="Sports tracked" value="12" />
-                      <MiniMetric label="Venues linked" value="18" />
-                      <MiniMetric label="Bracket states" value="Live" />
-                    </div>
-                  </div>
-
-                  <div className="landing-preview-card">
-                    <span className="landing-preview-title">Access lanes</span>
-                    <div className="mt-5 flex flex-wrap gap-2">
-                      <span className="landing-chip">Coordinator</span>
-                      <span className="landing-chip">Facilitator</span>
-                      <span className="landing-chip">Coach</span>
-                      <span className="landing-chip">Viewer</span>
-                    </div>
-                    <div className="mt-5 flex items-center gap-3 rounded-2xl bg-[var(--landing-accent-soft)] px-4 py-3 text-sm text-[var(--landing-text)]">
-                      <Users size={18} />
-                      Shared visibility with role-based control.
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
+              ))}
+            </div>
           </div>
         </section>
 
-        <section id="features" className="px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
-          <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, amount: 0.2 }}
-            variants={stagger}
-            className="mx-auto max-w-7xl"
-          >
-            <motion.div variants={fadeUp} className="mx-auto max-w-3xl text-center">
-              <p className="landing-section-label">Feature set</p>
-              <h2 className="mt-3 landing-section-title">
-                A landing page that finally matches the product behind it.
-              </h2>
-              <p className="mt-4 text-base leading-7 text-[var(--landing-muted)] sm:text-lg">
-                The experience now uses balanced color contrast, cleaner card rhythm, and a
-                layout that scales down without losing hierarchy.
-              </p>
-            </motion.div>
-
-            <motion.div
-              variants={stagger}
-              className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3"
-            >
-              {featureCards.map(({ icon: Icon, title, description }) => (
-                <motion.article key={title} variants={fadeUp} className="landing-feature-card">
-                  <div className="landing-feature-icon">
-                    <Icon size={22} />
-                  </div>
-                  <h3 className="mt-5 text-xl font-semibold tracking-tight">{title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-[var(--landing-muted)]">
-                    {description}
-                  </p>
-                </motion.article>
-              ))}
-            </motion.div>
-          </motion.div>
-        </section>
-
-        <section id="workflow" className="px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
-          <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, amount: 0.2 }}
-            variants={stagger}
-            className="mx-auto max-w-7xl rounded-[2rem] border border-[var(--landing-border)] bg-[var(--landing-surface)] p-6 shadow-[var(--landing-shadow)] sm:p-8 lg:p-10"
-          >
-            <motion.div variants={fadeUp} className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-2xl">
-                <p className="landing-section-label">Workflow</p>
-                <h2 className="mt-3 landing-section-title text-left">
-                  Clear sequence, stronger alignment, less visual clutter.
+        {/* Dashboard Simulation / Showcase */}
+        <section id="showcase" className="border-y border-[var(--border-soft)] bg-[var(--surface-soft)] px-4 py-14 sm:px-6 sm:py-18 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-[var(--primary)]">
+                  Live Operations Center
+                </span>
+                <h2 className="mt-1 text-2xl font-bold tracking-tight text-[var(--text-main)] sm:text-3xl">
+                  Unified visibility across every court and fixture
                 </h2>
               </div>
-              <p className="max-w-xl text-sm leading-7 text-[var(--landing-muted)] sm:text-base">
-                Each step now has a consistent card structure and spacing so the story stays
-                easy to scan on narrow screens and wide displays alike.
-              </p>
-            </motion.div>
-
-            <motion.div
-              variants={stagger}
-              className="mt-8 grid gap-4 lg:grid-cols-4"
-            >
-              {workflowSteps.map(({ step, title, description }) => (
-                <motion.div key={step} variants={fadeUp} className="landing-workflow-card">
-                  <span className="landing-step-number">{step}</span>
-                  <h3 className="mt-6 text-xl font-semibold">{title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-[var(--landing-muted)]">
-                    {description}
-                  </p>
-                </motion.div>
-              ))}
-            </motion.div>
-          </motion.div>
-        </section>
-
-        <section id="roles" className="px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
-          <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, amount: 0.2 }}
-            variants={stagger}
-            className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.9fr_1.1fr]"
-          >
-            <motion.div variants={fadeUp} className="max-w-2xl">
-              <p className="landing-section-label">Built for teams</p>
-              <h2 className="mt-3 landing-section-title text-left">
-                Responsive by default across every role.
-              </h2>
-              <p className="mt-4 text-base leading-7 text-[var(--landing-muted)] sm:text-lg">
-                The new composition uses tighter vertical rhythm on phones, balanced content
-                widths on tablets, and a true two-column hero on larger screens.
-              </p>
-            </motion.div>
-
-            <motion.div variants={stagger} className="grid gap-4 sm:grid-cols-3">
-              {roleCards.map(({ title, description }) => (
-                <motion.article key={title} variants={fadeUp} className="landing-role-card">
-                  <h3 className="text-lg font-semibold">{title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-[var(--landing-muted)]">
-                    {description}
-                  </p>
-                </motion.article>
-              ))}
-            </motion.div>
-          </motion.div>
-        </section>
-
-        <section className="px-4 pb-14 sm:px-6 sm:pb-20 lg:px-8">
-          <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, amount: 0.2 }}
-            variants={fadeUp}
-            className="mx-auto flex max-w-7xl flex-col gap-6 rounded-[2rem] border border-[var(--landing-border)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--landing-surface)_85%,transparent),color-mix(in_srgb,var(--landing-accent-soft)_90%,transparent))] p-6 shadow-[var(--landing-shadow)] sm:p-8 lg:flex-row lg:items-center lg:justify-between lg:p-10"
-          >
-            <div className="max-w-2xl">
-              <p className="landing-section-label">Ready to enter</p>
-              <h2 className="mt-3 landing-section-title text-left">
-                Move from scattered tournament admin to one readable workflow.
-              </h2>
+              <div className="flex items-center gap-2">
+                <span className="landing-badge landing-badge-live">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+                  Live Scoring Active
+                </span>
+                <span className="landing-badge landing-badge-success">
+                  All Courts Synced
+                </span>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => navigate('/login')}
-              className="landing-primary-button w-full justify-center px-6 py-4 sm:w-auto"
-            >
-              Continue to login
-              <ArrowRight size={18} />
-            </button>
-          </motion.div>
+
+            {/* Simulated Clean Dashboard Surface */}
+            <div className="landing-card overflow-hidden">
+              {/* Dashboard Subheader */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-soft)] bg-[var(--surface)] px-5 py-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                  <span className="text-xs font-semibold text-[var(--text-main)] sm:text-sm">
+                    University Intramural Championship 2026
+                  </span>
+                  <span className="hidden rounded bg-[var(--surface-muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-muted)] sm:inline">
+                    Main Gymnasium & Field Complex
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-[var(--text-muted)]">Real-time sync</span>
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                </div>
+              </div>
+
+              {/* Match Cards Grid */}
+              <div className="grid gap-4 p-5 md:grid-cols-2 lg:grid-cols-3">
+                {/* Match 1: Basketball */}
+                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] p-4 shadow-xs">
+                  <div className="flex items-center justify-between gap-2 border-b border-[var(--border-soft)] pb-2.5">
+                    <span className="text-xs font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400">
+                      Basketball · Men's Semifinal
+                    </span>
+                    <span className="landing-badge landing-badge-live">
+                      Q4 01:24
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-[var(--text-main)]">
+                        Titans (CCIS)
+                      </span>
+                      <span className="text-lg font-extrabold text-[var(--text-main)]">84</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-[var(--text-muted)]">
+                        Phoenix (CBA)
+                      </span>
+                      <span className="text-lg font-extrabold text-[var(--text-muted)]">79</span>
+                    </div>
+                  </div>
+                  <div className="mt-3.5 flex items-center justify-between pt-2.5 border-t border-[var(--border-soft)] text-xs text-[var(--text-muted)]">
+                    <span>Court 1 · Main Arena</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">Titans +5</span>
+                  </div>
+                </div>
+
+                {/* Match 2: Volleyball */}
+                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] p-4 shadow-xs">
+                  <div className="flex items-center justify-between gap-2 border-b border-[var(--border-soft)] pb-2.5">
+                    <span className="text-xs font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                      Volleyball · Women's Final
+                    </span>
+                    <span className="landing-badge landing-badge-live">
+                      Set 4 (21-18)
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-[var(--text-main)]">
+                        Warriors (CEA)
+                      </span>
+                      <span className="text-lg font-extrabold text-[var(--text-main)]">2 Sets</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-[var(--text-muted)]">
+                        Falcons (CAS)
+                      </span>
+                      <span className="text-lg font-extrabold text-[var(--text-muted)]">1 Set</span>
+                    </div>
+                  </div>
+                  <div className="mt-3.5 flex items-center justify-between pt-2.5 border-t border-[var(--border-soft)] text-xs text-[var(--text-muted)]">
+                    <span>Court 2 · Volleyball Hall</span>
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">Match Point Set</span>
+                  </div>
+                </div>
+
+                {/* Match 3: Badminton */}
+                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] p-4 shadow-xs">
+                  <div className="flex items-center justify-between gap-2 border-b border-[var(--border-soft)] pb-2.5">
+                    <span className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                      Badminton · Singles Quarterfinal
+                    </span>
+                    <span className="landing-badge landing-badge-neutral">
+                      Final
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-[var(--text-main)]">
+                        J. Santos (CED)
+                      </span>
+                      <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">21, 21</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-[var(--text-muted)]">
+                        M. Reyes (CON)
+                      </span>
+                      <span className="text-lg font-extrabold text-[var(--text-muted)]">17, 19</span>
+                    </div>
+                  </div>
+                  <div className="mt-3.5 flex items-center justify-between pt-2.5 border-t border-[var(--border-soft)] text-xs text-[var(--text-muted)]">
+                    <span>Court 3 · Badminton Center</span>
+                    <span className="font-semibold text-[var(--text-main)]">Advanced to Semis</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Core Platform Capabilities */}
+        <section id="features" className="px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <div className="text-center">
+              <span className="text-xs font-bold uppercase tracking-wider text-[var(--primary)]">
+                Core Capabilities
+              </span>
+              <h2 className="mt-1 text-2xl font-bold tracking-tight text-[var(--text-main)] sm:text-3xl">
+                Built specifically for collegiate athletic operations
+              </h2>
+              <p className="mx-auto mt-3 max-w-2xl text-sm text-[var(--text-muted)] sm:text-base">
+                Everything required to run multi-sport leagues and tournaments cleanly without spreadsheets or fragmented tools.
+              </p>
+            </div>
+
+            <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {platformFeatures.map((feature) => {
+                const Icon = feature.icon;
+                return (
+                  <div key={feature.title} className="landing-card p-6">
+                    <div className="landing-feature-icon">
+                      <Icon size={20} />
+                    </div>
+                    <h3 className="mt-4 text-base font-bold text-[var(--text-main)]">
+                      {feature.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+                      {feature.description}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* Roles & Governance */}
+        <section id="roles" className="border-t border-[var(--border-soft)] bg-[var(--surface-soft)] px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <div className="text-center">
+              <span className="text-xs font-bold uppercase tracking-wider text-[var(--primary)]">
+                Role Governance
+              </span>
+              <h2 className="mt-1 text-2xl font-bold tracking-tight text-[var(--text-main)] sm:text-3xl">
+                Tailored workflows for every tournament stakeholder
+              </h2>
+              <p className="mx-auto mt-3 max-w-2xl text-sm text-[var(--text-muted)] sm:text-base">
+                Each participant logs into a dedicated view focused entirely on what they need to execute.
+              </p>
+            </div>
+
+            <div className="mt-12 grid gap-6 md:grid-cols-2">
+              {roleWorkflows.map((item) => (
+                <div key={item.role} className="landing-card p-6 sm:p-7">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-lg font-bold text-[var(--text-main)]">
+                      {item.role}
+                    </h3>
+                    <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--text-muted)]">
+                      {item.tag}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
+                    {item.description}
+                  </p>
+                  <div className="mt-5 border-t border-[var(--border-soft)] pt-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                      Key Highlights:
+                    </p>
+                    <ul className="mt-2 space-y-1.5">
+                      {item.highlights.map((h) => (
+                        <li key={h} className="flex items-center gap-2 text-xs text-[var(--text-main)]">
+                          <CheckCircle2 size={14} className="text-emerald-500" />
+                          <span>{h}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Simple Call to Action Card */}
+        <section className="px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+          <div className="mx-auto max-w-5xl">
+            <div className="landing-card bg-[var(--surface)] p-8 text-center sm:p-12">
+              <h2 className="text-2xl font-bold tracking-tight text-[var(--text-main)] sm:text-3xl">
+                Ready to coordinate your sports tournaments?
+              </h2>
+              <p className="mx-auto mt-3 max-w-xl text-sm text-[var(--text-muted)] sm:text-base">
+                Sign in with your university account or register under your department to access tournament schedules, live scoring, and team rosters.
+              </p>
+              <div className="mt-6 flex flex-wrap justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/login')}
+                  className="landing-primary-button px-6 py-3"
+                >
+                  <span>Sign In to Admin Portal</span>
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
         </section>
       </main>
 
-      <footer className="relative z-10 border-t border-[var(--landing-border)] px-4 py-8 text-center text-sm text-[var(--landing-soft)] sm:px-6 lg:px-8">
-        <p>OmniSport AI (c) 2026. Designed for smoother tournament operations.</p>
+      {/* Uniform Minimal Footer */}
+      <footer className="border-t border-[var(--border-soft)] bg-[var(--surface)] px-4 py-6 text-xs text-[var(--text-muted)] sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
+          <div className="flex items-center gap-2.5">
+            <div className="landing-brand-mark h-6 w-6 text-xs">
+              OA
+            </div>
+            <span className="font-semibold text-[var(--text-main)]">
+              OmniSport AI
+            </span>
+            <span>· Athletic Tournament & Intramural System</span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              className="hover:text-[var(--text-main)] transition"
+            >
+              Sign In
+            </button>
+            <span>·</span>
+            <span>All rights reserved</span>
+          </div>
+        </div>
       </footer>
     </div>
   );
 };
-
-const MiniMetric = ({ label, value }) => (
-  <div className="rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-surface-muted)] px-4 py-4">
-    <div className="text-xl font-semibold tracking-tight">{value}</div>
-    <div className="mt-1 text-xs uppercase tracking-[0.14em] text-[var(--landing-soft)]">
-      {label}
-    </div>
-  </div>
-);
-
-const TimelineRow = ({ time, title, subtitle }) => (
-  <div className="flex items-start gap-3 rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-surface-muted)] px-4 py-3">
-    <span className="landing-time-pill">{time}</span>
-    <div className="min-w-0">
-      <div className="text-sm font-semibold text-[var(--landing-text)]">{title}</div>
-      <div className="mt-1 text-sm text-[var(--landing-muted)]">{subtitle}</div>
-    </div>
-  </div>
-);
-
-const ProgressRow = ({ label, value, width, tone }) => (
-  <div>
-    <div className="mb-2 flex items-center justify-between gap-4 text-sm">
-      <span className="text-[var(--landing-muted)]">{label}</span>
-      <span className="font-semibold text-[var(--landing-text)]">{value}</span>
-    </div>
-    <div className="h-2 overflow-hidden rounded-full bg-[var(--landing-track)]">
-      <div
-        className={`h-full rounded-full ${tone === 'secondary' ? 'bg-[var(--landing-secondary)]' : 'bg-[var(--landing-accent)]'}`}
-        style={{ width }}
-      />
-    </div>
-  </div>
-);
 
 export default LandingPage;

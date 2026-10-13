@@ -1,20 +1,32 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSportDisplayName } from "../../utils/tournamentEventCategories";
 import {
+  AlertCircle,
+  AlertTriangle,
   Archive,
   ArrowLeft,
+  Calendar,
   CalendarCheck2,
   CalendarClock,
   CheckCircle,
+  ChevronRight,
+  Filter,
   GitBranch,
-  Medal,
-  MapPin,
   ImagePlus,
+  Info,
+  Layers,
+  MapPin,
+  Medal,
   PlusCircle,
   RotateCcw,
+  Search,
+  ShieldAlert,
+  Sparkles,
   Trash2,
   Trophy,
   UserRoundCog,
+  Users,
+  X,
 } from "lucide-react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -37,12 +49,14 @@ import { getScheduleEvents, validateSchedule } from "../../services/scheduleServ
 import { getSports } from "../../services/sportService";
 import { getStandingsOverview } from "../../services/standingsService";
 import { buildTournamentByWorkspace } from "../../utils/workspaceTournamentResolver";
+import { isHiddenSport } from "../../utils/sportVisibility";
 import { getTournaments, updateTournament } from "../../services/tournamentService";
 import {
   activateWorkspace,
   archiveWorkspace,
   completeWorkspace,
   deleteWorkspace,
+  getWorkspaceDeletePreview,
   getWorkspaces,
   restoreWorkspace,
   uploadWorkspaceImage,
@@ -223,6 +237,11 @@ const Tournaments = () => {
   const [seasonActionLoading, setSeasonActionLoading] = useState(false);
   const [imageUploadingId, setImageUploadingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deletePreview, setDeletePreview] = useState(null);
+  const [isLoadingDeletePreview, setIsLoadingDeletePreview] = useState(false);
+  const [successFeedback, setSuccessFeedback] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [dateEdit, setDateEdit] = useState({
     open: false,
     tournament: null,
@@ -426,12 +445,48 @@ const Tournaments = () => {
     [loadSeasons, refreshWorkspaceContext]
   );
 
+  const initiateDelete = useCallback(
+    async (season) => {
+      if (!season?.id) return;
+      setDeleteTarget(season);
+      setSeasonActionError("");
+      setDeletePreview(null);
+      setIsLoadingDeletePreview(true);
+      try {
+        const preview = await getWorkspaceDeletePreview(season.id);
+        setDeletePreview(preview);
+      } catch (err) {
+        const isCurrentlyActive =
+          activeWorkspace?.id === season.id || String(season.status || "").toUpperCase() === "ACTIVE";
+        setDeletePreview({
+          can_delete: !isCurrentlyActive,
+          blockers: isCurrentlyActive
+            ? ["This intramural is currently set as ACTIVE. Switch the active season or complete it before deleting."]
+            : [],
+          message:
+            err?.response?.data?.detail ||
+            "All draft brackets, match configurations, and event settings for this intramural will be permanently removed.",
+          counts: {
+            sports: (tournamentsByWorkspace[Number(season.id)]?.sport_ids || []).length,
+            brackets: 0,
+            teams: (tournamentsByWorkspace[Number(season.id)]?.team_ids || []).length,
+            matches: 0,
+          },
+        });
+      } finally {
+        setIsLoadingDeletePreview(false);
+      }
+    },
+    [activeWorkspace?.id, tournamentsByWorkspace]
+  );
+
   const handleSeasonDelete = useCallback(async () => {
     if (!deleteTarget) return;
     setSeasonActionLoading(true);
     setSeasonActionError("");
     try {
-      await deleteWorkspace(deleteTarget.id);
+      const targetName = deleteTarget.name;
+      const res = await deleteWorkspace(deleteTarget.id);
       if (Number(selectedTournament?.workspace_id || 0) === Number(deleteTarget.id)) {
         setSelectedTournament(null);
         sessionStorage.removeItem(TOURNAMENT_WORKSPACE_STORAGE_KEY);
@@ -447,14 +502,64 @@ const Tournaments = () => {
         }
       }
       setDeleteTarget(null);
+      setDeletePreview(null);
+      setSuccessFeedback({
+        title: "Intramural Deleted",
+        message: res?.message || `"${targetName}" was permanently deleted.`,
+      });
       await loadSeasons();
       await refreshWorkspaceContext();
     } catch (error) {
-      setSeasonActionError(error?.response?.data?.detail || "Failed to delete intramural.");
+      const detail = error?.response?.data?.detail;
+      setSeasonActionError(
+        typeof detail === "string" ? detail : detail?.message || "Failed to delete intramural."
+      );
     } finally {
       setSeasonActionLoading(false);
     }
   }, [deleteTarget, loadSeasons, refreshWorkspaceContext, selectedTournament?.workspace_id, setSearchParams]);
+
+  const handleArchiveFromModal = useCallback(async () => {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    setDeletePreview(null);
+    await handleSeasonLifecycle(archiveWorkspace, target);
+  }, [deleteTarget, handleSeasonLifecycle]);
+
+  const filteredSeasons = useMemo(() => {
+    return seasons.filter((season) => {
+      const statusKey = String(season.status || "").toUpperCase();
+      const isCurrentActive = activeWorkspace?.id === season.id || statusKey === "ACTIVE";
+
+      if (statusFilter === "ACTIVE" && !isCurrentActive) return false;
+      if (statusFilter === "PLANNING" && !["DRAFT", "PLANNING", "READY"].includes(statusKey)) return false;
+      if (statusFilter === "HISTORY" && !["COMPLETED", "ARCHIVED"].includes(statusKey)) return false;
+
+      if (searchTerm.trim()) {
+        const query = searchTerm.toLowerCase().trim();
+        const name = String(season.name || "").toLowerCase();
+        const year = String(season.school_year || "").toLowerCase();
+        const sem = String(season.semester || "").toLowerCase();
+        const desc = String(season.description || "").toLowerCase();
+        return name.includes(query) || year.includes(query) || sem.includes(query) || desc.includes(query);
+      }
+      return true;
+    });
+  }, [activeWorkspace?.id, seasons, searchTerm, statusFilter]);
+
+  const seasonCounts = useMemo(() => {
+    let active = 0;
+    let planning = 0;
+    let history = 0;
+    seasons.forEach((season) => {
+      const st = String(season.status || "").toUpperCase();
+      if (season.id === activeWorkspace?.id || st === "ACTIVE") active += 1;
+      else if (["DRAFT", "PLANNING", "READY"].includes(st)) planning += 1;
+      else if (["COMPLETED", "ARCHIVED"].includes(st)) history += 1;
+    });
+    return { all: seasons.length, active, planning, history };
+  }, [activeWorkspace?.id, seasons]);
 
   const handleOpenSeason = useCallback(
     (season) => {
@@ -523,14 +628,16 @@ const Tournaments = () => {
     const fromTournament = toIntList(selectedTournament?.sport_ids || [selectedTournament?.sport_id]);
     const fallback = toIntList(visibleBrackets.map((row) => row?.sport_id));
     const ids = fromTournament.length > 0 ? fromTournament : fallback;
-    return ids.map((sportId) => ({
-      id: sportId,
-      name: sportsById[sportId] || "Unassigned sport",
-      hasBracket: visibleBrackets.some((row) => Number(row?.sport_id || 0) === sportId),
-    }));
+    return ids
+      .map((sportId) => ({
+        id: sportId,
+        name: sportsById[sportId] || "Unassigned sport",
+        hasBracket: visibleBrackets.some((row) => Number(row?.sport_id || 0) === sportId),
+      }))
+      .filter((sport) => !isHiddenSport(sport));
   }, [selectedTournament, sportsById, visibleBrackets]);
 
-	  const loadTournamentHub = useCallback(async () => {
+  const loadTournamentHub = useCallback(async () => {
     const tournamentId = Number(selectedTournament?.id || 0);
     if (!tournamentId) {
       setAllBrackets([]);
@@ -541,37 +648,37 @@ const Tournaments = () => {
       return;
     }
 
-	    setIsLoadingHub(true);
-	    setViewMessage("");
+    setIsLoadingHub(true);
+    setViewMessage("");
 
-	    try {
-	      const [bracketsRes, standingsRes, notificationsRes] = await Promise.all([
-	        getBrackets(),
-	        getStandingsOverview({ tournamentId }).catch(() => null),
-	        getNotifications({ limit: 60 }).catch(() => ({ items: [] })),
-	      ]);
+    try {
+      const [bracketsRes, standingsRes, notificationsRes] = await Promise.all([
+        getBrackets(),
+        getStandingsOverview({ tournamentId }).catch(() => null),
+        getNotifications({ limit: 60 }).catch(() => ({ items: [] })),
+      ]);
 
-	      const safeBrackets = Array.isArray(bracketsRes) ? bracketsRes : [];
-	      const tournamentBrackets = safeBrackets.filter(
-	        (row) => Number(row?.tournament_id || 0) === tournamentId
-	      );
-	      const shouldLoadScheduleData = tournamentBrackets.some((row) =>
-	        ["ACTIVE", "FINALIZED", "GENERATED", "COMPLETED"].includes(
-	          String(row?.status || "").trim().toUpperCase()
-	        )
-	      );
-	      const [scheduleRes, validationRes] = shouldLoadScheduleData
-	        ? await Promise.all([
-	            getScheduleEvents(tournamentId).catch(() => ({ events: [] })),
-	            validateSchedule(tournamentId).catch(() => null),
-	          ])
-	        : [{ events: [] }, null];
-	      const safeEvents = Array.isArray(scheduleRes)
-	        ? scheduleRes
-	        : Array.isArray(scheduleRes?.events)
-	          ? scheduleRes.events
-	          : [];
-	      const safeNotifications = Array.isArray(notificationsRes?.items) ? notificationsRes.items : [];
+      const safeBrackets = Array.isArray(bracketsRes) ? bracketsRes : [];
+      const tournamentBrackets = safeBrackets.filter(
+        (row) => Number(row?.tournament_id || 0) === tournamentId
+      );
+      const shouldLoadScheduleData = tournamentBrackets.some((row) =>
+        ["ACTIVE", "FINALIZED", "GENERATED", "COMPLETED"].includes(
+          String(row?.status || "").trim().toUpperCase()
+        )
+      );
+      const [scheduleRes, validationRes] = shouldLoadScheduleData
+        ? await Promise.all([
+          getScheduleEvents(tournamentId).catch(() => ({ events: [] })),
+          validateSchedule(tournamentId).catch(() => null),
+        ])
+        : [{ events: [] }, null];
+      const safeEvents = Array.isArray(scheduleRes)
+        ? scheduleRes
+        : Array.isArray(scheduleRes?.events)
+          ? scheduleRes.events
+          : [];
+      const safeNotifications = Array.isArray(notificationsRes?.items) ? notificationsRes.items : [];
 
       setAllBrackets(safeBrackets);
       setScheduleRows(
@@ -870,31 +977,145 @@ const Tournaments = () => {
   return (
     <div className="os-page-shell os-themed-page">
       {!selectedTournament ? (
-	          <div className="space-y-4">
+        <div className="space-y-5">
           <PageHeaderCard
             title="Intramurals"
-            subtitle="Create and manage intramural seasons. Only one intramural can be active at a time."
-            breadcrumbs=""
+            subtitle="Create, configure, and manage institutional intramural seasons and tournaments."
+            breadcrumbs="Coordinator / Intramurals"
             action={
               <button
                 type="button"
                 onClick={() => navigate("/coordinator/intramurals/create")}
-                className="os-btn-primary-soft inline-flex items-center gap-1.5"
+                className="os-btn-primary-soft inline-flex items-center gap-1.5 shadow-xs"
               >
-                <PlusCircle size={14} />
+                <PlusCircle size={15} />
                 Create Intramural
               </button>
             }
           />
 
-          {seasonActionError ? (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
-              {seasonActionError}
+          {/* Quick Metric Statistics Row */}
+          {/* <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900/60">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Seasons</span>
+                <Trophy size={14} className="text-slate-400" />
+              </div>
+              <p className="mt-1.5 text-2xl font-bold text-slate-900 dark:text-slate-100">{seasonCounts.all}</p>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3.5 shadow-xs dark:border-emerald-500/20 dark:bg-emerald-500/10">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-emerald-800 dark:text-emerald-300">Active Season</span>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+              </div>
+              <p className="mt-1.5 text-sm font-bold text-emerald-950 dark:text-emerald-200 truncate" title={activeWorkspace?.name || "None"}>
+                {activeWorkspace?.name || "None Active"}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900/60">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Planning & Draft</span>
+                <Layers size={14} className="text-slate-400" />
+              </div>
+              <p className="mt-1.5 text-2xl font-bold text-slate-900 dark:text-slate-100">{seasonCounts.planning}</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900/60">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">History / Archived</span>
+                <Archive size={14} className="text-slate-400" />
+              </div>
+              <p className="mt-1.5 text-2xl font-bold text-slate-900 dark:text-slate-100">{seasonCounts.history}</p>
+            </div>
+          </div> */}
+
+          {/* Success and Error Feedback Alerts */}
+          {successFeedback ? (
+            <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/90 px-4 py-3 text-emerald-900 shadow-xs dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold">{successFeedback.title}</p>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-300/90">{successFeedback.message}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSuccessFeedback(null)}
+                className="rounded-lg p-1 text-emerald-600 hover:bg-emerald-100 dark:text-emerald-400 dark:hover:bg-emerald-500/20"
+              >
+                <X size={16} />
+              </button>
             </div>
           ) : null}
 
+          {seasonActionError ? (
+            <div className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+              <div className="flex items-center gap-2">
+                <AlertCircle size={16} className="shrink-0" />
+                <span>{seasonActionError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSeasonActionError("")}
+                className="rounded-lg p-1 text-rose-600 hover:bg-rose-100 dark:text-rose-400 dark:hover:bg-rose-500/20"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ) : null}
+
+          {/* Search & Filter Toolbar */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80">
+              {[
+                { key: "ALL", label: `All (${seasonCounts.all})` },
+                { key: "ACTIVE", label: `Active (${seasonCounts.active})` },
+                { key: "PLANNING", label: `Draft & Planning (${seasonCounts.planning})` },
+                { key: "HISTORY", label: `Archived (${seasonCounts.history})` },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setStatusFilter(tab.key)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${statusFilter === tab.key
+                      ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
+                      : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                    }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative min-w-[240px] sm:max-w-xs">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search intramurals..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-9 pr-8 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              />
+              {searchTerm ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  <X size={14} />
+                </button>
+              ) : null}
+            </div>
+          </div>
+
           {isLoadingSeasons ? (
-            <LoadingState message="Loading intramurals..." />
+            <LoadingState message="Loading intramural seasons..." />
           ) : seasonsError ? (
             <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
               {seasonsError}
@@ -914,11 +1135,31 @@ const Tournaments = () => {
                 </button>
               }
             />
+          ) : filteredSeasons.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900">
+              <Search size={32} className="mx-auto text-slate-400 mb-2" />
+              <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">No matching intramurals found</h3>
+              <p className="mt-1 text-xs text-slate-500">
+                {searchTerm
+                  ? `No intramurals match "${searchTerm}". Try another search term or reset filters.`
+                  : "No intramurals found in this category."}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm("");
+                  setStatusFilter("ALL");
+                }}
+                className="mt-4 os-btn-ghost-soft text-xs"
+              >
+                Reset Filters
+              </button>
+            </div>
           ) : (
             <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {seasons.map((season) => {
+              {filteredSeasons.map((season) => {
                 const statusKey = String(season.status || "").toUpperCase();
-                const isCurrentActive = activeWorkspace?.id === season.id;
+                const isCurrentActive = activeWorkspace?.id === season.id || statusKey === "ACTIVE";
                 const linkedTournament = tournamentsByWorkspace[Number(season.id)];
                 const semesterLabel = SEMESTER_LABEL[String(season.semester || "").toUpperCase()] || season.semester;
                 const canEdit = ["DRAFT", "PLANNING", "READY"].includes(statusKey);
@@ -926,18 +1167,14 @@ const Tournaments = () => {
                 const canComplete = statusKey === "ACTIVE";
                 const canArchive = statusKey === "COMPLETED";
                 const canRestore = statusKey === "ARCHIVED";
-                const finishDate = String(linkedTournament?.end_date || "").trim();
-                const today = new Date();
-                const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-                const canDelete = linkedTournament ? Boolean(finishDate && finishDate < localToday) : statusKey !== "ACTIVE";
+                const canDelete = !isCurrentActive;
                 return (
                   <div
                     key={season.id}
-                    className={`flex min-h-full flex-col overflow-visible rounded-2xl border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md motion-reduce:transform-none dark:bg-slate-900 ${
-                      isCurrentActive
+                    className={`flex min-h-full flex-col overflow-visible rounded-2xl border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md motion-reduce:transform-none dark:bg-slate-900 ${isCurrentActive
                         ? "border-emerald-300 dark:border-emerald-500/40"
                         : "border-slate-200 dark:border-slate-700"
-                    }`}
+                      }`}
                   >
                     <div className="relative aspect-[16/8] overflow-hidden rounded-t-2xl bg-gradient-to-br from-blue-600 to-slate-800">
                       {season.image_url ? <img src={resolveMediaUrl(season.image_url)} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-white"><Trophy size={38} strokeWidth={1.5} /></div>}
@@ -947,126 +1184,150 @@ const Tournaments = () => {
                       </label>
                     </div>
                     <div className="flex flex-1 flex-col p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{season.name}</h3>
-                          <StatusBadge status={season.status} />
-                          {isCurrentActive ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
-                              <CheckCircle size={10} />
-                              Active
-                            </span>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{season.name}</h3>
+                            <StatusBadge status={season.status} />
+                            {isCurrentActive ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                                <CheckCircle size={10} />
+                                Active
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                            {season.school_year}
+                            {semesterLabel ? ` · ${semesterLabel}` : ""}
+                          </p>
+                          {season.description ? (
+                            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{season.description}</p>
                           ) : null}
                         </div>
-                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                          {season.school_year}
-                          {semesterLabel ? ` · ${semesterLabel}` : ""}
-                        </p>
-                        {season.description ? (
-                          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{season.description}</p>
-                        ) : null}
-                      </div>
 
-                      <div className="mt-3 flex w-full flex-wrap items-center gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
-                        <button
-                          type="button"
-                          disabled={!linkedTournament}
-                          title={linkedTournament ? "Open competition hub" : "No competition event linked yet"}
-                          onClick={() => handleOpenSeason(season)}
-                          className="os-btn-primary-soft text-xs disabled:opacity-50"
-                        >
-                          Open
-                        </button>
-                        <ActionMenu
-                          buttonLabel="More"
-                          disabled={!linkedTournament}
-                          buttonClassName="os-btn-ghost-soft inline-flex min-h-10 items-center gap-2 text-xs disabled:opacity-60"
-                          items={[
-                            { key: "assignments", label: "Open assignments", icon: UserRoundCog, onClick: () => openSeasonSetup(season, "assignments") },
-                            { key: "venues", label: "Manage venues", icon: MapPin, onClick: () => openSeasonSetup(season, "venues") },
-                          ]}
-                        />
-                        {canEdit ? (
-                          <button
-                            type="button"
-                            disabled={!linkedTournament || seasonActionLoading}
-                            onClick={() => openDateEdit(linkedTournament)}
-                            className="os-btn-ghost-soft text-xs disabled:opacity-60"
-                          >
-                            Edit Dates
-                          </button>
-                        ) : null}
-                        {canActivate ? (
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3.5 dark:border-slate-800">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <button
                               type="button"
-                              disabled={seasonActionLoading}
-                              onClick={() => handleSeasonLifecycle(activateWorkspace, season)}
-                              className="os-btn-ghost-soft text-xs disabled:opacity-60"
+                              disabled={!linkedTournament}
+                              title={linkedTournament ? "Open competition hub" : "No competition event linked yet"}
+                              onClick={() => handleOpenSeason(season)}
+                              className="os-btn-primary-soft inline-flex items-center gap-1 text-xs font-semibold"
                             >
-                              Activate
+                              Open Hub
+                              <ChevronRight size={13} />
                             </button>
-                        ) : null}
-                        {canComplete ? (
-                          <button
-                            type="button"
-                            disabled={seasonActionLoading}
-                            onClick={() => handleSeasonLifecycle(completeWorkspace, season)}
-                            className="os-btn-ghost-soft text-xs disabled:opacity-60"
-                          >
-                            Complete
-                          </button>
-                        ) : null}
-                        {canArchive ? (
-                          <button
-                            type="button"
-                            disabled={seasonActionLoading}
-                            onClick={() => handleSeasonLifecycle(archiveWorkspace, season)}
-                            className="os-btn-ghost-soft inline-flex items-center gap-1 text-xs disabled:opacity-60"
-                          >
-                            <Archive size={12} />
-                            Archive
-                          </button>
-                        ) : null}
-                        {canRestore ? (
-                          <button
-                            type="button"
-                            disabled={seasonActionLoading}
-                            onClick={() => handleSeasonLifecycle(restoreWorkspace, season)}
-                            className="os-btn-ghost-soft inline-flex items-center gap-1 text-xs disabled:opacity-60"
-                          >
-                            <RotateCcw size={12} />
-                            Restore
-                          </button>
-                        ) : null}
-                        {canDelete ? (
-                          <button
-                            type="button"
-                            disabled={seasonActionLoading}
-                            onClick={() => {
-                              setDeleteTarget(season);
-                              setSeasonActionError("");
-                            }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-400"
-                          >
-                            <Trash2 size={12} />
-                            Delete
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
 
-                    <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-400 dark:text-slate-500">
-                      {linkedTournament ? (
-                        <span>{(linkedTournament.sport_ids || []).length} sport{(linkedTournament.sport_ids || []).length === 1 ? "" : "s"}</span>
-                      ) : (
-                        <span>No competition event yet</span>
-                      )}
-                      {season.started_at ? <span>Started {new Date(season.started_at).toLocaleDateString()}</span> : null}
-                      {season.ended_at ? <span>Ended {new Date(season.ended_at).toLocaleDateString()}</span> : null}
-                      {season.archived_at ? <span>Archived {new Date(season.archived_at).toLocaleDateString()}</span> : null}
-                      <span>Created {new Date(season.created_at).toLocaleDateString()}</span>
-                    </div>
+                            {canActivate ? (
+                              <button
+                                type="button"
+                                disabled={seasonActionLoading}
+                                onClick={() => handleSeasonLifecycle(activateWorkspace, season)}
+                                className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
+                              >
+                                Activate
+                              </button>
+                            ) : null}
+
+                            {canComplete ? (
+                              <button
+                                type="button"
+                                disabled={seasonActionLoading}
+                                onClick={() => handleSeasonLifecycle(completeWorkspace, season)}
+                                className="os-btn-ghost-soft text-xs"
+                              >
+                                Complete
+                              </button>
+                            ) : null}
+
+                            {canArchive ? (
+                              <button
+                                type="button"
+                                disabled={seasonActionLoading}
+                                onClick={() => handleSeasonLifecycle(archiveWorkspace, season)}
+                                className="os-btn-ghost-soft inline-flex items-center gap-1 text-xs"
+                              >
+                                <Archive size={12} />
+                                Archive
+                              </button>
+                            ) : null}
+
+                            {canRestore ? (
+                              <button
+                                type="button"
+                                disabled={seasonActionLoading}
+                                onClick={() => handleSeasonLifecycle(restoreWorkspace, season)}
+                                className="os-btn-ghost-soft inline-flex items-center gap-1 text-xs"
+                              >
+                                <RotateCcw size={12} />
+                                Restore
+                              </button>
+                            ) : null}
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <ActionMenu
+                              buttonLabel="More"
+                              disabled={!linkedTournament}
+                              buttonClassName="os-btn-ghost-soft inline-flex items-center gap-1 text-xs py-1.5 px-2.5"
+                              items={[
+                                {
+                                  key: "assignments",
+                                  label: "Open assignments",
+                                  icon: UserRoundCog,
+                                  onClick: () => openSeasonSetup(season, "assignments"),
+                                },
+                                {
+                                  key: "venues",
+                                  label: "Manage venues",
+                                  icon: MapPin,
+                                  onClick: () => openSeasonSetup(season, "venues"),
+                                },
+                                ...(canEdit && linkedTournament
+                                  ? [
+                                    {
+                                      key: "dates",
+                                      label: "Edit dates",
+                                      icon: CalendarClock,
+                                      onClick: () => openDateEdit(linkedTournament),
+                                    },
+                                  ]
+                                  : []),
+                              ]}
+                            />
+
+                            {canDelete ? (
+                              <button
+                                type="button"
+                                disabled={seasonActionLoading}
+                                title="Delete Intramural"
+                                onClick={() => initiateDelete(season)}
+                                className="inline-flex items-center justify-center rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            ) : (
+                              <span
+                                title="Active intramurals cannot be deleted. Switch active season first."
+                                className="inline-flex cursor-not-allowed items-center justify-center rounded-lg p-2 text-slate-300 dark:text-slate-600"
+                              >
+                                <Trash2 size={15} />
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-[11px] text-slate-500 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400">
+                        <span>{linkedTournament ? `${(linkedTournament.sport_ids || []).length} sport(s)` : "No competition event"}</span>
+                        {season.started_at ? (
+                          <span>Started {new Date(season.started_at).toLocaleDateString()}</span>
+                        ) : season.archived_at ? (
+                          <span>Archived {new Date(season.archived_at).toLocaleDateString()}</span>
+                        ) : (
+                          <span>Created {new Date(season.created_at).toLocaleDateString()}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -1076,501 +1337,503 @@ const Tournaments = () => {
         </div>
       ) : (
         <>
-        {isHistoricalView ? <HistoricalBanner intramural={openedSeason} className="mb-4" /> : null}
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_340px]">
-          <div className="space-y-4">
+          {isHistoricalView ? <HistoricalBanner intramural={openedSeason} className="mb-4" /> : null}
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_340px]">
+            <div className="space-y-4">
 
-          
 
-            <header className="os-page-header-card">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="space-y-3">
-                  
-                  <div className="flex flex-wrap items-center gap-2">
-                    
-                    {summary.totalConflicts > 0 ? (
-                      <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
-                        {summary.totalConflicts} conflict{summary.totalConflicts === 1 ? "" : "s"}
-                      </span>
-                    ) : null }
-                  </div>
-                  <div>
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-                      {selectedTournament.tournament_name}
-                    </h1>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                      {formatDateRange(selectedTournament)}
-                    </p>
-                    
-                  </div>
-                 
-                  {/* <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500 dark:text-slate-400">
+
+              <header className="os-page-header-card">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="space-y-3">
+
+                    <div className="flex flex-wrap items-center gap-2">
+
+                      {summary.totalConflicts > 0 ? (
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                          {summary.totalConflicts} conflict{summary.totalConflicts === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div>
+                      <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+                        {selectedTournament.tournament_name}
+                      </h1>
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                        {formatDateRange(selectedTournament)}
+                      </p>
+
+                    </div>
+
+                    {/* <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500 dark:text-slate-400">
                     <span>{summary.sportCount} sports configured</span>
                     <span>{summary.teamCount} teams included</span>
                     <span>{summary.bracketCount} bracket workspace{summary.bracketCount === 1 ? "" : "s"}</span>
                   </div> */}
-                </div>
+                  </div>
 
-                <div className="flex max-w-xl flex-wrap items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={handleBackToList}
-                    className="inline-flex items-center gap-1.5 os-btn-ghost-soft"
-                  >
-                    <ArrowLeft size={14} />
-                    Back To Intramurals
-                  </button>
-                  {/* <button
-                    type="button"
-                    onClick={loadTournamentHub}
-                    disabled={isLoadingHub}
-                    className="os-btn-ghost-soft disabled:opacity-60"
-                  >
-                    {isLoadingHub ? "Refreshing..." : "Refresh Summary"}
-                  </button> */}
-                  {/* <button
-                    type="button"
-                    onClick={handleGenerateAllSportsBrackets}
-                    disabled={isGeneratingBrackets || tournamentSports.length === 0}
-                    className="os-btn-primary-soft disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isGeneratingBrackets ? "Processing..." : "Generate All Brackets"}
-                  </button> */}
-                  <button
-                    type="button"
-                    onClick={() => setSearchParams({ workspace_id: String(selectedTournament.workspace_id), section: "assignments" })}
-                    className="os-btn-primary-soft"
-                  >
-                    Open Assignments
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/coordinator/brackets?tournament_id=${selectedTournament.id}`)}
-                    className="os-btn-ghost-soft"
-                  >
-                    Open Brackets
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/coordinator/intramurals/${selectedTournament.id}/settings/venues`)}
-                    className="os-btn-ghost-soft"
-                  >
-                    Manage Venues
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigate("/coordinator/schedules")}
-                    className="os-btn-ghost-soft"
-                  >
-                    Open Schedule
-                  </button>
-                </div>
-                
-              </div>
-
-              <div>
-                     <span className="text-sm font-semibold text-cyan-700">
-                        {summary.workflowPercentage}%
-                      </span>
-                    </div>
-                    <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-200">
-                      <div
-                        className="h-full rounded-full bg-cyan-600 transition-all duration-300"
-                        style={{ width: `${summary.workflowPercentage}%` }}
+                  <div className="flex max-w-xl flex-wrap items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={handleBackToList}
+                      className="inline-flex items-center gap-1.5 os-btn-ghost-soft text-xs"
+                    >
+                      <ArrowLeft size={14} />
+                      Back To Intramurals
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSearchParams({
+                          workspace_id: String(selectedTournament.workspace_id),
+                          section: "assignments",
+                        })
+                      }
+                      className="os-btn-primary-soft text-xs"
+                    >
+                      Open Assignments
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/coordinator/brackets?tournament_id=${selectedTournament.id}`)}
+                      className="os-btn-ghost-soft text-xs"
+                    >
+                      Open Brackets
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/coordinator/intramurals/${selectedTournament.id}/settings/venues`)}
+                      className="os-btn-ghost-soft text-xs"
+                    >
+                      Venues
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/coordinator/schedules")}
+                      className="os-btn-ghost-soft text-xs"
+                    >
+                      Schedule
+                    </button>
+                    {openedSeason ? (
+                      <ActionMenu
+                        buttonLabel="Actions"
+                        buttonClassName="os-btn-ghost-soft inline-flex items-center gap-1 text-xs py-1.5 px-2.5"
+                        items={[
+                          {
+                            key: "dates",
+                            label: "Edit dates",
+                            icon: CalendarClock,
+                            onClick: () => openDateEdit(selectedTournament),
+                          },
+                          ...(openedSeason.id !== activeWorkspace?.id
+                            ? [
+                              {
+                                key: "delete",
+                                label: "Delete intramural",
+                                icon: Trash2,
+                                onClick: () => initiateDelete(openedSeason),
+                              },
+                            ]
+                            : []),
+                        ]}
                       />
-                    </div>
-                    <p className="mt-2 text-xs text-slate-500">
-                      {summary.workflowCompletedCount} of {summary.workflowTotalCount} workflow steps completed.
-                    </p>
-
-              {viewMessage ? (
-                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
-                  {viewMessage}
+                    ) : null}
+                  </div>
                 </div>
-              ) : null}
-            </header>
 
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <article className="os-kpi-card">
-                <p className="os-kpi-label">Sports</p>
-                <p className="os-kpi-value">{summary.sportCount}</p>
-              </article>
-              <article className="os-kpi-card">
-                <p className="os-kpi-label">Teams</p>
-                <p className="os-kpi-value">{summary.teamCount}</p>
-              </article>
-              <article className="os-kpi-card">
-                <p className="os-kpi-label">Brackets Ready</p>
-                <p className="os-kpi-value">{summary.bracketCount}</p>
-              </article>
-              <article className="os-kpi-card">
-                <p className="os-kpi-label">Scheduled Matches</p>
-                <p className="os-kpi-value">{summary.totalMatches}</p>
-              </article>
-              <article className="os-kpi-card">
-                <p className="os-kpi-label">Completed Matches</p>
-                <p className="os-kpi-value">{summary.completedMatches}</p>
-              </article>
-              <article className="os-kpi-card">
-                <p className="os-kpi-label">Live Matches</p>
-                <p className="os-kpi-value">{summary.ongoingMatches}</p>
-              </article>
-            </section>
+                <div>
+                  <span className="text-sm font-semibold text-cyan-700">
+                    {summary.workflowPercentage}%
+                  </span>
+                </div>
+                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    className="h-full rounded-full bg-cyan-600 transition-all duration-300"
+                    style={{ width: `${summary.workflowPercentage}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  {summary.workflowCompletedCount} of {summary.workflowTotalCount} workflow steps completed.
+                </p>
 
-            <section className="grid gap-4 lg:grid-cols-2">
-              <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                {viewMessage ? (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
+                    {viewMessage}
+                  </div>
+                ) : null}
+              </header>
+
+              <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <article className="os-kpi-card">
+                  <p className="os-kpi-label">Sports</p>
+                  <p className="os-kpi-value">{summary.sportCount}</p>
+                </article>
+                <article className="os-kpi-card">
+                  <p className="os-kpi-label">Teams</p>
+                  <p className="os-kpi-value">{summary.teamCount}</p>
+                </article>
+                <article className="os-kpi-card">
+                  <p className="os-kpi-label">Brackets Ready</p>
+                  <p className="os-kpi-value">{summary.bracketCount}</p>
+                </article>
+                <article className="os-kpi-card">
+                  <p className="os-kpi-label">Scheduled Matches</p>
+                  <p className="os-kpi-value">{summary.totalMatches}</p>
+                </article>
+                <article className="os-kpi-card">
+                  <p className="os-kpi-label">Completed Matches</p>
+                  <p className="os-kpi-value">{summary.completedMatches}</p>
+                </article>
+                <article className="os-kpi-card">
+                  <p className="os-kpi-label">Live Matches</p>
+                  <p className="os-kpi-value">{summary.ongoingMatches}</p>
+                </article>
+              </section>
+
+              <section className="grid gap-4 lg:grid-cols-2">
+                <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                        <Trophy size={14} className="text-amber-500" />
+                        Sports Setup
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Generate individual brackets only where setup is already complete.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/coordinator/sports")}
+                      className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      Open Sports
+                    </button>
+                  </div>
+                  {tournamentSports.length === 0 ? (
+                    <p className="mt-3 text-sm text-slate-500">No sports linked to this intramural event yet.</p>
+                  ) : (
+                    <ul className="mt-3 space-y-2">
+                      {tournamentSports.map((sport) => (
+                        <li
+                          key={`sport-progress-${sport.id}`}
+                          className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                        >
+                          <span className="text-sm font-medium text-slate-800">{getSportDisplayName(sport)}</span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${sport.hasBracket ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                                }`}
+                            >
+                              {sport.hasBracket ? "Bracket Ready" : "Pending Bracket"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleGenerateSingleSportBracket(sport.id)}
+                              disabled={isGeneratingBrackets}
+                              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                            >
+                              Generate
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </article>
+
+                <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                        <CalendarClock size={14} className="text-indigo-600" />
+                        Schedule Snapshot
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Keep an eye on the first few scheduled matches and validation status.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/coordinator/schedules")}
+                      className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      Open Schedule
+                    </button>
+                  </div>
+
+                  {scheduleRows.length === 0 ? (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-sm text-slate-500">
+                        {scheduleAvailabilityMessage || "No scheduled matches yet."}
+                      </p>
+                      {scheduleAvailabilityMessage ? (
+                        <p className="text-xs text-slate-400">
+                          Generate brackets first, then assign dates, times, and venues in the schedule workspace.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <ul className="mt-3 space-y-2">
+                      {scheduleRows.slice(0, 5).map((row, index) => {
+                        const tone = matchStatusTone(row?.status);
+                        const startRaw = row?.start || row?.scheduled_at || null;
+                        const when = startRaw ? new Date(startRaw).toLocaleString() : "Schedule pending";
+                        return (
+                          <li
+                            key={`schedule-preview-${row?.id || row?.match_id || index}`}
+                            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium text-slate-800">
+                                {row?.title || "Match details unavailable"}
+                              </p>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tone === "done"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : tone === "live"
+                                      ? "bg-amber-100 text-amber-700"
+                                      : "bg-slate-200 text-slate-700"
+                                  }`}
+                              >
+                                {String(row?.status || "Scheduled")}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {when} | {row?.venue || "Unassigned venue"}
+                            </p>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+
+                  {validationResult ? (
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                      Validation: {validationResult.valid ? "No conflicts detected" : `${summary.totalConflicts} conflict(s) detected`}
+                    </div>
+                  ) : null}
+                </article>
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                      <Trophy size={14} className="text-amber-500" />
-                      Sports Setup
+                      <CalendarCheck2 size={14} className="text-cyan-600" />
+                      Recent Notifications
                     </h3>
                     <p className="mt-1 text-xs text-slate-500">
-                      Generate individual brackets only where setup is already complete.
+                      Notifications and updates tied to this intramural workspace.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => navigate("/coordinator/sports")}
-                    className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                  >
-                    Open Sports
-                  </button>
                 </div>
-                {tournamentSports.length === 0 ? (
-                  <p className="mt-3 text-sm text-slate-500">No sports linked to this intramural event yet.</p>
+
+                {recentActivity.length === 0 ? (
+                  <p className="mt-3 text-sm text-slate-500">No intramural-specific notifications yet.</p>
                 ) : (
                   <ul className="mt-3 space-y-2">
-                    {tournamentSports.map((sport) => (
+                    {recentActivity.map((item) => (
                       <li
-                        key={`sport-progress-${sport.id}`}
-                        className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                        key={`tournament-activity-${item.id}`}
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
                       >
-                        <span className="text-sm font-medium text-slate-800">{getSportDisplayName(sport)}</span>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                              sport.hasBracket ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                            }`}
-                          >
-                            {sport.hasBracket ? "Bracket Ready" : "Pending Bracket"}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleGenerateSingleSportBracket(sport.id)}
-                            disabled={isGeneratingBrackets}
-                            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
-                          >
-                            Generate
-                          </button>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-slate-800">{item.title}</p>
+                          <span className="text-xs text-slate-500">{timeAgo(item.created_at)}</span>
                         </div>
+                        <p className="mt-1 text-xs text-slate-600">{item.message}</p>
                       </li>
                     ))}
                   </ul>
                 )}
-              </article>
-
-              <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                      <CalendarClock size={14} className="text-indigo-600" />
-                      Schedule Snapshot
-                    </h3>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Keep an eye on the first few scheduled matches and validation status.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => navigate("/coordinator/schedules")}
-                    className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                  >
-                    Open Schedule
-                  </button>
-                </div>
-
-                {scheduleRows.length === 0 ? (
-                  <div className="mt-3 space-y-2">
-                    <p className="text-sm text-slate-500">
-                      {scheduleAvailabilityMessage || "No scheduled matches yet."}
-                    </p>
-                    {scheduleAvailabilityMessage ? (
-                      <p className="text-xs text-slate-400">
-                        Generate brackets first, then assign dates, times, and venues in the schedule workspace.
-                      </p>
-                    ) : null}
-                  </div>
-                ) : (
-                  <ul className="mt-3 space-y-2">
-                    {scheduleRows.slice(0, 5).map((row, index) => {
-                      const tone = matchStatusTone(row?.status);
-                      const startRaw = row?.start || row?.scheduled_at || null;
-                      const when = startRaw ? new Date(startRaw).toLocaleString() : "Schedule pending";
-                      return (
-                        <li
-                          key={`schedule-preview-${row?.id || row?.match_id || index}`}
-                          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-medium text-slate-800">
-                              {row?.title || "Match details unavailable"}
-                            </p>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                tone === "done"
-                                  ? "bg-emerald-100 text-emerald-700"
-                                  : tone === "live"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : "bg-slate-200 text-slate-700"
-                              }`}
-                            >
-                              {String(row?.status || "Scheduled")}
-                            </span>
-                          </div>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {when} | {row?.venue || "Unassigned venue"}
-                          </p>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-
-                {validationResult ? (
-                  <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-                    Validation: {validationResult.valid ? "No conflicts detected" : `${summary.totalConflicts} conflict(s) detected`}
-                  </div>
-                ) : null}
-              </article>
-            </section>
-
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                    <CalendarCheck2 size={14} className="text-cyan-600" />
-                    Recent Notifications
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Notifications and updates tied to this intramural workspace.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate("/coordinator/notifications")}
-                  className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                >
-                  Open Notifications
-                </button>
-              </div>
-
-              {recentActivity.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-500">No intramural-specific notifications yet.</p>
-              ) : (
-                <ul className="mt-3 space-y-2">
-                  {recentActivity.map((item) => (
-                    <li
-                      key={`tournament-activity-${item.id}`}
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-slate-800">{item.title}</p>
-                        <span className="text-xs text-slate-500">{timeAgo(item.created_at)}</span>
-                      </div>
-                      <p className="mt-1 text-xs text-slate-600">{item.message}</p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            {isLoadingHub ? (
-              <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
-                Loading intramural details...
               </section>
-            ) : null}
-          </div>
 
-          <aside className="space-y-4">
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-slate-700">Tournament Snapshot</h3>
-                <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${summary.statusClassName}`}>
-                  {summary.statusLabel}
-                </span>
-              </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">Leading Department</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800">{summary.leadingDepartment}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">Pending Matches</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800">{summary.pendingMatches}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">Schedule Conflicts</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800">{summary.totalConflicts}</p>
-                </div>
-                <div
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-                  title="Setup progress: Teams → Brackets → Schedule → Live → Completed"
-                >
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">Setup Progress</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800">
-                    {summary.workflowCompletedCount}/{summary.workflowTotalCount} complete
-                  </p>
-                </div>
-              </div>
-              <p className="mt-3 text-xs text-slate-500">{summary.scheduleHealthLabel}</p>
-            </section>
+              {isLoadingHub ? (
+                <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
+                  Loading intramural details...
+                </section>
+              ) : null}
+            </div>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                  <GitBranch size={14} className="text-cyan-600" />
-                  Bracket Coverage
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/coordinator/brackets?tournament_id=${selectedTournament.id}`)}
-                  className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                >
-                  Open Brackets
-                </button>
-              </div>
-
-              {visibleBrackets.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-500">No generated brackets yet for this intramural event.</p>
-              ) : (
-                <div className="mt-3 space-y-2">
-                  {visibleBrackets.slice(0, 5).map((bracket) => (
-                    <div
-                      key={`bracket-preview-${bracket.id}`}
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-                    >
-                      <p className="text-sm font-semibold text-slate-800">{getSportDisplayName(bracket, "Sport")}</p>
-                      <p className="text-xs text-slate-500">
-                        {bracket.format || "Format"} | {formatStatusLabel(bracket.status, "Draft")}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                  <Medal size={14} className="text-amber-600" />
-                  Standings Preview
-                </h3>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/coordinator/teams")}
-                    className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                  >
-                    Teams
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigate("/coordinator/standings")}
-                    className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                  >
-                    Full Standings
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-3 grid gap-2">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">Top Team</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800">{standingsOverview?.top_team?.name || "-"}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">Top Player</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800">{standingsOverview?.top_player?.name || "-"}</p>
-                </div>
-              </div>
-
-              {topTeamsPreview.length > 0 ? (
-                <ul className="mt-3 space-y-2">
-                  {topTeamsPreview.map((row) => (
-                    <li
-                      key={`top-team-preview-${row.entity_id}`}
-                      className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                    >
-                      <span className="font-medium text-slate-800">
-                        #{row.rank} {row.name}
-                      </span>
-                      <span className="text-xs font-semibold text-slate-600">
-                        {Number(row?.metadata?.points || 0)} pts
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-3 text-sm text-slate-500">Standings will populate after results are recorded.</p>
-              )}
-            </section>
-
-            {bulkGenerationSummary ? (
+            <aside className="space-y-4">
               <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <h3 className="text-sm font-semibold text-slate-700">Latest Bracket Run</h3>
-                <div className="mt-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-slate-700">Tournament Snapshot</h3>
+                  <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${summary.statusClassName}`}>
+                    {summary.statusLabel}
+                  </span>
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Generated</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-800">
-                      {bulkGenerationSummary.generated_count || 0}
-                    </p>
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Leading Department</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800">{summary.leadingDepartment}</p>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Skipped</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-800">
-                      {bulkGenerationSummary.skipped_count || 0}
-                    </p>
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Pending Matches</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800">{summary.pendingMatches}</p>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Failed</p>
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Schedule Conflicts</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800">{summary.totalConflicts}</p>
+                  </div>
+                  <div
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                    title="Setup progress: Teams → Brackets → Schedule → Live → Completed"
+                  >
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Setup Progress</p>
                     <p className="mt-1 text-sm font-semibold text-slate-800">
-                      {bulkGenerationSummary.failed_count || 0}
+                      {summary.workflowCompletedCount}/{summary.workflowTotalCount} complete
                     </p>
                   </div>
                 </div>
-                <div className="mt-3 space-y-2">
-                  {(Array.isArray(bulkGenerationSummary.results) ? bulkGenerationSummary.results : [])
-                    .slice(0, 4)
-                    .map((row, index) => (
+                <p className="mt-3 text-xs text-slate-500">{summary.scheduleHealthLabel}</p>
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                    <GitBranch size={14} className="text-cyan-600" />
+                    Bracket Coverage
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/coordinator/brackets?tournament_id=${selectedTournament.id}`)}
+                    className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    Open Brackets
+                  </button>
+                </div>
+
+                {visibleBrackets.length === 0 ? (
+                  <p className="mt-3 text-sm text-slate-500">No generated brackets yet for this intramural event.</p>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {visibleBrackets.slice(0, 5).map((bracket) => (
                       <div
-                        key={`bulk-generation-row-${row.sport_id}-${index}`}
+                        key={`bracket-preview-${bracket.id}`}
                         className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-800">{getSportDisplayName(row, "Unassigned sport")}</p>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                              row.status === "generated"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : row.status === "skipped"
-                                  ? "bg-amber-100 text-amber-700"
-                                  : "bg-rose-100 text-rose-700"
-                            }`}
-                          >
-                            {formatStatusLabel(row.status, "Unknown")}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {row.reason || `${row.matches_created || 0} matches created`}
+                        <p className="text-sm font-semibold text-slate-800">{getSportDisplayName(bracket, "Sport")}</p>
+                        <p className="text-xs text-slate-500">
+                          {bracket.format || "Format"} | {formatStatusLabel(bracket.status, "Draft")}
                         </p>
                       </div>
                     ))}
-                </div>
+                  </div>
+                )}
               </section>
-            ) : null}
-          </aside>
-        </section>
+
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                    <Medal size={14} className="text-amber-600" />
+                    Standings Preview
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => navigate("/coordinator/teams")}
+                      className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      Teams
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/coordinator/standings")}
+                      className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      Full Standings
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-2">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Top Team</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800">{standingsOverview?.top_team?.name || "-"}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Top Player</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800">{standingsOverview?.top_player?.name || "-"}</p>
+                  </div>
+                </div>
+
+                {topTeamsPreview.length > 0 ? (
+                  <ul className="mt-3 space-y-2">
+                    {topTeamsPreview.map((row) => (
+                      <li
+                        key={`top-team-preview-${row.entity_id}`}
+                        className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                      >
+                        <span className="font-medium text-slate-800">
+                          #{row.rank} {row.name}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-600">
+                          {Number(row?.metadata?.points || 0)} pts
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-sm text-slate-500">Standings will populate after results are recorded.</p>
+                )}
+              </section>
+
+              {bulkGenerationSummary ? (
+                <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <h3 className="text-sm font-semibold text-slate-700">Latest Bracket Run</h3>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500">Generated</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-800">
+                        {bulkGenerationSummary.generated_count || 0}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500">Skipped</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-800">
+                        {bulkGenerationSummary.skipped_count || 0}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500">Failed</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-800">
+                        {bulkGenerationSummary.failed_count || 0}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {(Array.isArray(bulkGenerationSummary.results) ? bulkGenerationSummary.results : [])
+                      .slice(0, 4)
+                      .map((row, index) => (
+                        <div
+                          key={`bulk-generation-row-${row.sport_id}-${index}`}
+                          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-slate-800">{getSportDisplayName(row, "Unassigned sport")}</p>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${row.status === "generated"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : row.status === "skipped"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-rose-100 text-rose-700"
+                                }`}
+                            >
+                              {formatStatusLabel(row.status, "Unknown")}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {row.reason || `${row.matches_created || 0} matches created`}
+                          </p>
+                        </div>
+                      ))}
+                  </div>
+                </section>
+              ) : null}
+            </aside>
+          </section>
         </>
       )}
 
@@ -1617,11 +1880,10 @@ const Tournaments = () => {
                     <td className="hidden px-3 py-2 text-slate-600 sm:table-cell dark:text-slate-300">{row.teams_or_units || 0}</td>
                     <td className="px-3 py-2">
                       <span
-                        className={`rounded-full px-2 py-0.5 font-semibold ${
-                          row.is_ready
+                        className={`rounded-full px-2 py-0.5 font-semibold ${row.is_ready
                             ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
                             : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
-                        }`}
+                          }`}
                       >
                         {row.is_ready ? "Ready" : "Needs Setup"}
                       </span>
@@ -1766,43 +2028,170 @@ const Tournaments = () => {
         onClose={() => {
           if (seasonActionLoading) return;
           setDeleteTarget(null);
+          setDeletePreview(null);
           setSeasonActionError("");
         }}
-        title="Delete Intramural"
-        subtitle="This action cannot be undone."
-        maxWidthClass="max-w-sm"
+        title="Delete Intramural Event"
+        subtitle="Review impact before permanent deletion"
+        maxWidthClass="max-w-lg"
       >
         <div className="space-y-4">
-          <p className="text-sm text-slate-700 dark:text-slate-300">
-            Delete <strong>{deleteTarget?.name}</strong>? An intramural with existing competition data
-            cannot be deleted — archive it instead to preserve historical records.
-          </p>
-          {seasonActionError ? (
-            <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
-              {seasonActionError}
-            </p>
-          ) : null}
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setDeleteTarget(null);
-                setSeasonActionError("");
-              }}
-              className="os-btn-ghost-soft"
-              disabled={seasonActionLoading}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSeasonDelete}
-              disabled={seasonActionLoading}
-              className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-60"
-            >
-              {seasonActionLoading ? "Deleting..." : "Delete"}
-            </button>
+          {/* Target Preview Pill */}
+          <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-800 dark:bg-slate-850">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
+                <Trash2 size={20} />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">
+                  {deleteTarget?.name}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {deleteTarget?.school_year} · {SEMESTER_LABEL[String(deleteTarget?.semester || "").toUpperCase()] || deleteTarget?.semester}
+                </p>
+              </div>
+            </div>
+            {deleteTarget?.status ? <StatusBadge status={deleteTarget.status} /> : null}
           </div>
+
+          {isLoadingDeletePreview ? (
+            <div className="py-6">
+              <LoadingState message="Analyzing intramural dependencies and safety policies..." />
+            </div>
+          ) : deletePreview && !deletePreview.can_delete ? (
+            /* Blocked state */
+            <div className="space-y-3.5">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                <div className="flex items-center gap-2 font-bold text-amber-950 dark:text-amber-100">
+                  <ShieldAlert size={16} className="text-amber-600 shrink-0" />
+                  Deletion Blocked
+                </div>
+                <ul className="mt-2 list-disc pl-4 space-y-1 text-amber-800 dark:text-amber-300">
+                  {(deletePreview.blockers || []).map((blocker, idx) => (
+                    <li key={idx}>{blocker}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                To protect institutional athletic records and active competitions, this intramural cannot be hard-deleted right now. Archiving safely removes it from active views while preserving historical student records.
+              </p>
+
+              {seasonActionError ? (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+                  {seasonActionError}
+                </div>
+              ) : null}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteTarget(null);
+                    setDeletePreview(null);
+                    setSeasonActionError("");
+                  }}
+                  className="os-btn-ghost-soft text-xs"
+                  disabled={seasonActionLoading}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleArchiveFromModal}
+                  disabled={seasonActionLoading}
+                  className="os-btn-primary-soft inline-flex items-center gap-1.5 text-xs"
+                >
+                  <Archive size={13} />
+                  {seasonActionLoading ? "Processing..." : "Archive Instead"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Deletion Allowed state */
+            <div className="space-y-3.5">
+              <div className="rounded-xl border border-rose-200/80 bg-rose-50/70 p-3.5 text-xs text-rose-900 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+                <div className="flex items-center gap-2 font-bold text-rose-950 dark:text-rose-100">
+                  <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                  Warning: This action cannot be undone
+                </div>
+                <p className="mt-1 text-rose-800 dark:text-rose-300">
+                  Deleting will permanently erase this event and all associated draft configuration, brackets, and venue settings.
+                </p>
+              </div>
+
+              {deletePreview?.counts ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-800/40">
+                  <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                    Items that will be permanently removed:
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-400">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {deletePreview.counts.sports ?? 0}
+                      </span>{" "}
+                      Sport(s)
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {deletePreview.counts.brackets ?? 0}
+                      </span>{" "}
+                      Bracket(s)
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {deletePreview.counts.teams ?? 0}
+                      </span>{" "}
+                      Team link(s)
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {deletePreview.counts.matches ?? 0}
+                      </span>{" "}
+                      Match slot(s)
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex items-start gap-2 rounded-lg bg-blue-50/70 p-2.5 text-[11px] text-blue-800 dark:bg-blue-500/10 dark:text-blue-300">
+                <Info size={14} className="shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+                <span>
+                  Department directories, user accounts, and player master rosters will <strong>not</strong> be deleted.
+                </span>
+              </div>
+
+              {seasonActionError ? (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+                  {seasonActionError}
+                </div>
+              ) : null}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteTarget(null);
+                    setDeletePreview(null);
+                    setSeasonActionError("");
+                  }}
+                  className="os-btn-ghost-soft text-xs"
+                  disabled={seasonActionLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSeasonDelete}
+                  disabled={seasonActionLoading}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-rose-500 disabled:opacity-60 transition"
+                >
+                  <Trash2 size={13} />
+                  {seasonActionLoading ? "Deleting..." : "Permanently Delete"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </AppModal>
 

@@ -25,7 +25,8 @@ const useViewerClock = (clock) => {
   }, [clock?.running]);
 
   const observed = Date.parse(clock?.observed_at || "");
-  const anchor = Number.isFinite(observed) ? observed : now;
+  const started = Date.parse(clock?.started_at || "");
+  const anchor = Number.isFinite(observed) ? observed : (Number.isFinite(started) ? started : now);
   const elapsed = clock?.running ? Math.max(0, Math.floor((now - anchor) / 1000)) : 0;
   const remaining = Math.max(0, canonical - elapsed);
   return formatClock(remaining);

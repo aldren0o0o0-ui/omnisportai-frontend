@@ -99,8 +99,14 @@ export const restoreWorkspace = async (workspaceId) => {
   return res.data;
 };
 
+export const getWorkspaceDeletePreview = async (workspaceId) => {
+  const res = await api.get(`/workspaces/${workspaceId}/delete-preview`);
+  return res.data;
+};
+
 export const deleteWorkspace = async (workspaceId) => {
-  await api.delete(`/workspaces/${workspaceId}`);
+  const res = await api.delete(`/workspaces/${workspaceId}`);
   await invalidateWorkspaceCache();
   dispatchWorkspaceListChanged(null);
+  return res.data;
 };

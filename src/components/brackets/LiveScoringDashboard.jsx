@@ -13,8 +13,11 @@ import TallyBoardShell from "./live-scoring/TallyBoardShell";
 import TimedTeamSurface from "./live-scoring/TimedTeamSurface";
 import BoxingScorecardSurface from "./live-scoring/BoxingScorecardSurface";
 import ParticipantPlayerStrip from "./live-scoring/ParticipantPlayerStrip";
+import ShortcutWinnerModal from "./components/ShortcutWinnerModal";
+import { Trophy } from "lucide-react";
 import { buildSubstitutionSubmission } from "./live-scoring/substitutionPayload";
 import { resolveLiveScoringSurface } from "./live-scoring/tallyBoardSurfaceResolver";
+import { getBasketballActionDisabledReason } from "./live-scoring/timedTeamActions";
 
 import { validateEventConfig } from "./eventComposer/config/validateEventConfig";
 import { useEventComposerState } from "./eventComposer/state/useEventComposerState";
@@ -82,6 +85,8 @@ const defaultSafeDisplay = {
   allow_composer: true,
 };
 const CLOCK_HARD_SYNC_EVENT_TYPES = new Set([
+  "CLOCK_START",
+  "CLOCK_STOP",
   "CLOCK_RESET",
   "CLOCK_SET",
   "PERIOD_ADVANCE",
@@ -269,7 +274,7 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
   const [configHash, setConfigHash] = useState(null);
   const [configResponseSnapshot, setConfigResponseSnapshot] = useState(null);
   const [ruleSnapshotMeta, setRuleSnapshotMeta] = useState(null);
-  
+
   const [capabilities, setCapabilities] = useState({});
   const [rosterByTeamId, setRosterByTeamId] = useState({});
   const [debugMode, setDebugMode] = useState(false);
@@ -291,6 +296,7 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
   const [showDetailedComposer, setShowDetailedComposer] = useState(false);
   const [pendingCompletion, setPendingCompletion] = useState(null);
   const [isUndoConfirmationOpen, setIsUndoConfirmationOpen] = useState(false);
+  const [isShortcutWinnerOpen, setIsShortcutWinnerOpen] = useState(false);
 
   const handleRealtimeConfigRecovery = useCallback(() => {
     if (configRecoveryNeededRef.current) {
@@ -331,21 +337,58 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
     () => controlResolver(validatedConfig, selectedControlId),
     [validatedConfig, selectedControlId]
   );
+  const isSoloSport = useMemo(() => {
+    const rawShapes = [
+      liveState?.participant_state?.unit_type,
+      validatedConfig?.participant_profile?.unit_type,
+      validatedConfig?.participant_profile?.participant_model,
+      validatedConfig?.sport_definition?.participant_type,
+      match?.participant_shape,
+      match?.tournament_sport_event?.participant_shape,
+      match?.participant1?.participant_shape,
+      match?.participant2?.participant_shape,
+    ];
+    for (const shape of rawShapes) {
+      const normalized = String(shape || "").trim().toUpperCase();
+      if (normalized === "SOLO" || normalized === "INDIVIDUAL" || normalized === "SINGLE" || normalized === "SINGLES") {
+        return true;
+      }
+    }
+    const playersPerEntry = Number(
+      match?.tournament_sport_event?.players_per_entry
+      ?? match?.players_per_entry
+      ?? validatedConfig?.participant_profile?.players_per_entry
+      ?? 0
+    );
+    if (playersPerEntry === 1) return true;
+    return false;
+  }, [
+    liveState?.participant_state?.unit_type,
+    match?.participant1?.participant_shape,
+    match?.participant2?.participant_shape,
+    match?.participant_shape,
+    match?.players_per_entry,
+    match?.tournament_sport_event?.participant_shape,
+    match?.tournament_sport_event?.players_per_entry,
+    validatedConfig?.participant_profile,
+    validatedConfig?.sport_definition,
+  ]);
+
   const substitutionControl = useMemo(
-    () =>
+    () => isSoloSport ? null :
       (validatedConfig?.controls || []).find((control) => {
         const group = String(control?.group || control?.category || "").toLowerCase();
         const type = String(control?.event_type || "").toUpperCase();
         return group.includes("sub") || type.includes("SUB");
       }) || null,
-    [validatedConfig?.controls]
+    [isSoloSport, validatedConfig?.controls]
   );
   const substitutionEventDefinition = useMemo(
     () =>
       substitutionControl
         ? (validatedConfig?.event_types || []).find(
-            (row) => String(row?.name || "").toUpperCase() === String(substitutionControl.event_type || "").toUpperCase()
-          ) || null
+          (row) => String(row?.name || "").toUpperCase() === String(substitutionControl.event_type || "").toUpperCase()
+        ) || null
         : null,
     [substitutionControl, validatedConfig?.event_types]
   );
@@ -368,8 +411,8 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
   const scheduleReadinessBlocker = useMemo(
     () => (Array.isArray(operationalReadiness?.blockers)
       ? operationalReadiness.blockers.find(
-          (row) => String(row?.code || "").trim().toUpperCase() === "SCHEDULE_NOT_ASSIGNED"
-        ) || null
+        (row) => String(row?.code || "").trim().toUpperCase() === "SCHEDULE_NOT_ASSIGNED"
+      ) || null
       : null),
     [operationalReadiness]
   );
@@ -450,6 +493,10 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
       })),
     [resolvedParticipants]
   );
+  const canDeclareWinner = useMemo(
+    () => !completedMatch && (canComposerSubmit || (roleCanWrite && isAuthenticatedForScoring)) && (teamOptions?.length > 0),
+    [canComposerSubmit, completedMatch, isAuthenticatedForScoring, roleCanWrite, teamOptions?.length]
+  );
   const applyParticipantTargetToPayload = useCallback((payload, targetId) => {
     const nextPayload = { ...(payload || {}) };
     const selectedTarget = teamOptions.find(
@@ -505,7 +552,7 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
     (teamId) => teamOptions.find((t) => Number(t.id) === Number(teamId))?.name || (teamId ? "Unnamed team" : "-"),
     [teamOptions]
   );
-  
+
   const participantState = useMemo(() => (liveState?.participant_state && typeof liveState.participant_state === "object" ? liveState.participant_state : {}), [liveState]);
   const participantUnitType = String(participantState?.unit_type || validatedConfig?.participant_profile?.unit_type || "TEAM").toUpperCase();
   const statisticsPresentation = useMemo(
@@ -544,6 +591,17 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
   );
 
   const lineupUi = useMemo(() => {
+    if (isSoloSport) {
+      return {
+        requiresLineupSetup: false,
+        activePlayersPerSide: 0,
+        supportsSubstitution: false,
+        lineupLabel: "Participant",
+        incompleteTeams: [],
+        hasIncompleteLineup: false,
+        warningText: "",
+      };
+    }
     const uiSpec = validatedConfig?.ui_spec || {};
     const profile = validatedConfig?.participant_profile || {};
     const requiresLineupSetup = Boolean(
@@ -595,7 +653,7 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
           ? `Select ${activePlayersPerSide} active players for ${incompleteTeams.join(" and ")} before starting the clock.`
           : "",
     };
-  }, [participantState?.sides, participantUnitType, sportUiProfile?.activePlayersPerSide, sportUiProfile?.lineupLabel, sportUiProfile?.supportsLineup, sportUiProfile?.supportsSubstitution, teamOptions, validatedConfig?.participant_profile, validatedConfig?.ui_spec]);
+  }, [isSoloSport, participantState?.sides, participantUnitType, sportUiProfile?.activePlayersPerSide, sportUiProfile?.lineupLabel, sportUiProfile?.supportsLineup, sportUiProfile?.supportsSubstitution, teamOptions, validatedConfig?.participant_profile, validatedConfig?.ui_spec]);
 
   const playerOptions = useMemo(() => {
     if (!uiRules.shouldShowPlayerSelector) return [];
@@ -652,7 +710,7 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
   const isServerEnabled = Boolean(displayEnabled.server ?? displayWidgets.has("server"));
   const isBattingEnabled = Boolean(displayEnabled.batting ?? displayWidgets.has("batting"));
   const currentPeriod = Number(displayState?.period?.current || 1);
-  
+
   const sportProfile = String(validatedConfig?.sport_profile || "").toLowerCase();
   const matchPhaseLabel = useMemo(() => {
     const pLabel = displayState?.period?.label || "Phase";
@@ -710,18 +768,54 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
   const backendGameClockState = useMemo(() => {
     const clock = displayState?.clock;
     if (!clock || typeof clock !== "object") return null;
+    const isRunning = Boolean(clock.running);
+    const now = Date.now();
+
+    const remainingSecondsRaw = Number(
+      clock.effective_remaining_seconds ??
+      clock.remaining_seconds ??
+      clock.seconds ??
+      clock.value_seconds
+    );
+    if (!Number.isFinite(remainingSecondsRaw)) return null;
+
+    let baseMs = Math.max(0, Math.round(remainingSecondsRaw * 1000));
     const remainingMs = Number(clock.remaining_milliseconds ?? clock.milliseconds);
     if (Number.isFinite(remainingMs)) {
-      return {
-        valueMs: Math.max(0, Math.round(remainingMs)),
-        isRunning: Boolean(clock.running),
-      };
+      baseMs = Math.max(0, Math.round(remainingMs));
     }
-    const remainingSeconds = Number(clock.effective_remaining_seconds ?? clock.remaining_seconds ?? clock.seconds ?? clock.value_seconds);
-    if (!Number.isFinite(remainingSeconds)) return null;
+
+    if (isRunning) {
+      const observedMs = clock.observed_at ? Date.parse(clock.observed_at) : NaN;
+      const startedMs = clock.started_at ? Date.parse(clock.started_at) : NaN;
+
+      if (Number.isFinite(observedMs) && clock.effective_remaining_seconds !== undefined) {
+        const elapsedSinceObserved = Math.max(0, now - observedMs);
+        const effectiveMs = Math.max(0, Math.round(Number(clock.effective_remaining_seconds) * 1000) - elapsedSinceObserved);
+        return {
+          valueMs: effectiveMs,
+          isRunning: true,
+          baseMs,
+          syncedAt: now,
+        };
+      } else if (Number.isFinite(startedMs)) {
+        const canonicalBaseMs = Math.max(0, Math.round(Number(clock.remaining_seconds ?? remainingSecondsRaw) * 1000));
+        const elapsedSinceStarted = Math.max(0, now - startedMs);
+        const effectiveMs = Math.max(0, canonicalBaseMs - elapsedSinceStarted);
+        return {
+          valueMs: effectiveMs,
+          isRunning: true,
+          baseMs: canonicalBaseMs,
+          syncedAt: now,
+        };
+      }
+    }
+
     return {
-      valueMs: Math.max(0, Math.round(remainingSeconds * 1000)),
-      isRunning: Boolean(clock.running),
+      valueMs: baseMs,
+      isRunning: false,
+      baseMs,
+      syncedAt: now,
     };
   }, [displayState?.clock]);
   const effectiveGameClockState = useMemo(() => {
@@ -853,9 +947,9 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
     const scoreDelta = eventRow?.score_delta && typeof eventRow.score_delta === "object" ? eventRow.score_delta : eventRow?.step?.score_delta;
     const scoreImpact = scoreDelta && typeof scoreDelta === "object"
       ? Object.entries(scoreDelta)
-          .filter(([, value]) => Number(value || 0) !== 0)
-          .map(([teamId, value]) => `${getShortTeamName(resolveTeamName(teamId))} ${Number(value) > 0 ? "+" : ""}${Number(value || 0)}`)
-          .join(" | ")
+        .filter(([, value]) => Number(value || 0) !== 0)
+        .map(([teamId, value]) => `${getShortTeamName(resolveTeamName(teamId))} ${Number(value) > 0 ? "+" : ""}${Number(value || 0)}`)
+        .join(" | ")
       : "";
     let effect = "";
     if (scoreImpact) effect = scoreImpact;
@@ -1117,10 +1211,31 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
 
       if (backendRunning !== localRunning) {
         return {
-          ...current,
+          valueMs: backendMs,
           isRunning: backendRunning,
           lastTickAt: now,
         };
+      }
+
+      if (backendRunning && localRunning) {
+        const drift = Math.abs(Number(current.valueMs || 0) - backendMs);
+        if (drift > 1500) {
+          return {
+            valueMs: backendMs,
+            isRunning: backendRunning,
+            lastTickAt: now,
+          };
+        }
+      }
+
+      if (!backendRunning && !localRunning) {
+        if (Math.abs(Number(current.valueMs || 0) - backendMs) > 200) {
+          return {
+            valueMs: backendMs,
+            isRunning: false,
+            lastTickAt: now,
+          };
+        }
       }
 
       return current;
@@ -1172,16 +1287,16 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
     if (!secondaryClockConfig.enabled || !secondaryClockConfig.isLocalOnly || !secondaryClockConfig.syncWithGameClock) return;
     setSecondaryClockLocalState((current) => {
       if (!current) return current;
-      const gameClockRunning = Boolean(displayState?.clock?.running);
+      const gameClockRunning = Boolean(effectiveGameClockState?.isRunning);
       if (!gameClockRunning) {
         if (!current.isRunning) return current;
-        return { ...current, isRunning: false };
+        return { ...current, isRunning: false, lastTickAt: Date.now() };
       }
       if (current.manualPaused) return current;
       if (current.isRunning) return current;
-      return { ...current, isRunning: true };
+      return { ...current, isRunning: true, lastTickAt: Date.now() };
     });
-  }, [displayState?.clock?.running, secondaryClockConfig.enabled, secondaryClockConfig.isLocalOnly, secondaryClockConfig.syncWithGameClock]);
+  }, [effectiveGameClockState?.isRunning, secondaryClockConfig.enabled, secondaryClockConfig.isLocalOnly, secondaryClockConfig.syncWithGameClock]);
 
   useEffect(() => {
     if (!secondaryClockConfig.enabled || !secondaryClockConfig.isLocalOnly) return;
@@ -1189,8 +1304,15 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
     const timer = window.setInterval(() => {
       setSecondaryClockLocalState((current) => {
         if (!current?.isRunning) return current;
-        const nextValue = Math.max(0, Number(current.valueMs || 0) - 100);
-        return { ...current, valueMs: nextValue, isRunning: nextValue > 0 && current.isRunning };
+        const now = Date.now();
+        const elapsedMs = Math.max(0, now - Number(current.lastTickAt || now));
+        const nextValue = Math.max(0, Number(current.valueMs || 0) - elapsedMs);
+        return {
+          ...current,
+          valueMs: nextValue,
+          isRunning: nextValue > 0 && current.isRunning,
+          lastTickAt: now,
+        };
       });
     }, 100);
     return () => window.clearInterval(timer);
@@ -1447,8 +1569,8 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
       eventDefinitionOverride
       || (Array.isArray(validatedConfig?.event_types)
         ? validatedConfig.event_types.find(
-            (row) => String(row?.name || "").toUpperCase() === String(effectiveControl?.event_type || "").toUpperCase()
-          ) || null
+          (row) => String(row?.name || "").toUpperCase() === String(effectiveControl?.event_type || "").toUpperCase()
+        ) || null
         : null)
       || selectedEventDefinition
       || null;
@@ -1467,7 +1589,7 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
       validatedConfig,
       liveStateVersion: liveStateRef.current?.state_version
     });
-    
+
     if (payloadErr) { setError(payloadErr); return false; }
     const selectedParticipantId = Number(
       teamIdOverride !== undefined
@@ -1496,12 +1618,12 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
     }
     try {
       const response = await submitSessionEvent(eventPayload);
-      
+
       const createdEvent = response?.event || null;
       const normalizedEventType = String(createdEvent?.event_type || eventPayload.event_type || "").toUpperCase();
       const isScoreEvent = validatedConfig?.score_event_types?.some(set => String(set || "").toUpperCase() === normalizedEventType);
       const isViolation = validatedConfig?.violations?.some(v => String(v.name || v.event_type || "").toUpperCase() === normalizedEventType);
-      
+
       pushToast({
         kind: isScoreEvent ? "score" : isViolation ? "violation" : "neutral",
         title: `${normalizedEventType} Recorded`,
@@ -1604,7 +1726,7 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
       } catch {
         // Secondary clock is assistive UI only; it must never block scoring.
       }
-      
+
       if (resolvedEventDefinition?.has_value) {
         if (resolvedEventDefinition.value_type === "boolean") formActions.setInputBoolean(true);
         else formActions.setInputValue("");
@@ -1761,7 +1883,7 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
   };
 
   const quickControlDisabledReason = useCallback(
-    (control) => {
+    (control, targetTeamId = undefined) => {
       if (!control?.enabled) return "Disabled by config";
       const type = String(control?.event_type || "").toUpperCase();
       if (!isOperationallyReady) return operationalReadinessMessage || "Complete the Match setup before using scoring controls";
@@ -1770,9 +1892,23 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
       if ((type.includes("CLOCK_STOP") || type.includes("CLOCK_PAUSE")) && !isGameClockRunning) return "Clock already stopped";
       if (!canComposerSubmit) return "Scoring is locked";
       if (isSubmitting || isUndoing) return "Processing";
+
+      if (sportKey === "basketball" || (sportKey || "").includes("basketball")) {
+        const effectiveTeamId = targetTeamId !== undefined ? targetTeamId : formState.selectedTeamId;
+        const possessionParticipant = teamOptions.find((team) => Number(team.id) === Number(sportStateTeamId));
+        const basketballReason = getBasketballActionDisabledReason({
+          eventType: type,
+          teamId: effectiveTeamId,
+          possessionTeamId: sportStateTeamId,
+          possessionTeamName: possessionParticipant?.name || "",
+          hasSelectedPlayer: true,
+        });
+        if (basketballReason) return basketballReason;
+      }
+
       return "";
     },
-    [canComposerSubmit, isGameClockRunning, isOperationallyReady, isSubmitting, isUndoing, lineupUi.hasIncompleteLineup, lineupUi.warningText, operationalReadinessMessage]
+    [canComposerSubmit, formState.selectedTeamId, isGameClockRunning, isOperationallyReady, isSubmitting, isUndoing, lineupUi.hasIncompleteLineup, lineupUi.warningText, operationalReadinessMessage, sportKey, sportStateTeamId, teamOptions]
   );
   const handleClockControlSubmit = useCallback(async (control) => {
     if (!control) return false;
@@ -2047,22 +2183,21 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
     ? "Secondary clock is unavailable for this sport."
     : !secondaryClockConfig.isLocalOnly
       ? "Secondary clock backend controls are not yet wired for this environment."
-    : !canComposerSubmit || isConfigBlocked
-      ? "Scoring controls are currently locked."
-      : "";
+      : !canComposerSubmit || isConfigBlocked
+        ? "Scoring controls are currently locked."
+        : "";
 
   const systemStatusCard = (
     <details className="rounded-2xl border border-slate-200 bg-white/85 p-3.5 shadow-md shadow-slate-300/30 dark:border-slate-700/80 dark:bg-slate-950/60 dark:shadow-lg dark:shadow-slate-950/20">
       <summary className="cursor-pointer list-none">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">System Status</h3>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-            liveStatusMode === "live"
-              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200"
-              : liveStatusMode === "stale" || liveStatusMode === "reconnecting"
-                ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200"
-                : "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200"
-          }`}>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${liveStatusMode === "live"
+            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200"
+            : liveStatusMode === "stale" || liveStatusMode === "reconnecting"
+              ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200"
+              : "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200"
+            }`}>
             {liveStatusMode.toUpperCase()}
           </span>
         </div>
@@ -2081,11 +2216,10 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
         {feedbackToasts.length > 0 && (
           <div className="pointer-events-none fixed right-4 top-4 z-[80] flex w-[320px] max-w-[92vw] flex-col gap-2">
             {feedbackToasts.map((toast) => (
-              <div key={toast.id} className={`rounded-lg border px-3 py-2 text-xs shadow-md dark:shadow-lg ${
-                toast.kind === "score" ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100" :
+              <div key={toast.id} className={`rounded-lg border px-3 py-2 text-xs shadow-md dark:shadow-lg ${toast.kind === "score" ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100" :
                 toast.kind === "violation" ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100" :
-                "border-slate-300 bg-white text-slate-700 dark:border-slate-600 dark:bg-slate-800/95 dark:text-slate-100"
-              }`}>
+                  "border-slate-300 bg-white text-slate-700 dark:border-slate-600 dark:bg-slate-800/95 dark:text-slate-100"
+                }`}>
                 <p className="font-semibold">{toast.title}</p>
                 {toast.detail && <p className="mt-0.5 text-xs opacity-90">{toast.detail}</p>}
               </div>
@@ -2128,6 +2262,8 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
             matchStatus={completedMatch ? "COMPLETED" : String(liveState?.match_status || match?.status || "LIVE").toUpperCase()}
             connection={connectionPresentation}
             blockingMessage={!canComposerSubmit ? (operationalReadinessMessage || blockingSessionError || (completedMatch ? "This Match is complete." : "Your current session cannot record Match actions.")) : ""}
+            canDeclareWinner={canDeclareWinner}
+            onDeclareWinner={() => setIsShortcutWinnerOpen(true)}
             onRefresh={handleSaveAndRefresh}
             onExit={onExit}
             recentAction={timelineWithEffects[0]
@@ -2138,7 +2274,7 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
             onUndo={requestUndoLastEvent}
             secondaryPanels={(
               <>
-                {safeDisplay.allow_timeline ? <details className="rounded-xl bg-[var(--surface-soft)] p-3"><summary className="cursor-pointer text-sm font-semibold">Timeline</summary><div className="mt-3"><LiveTimeline timelineWithEffects={timelineWithEffects} canDeleteEvents={false} isDeletingById={{}} handleDeleteEvent={() => {}} /></div></details> : null}
+                {safeDisplay.allow_timeline ? <details className="rounded-xl bg-[var(--surface-soft)] p-3"><summary className="cursor-pointer text-sm font-semibold">Timeline</summary><div className="mt-3"><LiveTimeline timelineWithEffects={timelineWithEffects} canDeleteEvents={false} isDeletingById={{}} handleDeleteEvent={() => { }} /></div></details> : null}
                 {ruleSnapshotMeta ? <details className="rounded-xl bg-[var(--surface-soft)] p-3"><summary className="cursor-pointer text-sm font-semibold">Rules</summary><div className="mt-3"><RulesSummaryPanel snapshot={ruleSnapshotMeta} configStatus={normalizedConfigStatus} validatedConfig={validatedConfig} rawEventConfig={configResponseSnapshot?.event_config} sportName={sportDefinition?.sport || match?.sport_name || ""} liveState={liveState} serviceOwnerLabel={resolveTeamName(liveState?.service_state?.server_team_id)} /></div></details> : null}
                 <details className="rounded-xl bg-[var(--surface-soft)] p-3"><summary className="cursor-pointer text-sm font-semibold">Match details</summary><div className="mt-3"><MatchSummaryPanel match={match} liveState={liveState} sportProfile={sportProfile} isRoleReadOnly={isRoleReadOnly || isConfigBlocked} canWrite={canComposerSubmit} latestViolation={latestViolation} sportDefinition={validatedConfig?.sport_definition} /></div></details>
               </>
@@ -2151,6 +2287,7 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
               clockValue={formatClock(effectiveGameClockSeconds)}
               clockRunning={isGameClockRunning}
               periodLabel={matchPhaseLabel}
+              periodTotal={displayState?.period?.total || (sportKey === "basketball" ? 4 : undefined)}
               possessionTeamId={sportStateTeamId}
               canSubmit={canComposerSubmit}
               isPending={isSubmitting || isUndoing}
@@ -2160,6 +2297,9 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
               onUtilityAction={(control, targetId) => handleTimedTeamActionSubmit(control, targetId || teamOptions[0]?.id, "")}
               substitutionControl={lineupUi.supportsSubstitution ? substitutionControl : null}
               onSubstitute={handleTimedTeamSubstitution}
+              timeline={timelineWithEffects}
+              currentPeriod={displayState?.period?.current || matchPhaseLabel}
+              playerStats={liveState?.player_stats}
             />
             {completedMatch ? <div className="mt-3 space-y-3"><MatchCompletionPanel presentation={completionPresentation} /><ResultCorrectionPanel match={match} completed={completedMatch} /></div> : null}
           </TallyBoardShell>
@@ -2171,6 +2311,8 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
             matchStatus={completedMatch ? "COMPLETED" : String(liveState?.match_status || match?.status || "LIVE").toUpperCase()}
             connection={connectionPresentation}
             blockingMessage={!canComposerSubmit ? (operationalReadinessMessage || blockingSessionError || (completedMatch ? "This bout is complete." : "Your current session cannot record Boxing actions.")) : ""}
+            canDeclareWinner={canDeclareWinner}
+            onDeclareWinner={() => setIsShortcutWinnerOpen(true)}
             onRefresh={handleSaveAndRefresh}
             onExit={onExit}
             recentAction={timelineWithEffects[0]
@@ -2181,7 +2323,7 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
             onUndo={requestUndoLastEvent}
             secondaryPanels={(
               <>
-                {safeDisplay.allow_timeline ? <details className="rounded-xl bg-[var(--surface-soft)] p-3"><summary className="cursor-pointer text-sm font-semibold">Timeline</summary><div className="mt-3"><LiveTimeline timelineWithEffects={timelineWithEffects} canDeleteEvents={false} isDeletingById={{}} handleDeleteEvent={() => {}} /></div></details> : null}
+                {safeDisplay.allow_timeline ? <details className="rounded-xl bg-[var(--surface-soft)] p-3"><summary className="cursor-pointer text-sm font-semibold">Timeline</summary><div className="mt-3"><LiveTimeline timelineWithEffects={timelineWithEffects} canDeleteEvents={false} isDeletingById={{}} handleDeleteEvent={() => { }} /></div></details> : null}
                 <details className="rounded-xl bg-[var(--surface-soft)] p-3"><summary className="cursor-pointer text-sm font-semibold">Rules</summary><div className="mt-3"><RulesSummaryPanel snapshot={ruleSnapshotMeta} configStatus={normalizedConfigStatus} validatedConfig={validatedConfig} rawEventConfig={configResponseSnapshot?.event_config} sportName={sportDefinition?.sport || match?.sport_name || "Boxing"} liveState={liveState} serviceOwnerLabel="" /></div></details>
                 <details className="rounded-xl bg-[var(--surface-soft)] p-3"><summary className="cursor-pointer text-sm font-semibold">Match details</summary><div className="mt-3"><MatchSummaryPanel match={match} liveState={liveState} sportProfile={sportProfile} isRoleReadOnly={isRoleReadOnly || isConfigBlocked} canWrite={canComposerSubmit} latestViolation={latestViolation} sportDefinition={validatedConfig?.sport_definition} /></div></details>
               </>
@@ -2199,164 +2341,177 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
             {completedMatch ? <div className="mt-3 space-y-3"><MatchCompletionPanel presentation={completionPresentation} /><ResultCorrectionPanel match={match} completed={completedMatch} /></div> : null}
           </TallyBoardShell>
         ) : (
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <main className="space-y-3">
-            <header className="flex flex-wrap items-start justify-between gap-3 px-1 py-2">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-cyan-700 dark:text-cyan-300">Live Scoring</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 sm:text-xl">
-                    {liveScoringSportLabel}
-                  </h1>
-                  {competitionTypeLabel && (
-                    <span className="rounded-full border border-cyan-300 bg-cyan-50 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-700 dark:border-cyan-500/40 dark:bg-cyan-500/15 dark:text-cyan-100">
-                      {competitionTypeLabel}
-                    </span>
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
+            <main className="space-y-3">
+              <header className="flex flex-wrap items-start justify-between gap-3 px-1 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-cyan-700 dark:text-cyan-300">Live Scoring</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 sm:text-xl">
+                      {liveScoringSportLabel}
+                    </h1>
+                    {competitionTypeLabel && (
+                      <span className="rounded-full border border-cyan-300 bg-cyan-50 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-700 dark:border-cyan-500/40 dark:bg-cyan-500/15 dark:text-cyan-100">
+                        {competitionTypeLabel}
+                      </span>
+                    )}
+                  </div>
+                  {liveScoringMatchupLabel && (
+                    <p className="mt-1 text-base font-semibold text-slate-700 dark:text-slate-200 sm:text-lg">
+                      {liveScoringMatchupLabel}
+                    </p>
+                  )}
+                  {liveScoringMetaLine && (
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      {liveScoringMetaLine}
+                    </p>
                   )}
                 </div>
-                {liveScoringMatchupLabel && (
-                  <p className="mt-1 text-base font-semibold text-slate-700 dark:text-slate-200 sm:text-lg">
-                    {liveScoringMatchupLabel}
-                  </p>
-                )}
-                {liveScoringMetaLine && (
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {liveScoringMetaLine}
-                  </p>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                  connectionPresentation.tone === "success"
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${connectionPresentation.tone === "success"
                     ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200"
                     : connectionPresentation.tone === "warning"
                       ? "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200"
                       : connectionPresentation.tone === "danger"
                         ? "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200"
                         : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                }`} role="status">
-                  <span className={`h-2 w-2 rounded-full ${connectionPresentation.tone === "success" ? "bg-emerald-500" : "bg-amber-500"}`} />
-                  {connectionPresentation.label}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleSaveAndRefresh}
-                  className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-[var(--surface)]"
-                >
-                  Refresh
-                </button>
-                <button
-                  type="button"
-                  onClick={onExit}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-                >
-                  Exit
-                </button>
-              </div>
-            </header>
+                    }`} role="status">
+                    <span className={`h-2 w-2 rounded-full ${connectionPresentation.tone === "success" ? "bg-emerald-500" : "bg-amber-500"}`} />
+                    {connectionPresentation.label}
+                  </span>
+                  {canDeclareWinner && (
+                    <button
+                      type="button"
+                      onClick={() => setIsShortcutWinnerOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-500/20 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
+                    >
+                      <Trophy className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                      Declare Winner
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleSaveAndRefresh}
+                    className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-[var(--surface)]"
+                  >
+                    Refresh
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onExit}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                  >
+                    Exit
+                  </button>
+                </div>
+              </header>
 
-            {safeDisplay.allow_scoreboard && (isHeadToHeadLike || isCombatMode) && (
-              <div className="py-3 sm:py-5">
-                <ScoreboardDisplay
-                  match={match}
-                  sportProfile={sportProfile}
-                  matchPhaseLabel={matchPhaseLabel}
-                  presentation={scoreboardPresentation}
-                  team1LiveScore={team1LiveScore}
-                  team2LiveScore={team2LiveScore}
-                  winnerTeamId={asInt(liveState?.match_result?.winner_team_id) || asInt(match?.winner_team_id)}
-                  isClockEnabled={isClockEnabled}
-                  clockValue={formatClock(effectiveGameClockSeconds)}
-                  clockRunning={isGameClockRunning}
-                  clockMilliseconds={effectiveGameClockMilliseconds}
-                  clockControls={primaryClockControls}
-                  onClockControlSubmit={handleClockControlSubmit}
-                  getClockControlDisabledReason={quickControlDisabledReason}
-                  isPeriodEnabled={isPeriodEnabled}
-                  sportStateMode={sportStateMode}
-                  sportStateLabel={sportStateLabel}
-                  sportStateTeamId={sportStateTeamId}
-                  onStateOverrideApply={(teamId) =>
-                    handleStateOverrideApply({
-                      teamId,
-                      control: stateOverrideControl,
-                      label: sportStateLabel,
-                      source: "scoreboard",
-                    })
-                  }
-                  isApplyingStateOverride={isApplyingStateOverride}
-                  canApplyStateOverride={Boolean(canComposerSubmit && stateOverrideControl)}
-                  teamOptions={teamOptions}
-                  secondaryClock={secondaryClockConfig.enabled && canComposerSubmit ? {
-                    config: secondaryClockConfig,
-                    state: secondaryClockState,
-                    suggestion: secondaryClockSuggestion,
-                    disabled: secondaryClockDisabled,
-                    disabledReason: secondaryClockDisabledReason,
-                    onStart: handleSecondaryClockStart,
-                    onPause: handleSecondaryClockPause,
-                    onResetDefault: () => applySecondaryClockReset(secondaryClockConfig.defaultSeconds, "Full reset"),
-                    onResetAlternate: () => applySecondaryClockReset(secondaryClockConfig.alternateSeconds, "Short reset"),
-                    onAdjust: handleSecondaryClockAdjust,
-                    onApplySuggestion: () => applySecondaryClockReset(
-                      secondaryClockSuggestion?.seconds,
-                      secondaryClockSuggestion?.reason || "Suggested reset applied"
-                    ),
-                    onDismissSuggestion: () => setSecondaryClockSuggestion(null),
-                  } : null}
+              {safeDisplay.allow_scoreboard && (isHeadToHeadLike || isCombatMode) && (
+                <div className="py-3 sm:py-5">
+                  <ScoreboardDisplay
+                    match={match}
+                    sportProfile={sportProfile}
+                    matchPhaseLabel={matchPhaseLabel}
+                    presentation={scoreboardPresentation}
+                    team1LiveScore={team1LiveScore}
+                    team2LiveScore={team2LiveScore}
+                    winnerTeamId={asInt(liveState?.match_result?.winner_team_id) || asInt(match?.winner_team_id)}
+                    isClockEnabled={isClockEnabled}
+                    clockValue={formatClock(effectiveGameClockSeconds)}
+                    clockRunning={isGameClockRunning}
+                    clockMilliseconds={effectiveGameClockMilliseconds}
+                    clockControls={primaryClockControls}
+                    onClockControlSubmit={handleClockControlSubmit}
+                    getClockControlDisabledReason={quickControlDisabledReason}
+                    isPeriodEnabled={isPeriodEnabled}
+                    sportStateMode={sportStateMode}
+                    sportStateLabel={sportStateLabel}
+                    sportStateTeamId={sportStateTeamId}
+                    onStateOverrideApply={(teamId) =>
+                      handleStateOverrideApply({
+                        teamId,
+                        control: stateOverrideControl,
+                        label: sportStateLabel,
+                        source: "scoreboard",
+                      })
+                    }
+                    isApplyingStateOverride={isApplyingStateOverride}
+                    canApplyStateOverride={Boolean(canComposerSubmit && stateOverrideControl)}
+                    teamOptions={teamOptions}
+                    sportKey={sportKey}
+                    timeline={timelineWithEffects}
+                    participants={timedTeamParticipants}
+                    playerStats={liveState?.player_stats}
+                    secondaryClock={secondaryClockConfig.enabled && canComposerSubmit ? {
+                      config: secondaryClockConfig,
+                      state: secondaryClockState,
+                      suggestion: secondaryClockSuggestion,
+                      disabled: secondaryClockDisabled,
+                      disabledReason: secondaryClockDisabledReason,
+                      onStart: handleSecondaryClockStart,
+                      onPause: handleSecondaryClockPause,
+                      onResetDefault: () => applySecondaryClockReset(secondaryClockConfig.defaultSeconds, "Full reset"),
+                      onResetAlternate: () => applySecondaryClockReset(secondaryClockConfig.alternateSeconds, "Short reset"),
+                      onAdjust: handleSecondaryClockAdjust,
+                      onApplySuggestion: () => applySecondaryClockReset(
+                        secondaryClockSuggestion?.seconds,
+                        secondaryClockSuggestion?.reason || "Suggested reset applied"
+                      ),
+                      onDismissSuggestion: () => setSecondaryClockSuggestion(null),
+                    } : null}
+                  />
+                </div>
+              )}
+
+              {specializedEngineType && (
+                <SpecializedScoringPanel
+                  engineType={specializedEngineType}
+                  config={validatedConfig}
+                  liveState={liveState}
+                  participants={participantRowsForResultMode}
+                  canWrite={canComposerSubmit && !completedMatch}
+                  isSubmitting={isSubmitting || isUndoing}
+                  onSubmit={handleSpecializedEventRequest}
                 />
-              </div>
-            )}
+              )}
 
-            {!completedMatch && specializedEngineType && (
-              <SpecializedScoringPanel
-                engineType={specializedEngineType}
-                config={validatedConfig}
-                liveState={liveState}
-                participants={participantRowsForResultMode}
-                canWrite={canComposerSubmit}
-                isSubmitting={isSubmitting || isUndoing}
-                onSubmit={handleSpecializedEventRequest}
-              />
-            )}
+              {completedMatch ? (
+                <ResultCorrectionPanel match={match} completed={completedMatch} />
+              ) : null}
 
-            {completedMatch ? (
-              <ResultCorrectionPanel match={match} completed={completedMatch} />
-            ) : null}
-
-            {completedMatch ? (
-              <MatchCompletionPanel presentation={completionPresentation} />
-            ) : hasDedicatedSpecializedEntry ? null : isHeadToHeadLike ? (
-              <div className="grid gap-3">
-                {completedMatch ? (
-                  null
-                ) : isRoleReadOnly ? (
-                  <p className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
-                    Live score is available in read-only mode.
-                  </p>
-                ) : !canComposerSubmit ? (
-                  <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
-                    {isConfigBlocked
-                      ? "The Match rules are not ready for live scoring. Review and approve the rule profile before continuing."
-                      : "Scoring is not available for the current Match status."}
-                  </p>
-                ) : (
-                  <>
-                    {teamOptions.length > 0 && resolvedParticipants.some((participant) => participant.members.length > 0) ? (
-                      <ParticipantPlayerStrip
-                        participants={timedTeamParticipants}
-                        selectedTeamId={formState.selectedTeamId}
-                        selectedPlayerId={formState.selectedPlayerId}
-                        onSelectPlayer={({ teamId, playerId }) => {
-                          formActions.setSelectedTeamId(String(teamId));
-                          formActions.setSelectedPlayerId(String(playerId));
-                        }}
-                        substitutionControl={lineupUi.supportsSubstitution ? substitutionControl : null}
-                        onSubstitute={handleTimedTeamSubstitution}
-                        disabled={!canComposerSubmit || isSubmitting || isUndoing}
-                      />
-                    ) : null}
-                    {/* Legacy global participant/player selector retained temporarily for reference.
+              {completedMatch ? (
+                <MatchCompletionPanel presentation={completionPresentation} />
+              ) : hasDedicatedSpecializedEntry ? null : isHeadToHeadLike ? (
+                <div className="grid gap-3">
+                  {completedMatch ? (
+                    null
+                  ) : isRoleReadOnly ? (
+                    <p className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
+                      Live score is available in read-only mode.
+                    </p>
+                  ) : !canComposerSubmit ? (
+                    <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
+                      {isConfigBlocked
+                        ? "The Match rules are not ready for live scoring. Review and approve the rule profile before continuing."
+                        : "Scoring is not available for the current Match status."}
+                    </p>
+                  ) : (
+                    <>
+                      {teamOptions.length > 0 && resolvedParticipants.some((participant) => participant.members.length > 0) ? (
+                        <ParticipantPlayerStrip
+                          participants={timedTeamParticipants}
+                          selectedTeamId={formState.selectedTeamId}
+                          selectedPlayerId={formState.selectedPlayerId}
+                          onSelectPlayer={({ teamId, playerId }) => {
+                            formActions.setSelectedTeamId(String(teamId));
+                            formActions.setSelectedPlayerId(String(playerId));
+                          }}
+                          substitutionControl={lineupUi.supportsSubstitution ? substitutionControl : null}
+                          onSubstitute={handleTimedTeamSubstitution}
+                          disabled={!canComposerSubmit || isSubmitting || isUndoing}
+                        />
+                      ) : null}
+                      {/* Legacy global participant/player selector retained temporarily for reference.
                       <section className="border-b border-[var(--border-soft)] pb-4" aria-labelledby="action-player-title">
                         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] sm:items-end">
                           <div>
@@ -2388,517 +2543,514 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
                         </p>
                       </section>
                     */}
-                    <SportActionPanel
-                      config={validatedConfig}
-                      sportCode={scoringSportCode}
-                      participants={scoringParticipants}
-                      selectedParticipantId={formState.selectedTeamId}
-                      selectedPlayerId={formState.selectedPlayerId}
-                      selectedPlayerLabel={formState.selectedPlayerId
-                        ? selectedParticipant?.members?.find((player) => Number(player.playerId) === Number(formState.selectedPlayerId))?.displayName || ""
-                        : ""}
-                      canWrite={canComposerSubmit}
-                      isSubmitting={isSubmitting || isUndoing}
-                      getDisabledReason={quickControlDisabledReason}
-                      onAction={handleSportActionRequest}
-                      onOpenDetailedControls={openDetailedControls}
-                    />
-                  </>
-                )}
-                {showDetailedComposer && detailedValidatedConfig && !completedMatch && !isRoleReadOnly && !normalizeSportKey(sportKey || "").includes("volleyball") && !normalizeSportKey(sportKey || "").includes("takraw") ? (
-                  <details open className="rounded-2xl bg-[var(--surface-soft)] p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-[var(--text-main)]">Player and substitution controls</summary>
-                    <div className="mt-3">
-                  <ComposerUI
-                    embedded
-                    validatedConfig={detailedValidatedConfig}
-                    isLoading={isLoading}
-                    selectedControlId={selectedControlId}
-                    handleControlSelect={formActions.handleControlSelect}
-                    selectedControl={selectedControl}
-                    selectedEventDefinition={selectedEventDefinition}
-                    uiRules={uiRules}
-                    teamOptions={teamOptions}
-                    playerOptions={playerOptions}
-                    isRosterLoading={isRosterLoading}
-                    formState={formState}
-                    formActions={formActions}
-                    handleSubmitEvent={handleSubmitEvent}
-                    isSubmitting={isSubmitting}
-                    canWrite={canComposerSubmit}
-                    isRoleReadOnly={isRoleReadOnly || isConfigBlocked}
-                    quickControlDisabledReason={quickControlDisabledReason}
-                    configStatus={normalizedConfigStatus}
-                    safeModeResponse={safeModePayload}
-                    onRefreshConfig={handleRefreshConfig}
-                    onReloadState={handleRefreshLiveState}
-                    lineupUi={lineupUi}
-                    sportStateMode={sportStateMode}
-                    sportStateTeamId={sportStateTeamId}
-                    scoringMode={scoringMode}
-                    sportKey={sportKey}
-                    participantState={participantState}
-                    rosterByTeamId={rosterByTeamId}
-                    participantUnitType={participantUnitType}
-                    recentEventTypes={recentEventTypes}
-                    suggestedActionPreferenceKey={suggestedActionPreferenceKey}
-                    onStateOverrideApply={handleStateOverrideApply}
-                    pendingStateSuggestion={pendingStateSuggestion}
-                    onApplyPendingStateSuggestion={applyPendingStateSuggestion}
-                    onDismissPendingStateSuggestion={dismissPendingStateSuggestion}
-                    isApplyingStateOverride={isApplyingStateOverride}
-                    substitutionControl={substitutionControl}
-                    onPrepareSubstitution={handlePrepareSubstitution}
-                    handleUndoLastEvent={requestUndoLastEvent}
-                    canUndoEvents={canUndoEvents}
-                    isUndoing={isUndoing}
-                    eventCount={liveState?.event_count}
-                  />
+                      <SportActionPanel
+                        config={validatedConfig}
+                        sportCode={scoringSportCode}
+                        participants={scoringParticipants}
+                        selectedParticipantId={formState.selectedTeamId}
+                        selectedPlayerId={formState.selectedPlayerId}
+                        selectedPlayerLabel={formState.selectedPlayerId
+                          ? selectedParticipant?.members?.find((player) => Number(player.playerId) === Number(formState.selectedPlayerId))?.displayName || ""
+                          : ""}
+                        canWrite={canComposerSubmit}
+                        isSubmitting={isSubmitting || isUndoing}
+                        getDisabledReason={quickControlDisabledReason}
+                        onAction={handleSportActionRequest}
+                        onOpenDetailedControls={openDetailedControls}
+                        isSoloSport={isSoloSport}
+                      />
+                    </>
+                  )}
+                  {showDetailedComposer && detailedValidatedConfig && !completedMatch && !isRoleReadOnly && !isSoloSport && !normalizeSportKey(sportKey || "").includes("volleyball") && !normalizeSportKey(sportKey || "").includes("takraw") && !normalizeSportKey(sportKey || "").includes("badminton") ? (
+                    <details open className="rounded-2xl bg-[var(--surface-soft)] p-3">
+                      <summary className="cursor-pointer text-sm font-semibold text-[var(--text-main)]">Player and substitution controls</summary>
+                      <div className="mt-3">
+                        <ComposerUI
+                          embedded
+                          validatedConfig={detailedValidatedConfig}
+                          isLoading={isLoading}
+                          selectedControlId={selectedControlId}
+                          handleControlSelect={formActions.handleControlSelect}
+                          selectedControl={selectedControl}
+                          selectedEventDefinition={selectedEventDefinition}
+                          uiRules={uiRules}
+                          teamOptions={teamOptions}
+                          playerOptions={playerOptions}
+                          isRosterLoading={isRosterLoading}
+                          formState={formState}
+                          formActions={formActions}
+                          handleSubmitEvent={handleSubmitEvent}
+                          isSubmitting={isSubmitting}
+                          canWrite={canComposerSubmit}
+                          isRoleReadOnly={isRoleReadOnly || isConfigBlocked}
+                          quickControlDisabledReason={quickControlDisabledReason}
+                          configStatus={normalizedConfigStatus}
+                          safeModeResponse={safeModePayload}
+                          onRefreshConfig={handleRefreshConfig}
+                          onReloadState={handleRefreshLiveState}
+                          lineupUi={lineupUi}
+                          sportStateMode={sportStateMode}
+                          sportStateTeamId={sportStateTeamId}
+                          scoringMode={scoringMode}
+                          sportKey={sportKey}
+                          participantState={participantState}
+                          rosterByTeamId={rosterByTeamId}
+                          participantUnitType={participantUnitType}
+                          recentEventTypes={recentEventTypes}
+                          suggestedActionPreferenceKey={suggestedActionPreferenceKey}
+                          onStateOverrideApply={handleStateOverrideApply}
+                          pendingStateSuggestion={pendingStateSuggestion}
+                          onApplyPendingStateSuggestion={applyPendingStateSuggestion}
+                          onDismissPendingStateSuggestion={dismissPendingStateSuggestion}
+                          isApplyingStateOverride={isApplyingStateOverride}
+                          substitutionControl={substitutionControl}
+                          onPrepareSubstitution={handlePrepareSubstitution}
+                          handleUndoLastEvent={requestUndoLastEvent}
+                          canUndoEvents={canUndoEvents}
+                          isUndoing={isUndoing}
+                          eventCount={liveState?.event_count}
+                          isSoloSport={isSoloSport}
+                        />
+                      </div>
+                    </details>
+                  ) : null}
+                </div>
+              ) : (
+                <>
+                  <div className="rounded-2xl border border-slate-200 bg-white/85 p-3.5 shadow-md shadow-slate-300/30 dark:border-slate-700/80 dark:bg-slate-950/60 dark:shadow-lg dark:shadow-slate-950/25">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2.5 dark:border-slate-800">
+                      <div>
+                        <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100">
+                          <span>{isCombatMode ? "Combat Console" : isMultiParticipantResultMode ? "Result Entry Mode" : "Board Game Mode"}</span>
+                          {isCombatMode && (
+                            <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-extrabold uppercase text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-200">
+                              {matchPhaseLabel || "Round"}
+                            </span>
+                          )}
+                        </h3>
+                        <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
+                          {isCombatMode
+                            ? "Ringside operator console with corner-targeted actions, round advance, and stoppage controls."
+                            : isMultiParticipantResultMode
+                              ? "This sport uses result-entry flow. Team-vs-team controls are hidden by design."
+                              : "Sport-specific action mode is active. Lineup and possession controls are hidden for this profile."}
+                        </p>
+                      </div>
                     </div>
-                  </details>
-                ) : null}
-              </div>
-            ) : (
-              <>
-                <div className="rounded-2xl border border-slate-200 bg-white/85 p-3.5 shadow-md shadow-slate-300/30 dark:border-slate-700/80 dark:bg-slate-950/60 dark:shadow-lg dark:shadow-slate-950/25">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2.5 dark:border-slate-800">
-                    <div>
-                      <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100">
-                        <span>{isCombatMode ? "Combat Console" : isMultiParticipantResultMode ? "Result Entry Mode" : "Board Game Mode"}</span>
-                        {isCombatMode && (
-                          <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-extrabold uppercase text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-200">
-                            {matchPhaseLabel || "Round"}
-                          </span>
-                        )}
-                      </h3>
-                      <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
-                        {isCombatMode
-                          ? "Ringside operator console with corner-targeted actions, round advance, and stoppage controls."
-                          : isMultiParticipantResultMode
-                          ? "This sport uses result-entry flow. Team-vs-team controls are hidden by design."
-                          : "Sport-specific action mode is active. Lineup and possession controls are hidden for this profile."}
-                      </p>
-                    </div>
-                  </div>
 
-                  {isCombatMode && participantRowsForResultMode.length >= 2 ? (
-                    <div className="mt-3 space-y-3">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {/* RED CORNER (Side 1) */}
-                        {(() => {
-                          const red = participantRowsForResultMode[0];
-                          const redStats = liveState?.team_stats?.[String(red?.teamId)] || {};
-                          const redKnockdowns = Number(redStats?.KNOCKDOWN || 0);
-                          const redWarnings = Number(redStats?.WARNING || 0);
-                          return (
-                            <div className="rounded-xl border border-red-300/80 bg-red-50/40 p-3 dark:border-red-800/50 dark:bg-red-950/20">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="rounded-full bg-red-600 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
-                                  Red Corner
-                                </span>
-                                <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                                  <span>KD: <strong className="font-mono text-red-600 dark:text-red-400">{redKnockdowns}</strong></span>
-                                  <span>Warn: <strong className="font-mono text-amber-600 dark:text-amber-400">{redWarnings}</strong></span>
+                    {isCombatMode && participantRowsForResultMode.length >= 2 ? (
+                      <div className="mt-3 space-y-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {/* RED CORNER (Side 1) */}
+                          {(() => {
+                            const red = participantRowsForResultMode[0];
+                            const redStats = liveState?.team_stats?.[String(red?.teamId)] || {};
+                            const redKnockdowns = Number(redStats?.KNOCKDOWN || 0);
+                            const redWarnings = Number(redStats?.WARNING || 0);
+                            return (
+                              <div className="rounded-xl border border-red-300/80 bg-red-50/40 p-3 dark:border-red-800/50 dark:bg-red-950/20">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="rounded-full bg-red-600 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                                    Red Corner
+                                  </span>
+                                  <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                                    <span>KD: <strong className="font-mono text-red-600 dark:text-red-400">{redKnockdowns}</strong></span>
+                                    <span>Warn: <strong className="font-mono text-amber-600 dark:text-amber-400">{redWarnings}</strong></span>
+                                  </div>
                                 </div>
-                              </div>
-                              <p className="mt-2 text-sm font-bold text-slate-900 dark:text-slate-100">{red.label}</p>
-                              {Array.isArray(red.activePlayers) && red.activePlayers.length > 0 && (
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                  Athlete: {red.activePlayers.map((p) => String(p?.name || `#${p?.id || "-"}`)).join(", ")}
-                                </p>
-                              )}
+                                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-slate-100">{red.label}</p>
+                                {Array.isArray(red.activePlayers) && red.activePlayers.length > 0 && (
+                                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    Athlete: {red.activePlayers.map((p) => String(p?.name || `#${p?.id || "-"}`)).join(", ")}
+                                  </p>
+                                )}
 
-                              <div className="mt-3 grid grid-cols-2 gap-1.5">
-                                {modeActionControls
-                                  .filter((c) => ["KNOCKDOWN", "WARNING", "ROUND_WARNING", "ROUND_WIN", "PUNCH"].includes(String(c.event_type || "").toUpperCase()))
-                                  .slice(0, 4)
-                                  .map((control) => {
-                                    const disabled = !canComposerSubmit || isSubmitting || isUndoing || control?.enabled === false;
-                                    const isKnockdown = String(control.event_type).toUpperCase() === "KNOCKDOWN";
-                                    const isRoundWin = String(control.event_type).toUpperCase() === "ROUND_WIN";
-                                    return (
-                                      <button
-                                        key={`red-${control.id || control.event_type}`}
-                                        type="button"
-                                        disabled={disabled}
-                                        onClick={() => handleModeActionSubmit(control, red)}
-                                        className={`rounded-lg px-2.5 py-2 text-xs font-bold transition disabled:opacity-50 ${
-                                          isKnockdown
+                                <div className="mt-3 grid grid-cols-2 gap-1.5">
+                                  {modeActionControls
+                                    .filter((c) => ["KNOCKDOWN", "WARNING", "ROUND_WARNING", "ROUND_WIN", "PUNCH"].includes(String(c.event_type || "").toUpperCase()))
+                                    .slice(0, 4)
+                                    .map((control) => {
+                                      const disabled = !canComposerSubmit || isSubmitting || isUndoing || control?.enabled === false;
+                                      const isKnockdown = String(control.event_type).toUpperCase() === "KNOCKDOWN";
+                                      const isRoundWin = String(control.event_type).toUpperCase() === "ROUND_WIN";
+                                      return (
+                                        <button
+                                          key={`red-${control.id || control.event_type}`}
+                                          type="button"
+                                          disabled={disabled}
+                                          onClick={() => handleModeActionSubmit(control, red)}
+                                          className={`rounded-lg px-2.5 py-2 text-xs font-bold transition disabled:opacity-50 ${isKnockdown
                                             ? "bg-red-600 text-white hover:bg-red-500 shadow-xs"
                                             : isRoundWin
-                                            ? "bg-emerald-600 text-white hover:bg-emerald-500"
-                                            : "border border-red-200 bg-white text-red-900 hover:bg-red-100 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-200 dark:hover:bg-red-950/40"
-                                        }`}
-                                      >
-                                        {getActionDisplayLabel(control)}
-                                      </button>
-                                    );
-                                  })}
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                        {/* BLUE CORNER (Side 2) */}
-                        {(() => {
-                          const blue = participantRowsForResultMode[1];
-                          const blueStats = liveState?.team_stats?.[String(blue?.teamId)] || {};
-                          const blueKnockdowns = Number(blueStats?.KNOCKDOWN || 0);
-                          const blueWarnings = Number(blueStats?.WARNING || 0);
-                          return (
-                            <div className="rounded-xl border border-blue-300/80 bg-blue-50/40 p-3 dark:border-blue-800/50 dark:bg-blue-950/20">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="rounded-full bg-blue-600 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
-                                  Blue Corner
-                                </span>
-                                <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                                  <span>KD: <strong className="font-mono text-blue-600 dark:text-blue-400">{blueKnockdowns}</strong></span>
-                                  <span>Warn: <strong className="font-mono text-amber-600 dark:text-amber-400">{blueWarnings}</strong></span>
+                                              ? "bg-emerald-600 text-white hover:bg-emerald-500"
+                                              : "border border-red-200 bg-white text-red-900 hover:bg-red-100 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-200 dark:hover:bg-red-950/40"
+                                            }`}
+                                        >
+                                          {getActionDisplayLabel(control)}
+                                        </button>
+                                      );
+                                    })}
                                 </div>
                               </div>
-                              <p className="mt-2 text-sm font-bold text-slate-900 dark:text-slate-100">{blue.label}</p>
-                              {Array.isArray(blue.activePlayers) && blue.activePlayers.length > 0 && (
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                  Athlete: {blue.activePlayers.map((p) => String(p?.name || `#${p?.id || "-"}`)).join(", ")}
-                                </p>
-                              )}
+                            );
+                          })()}
 
-                              <div className="mt-3 grid grid-cols-2 gap-1.5">
-                                {modeActionControls
-                                  .filter((c) => ["KNOCKDOWN", "WARNING", "ROUND_WARNING", "ROUND_WIN", "PUNCH"].includes(String(c.event_type || "").toUpperCase()))
-                                  .slice(0, 4)
-                                  .map((control) => {
-                                    const disabled = !canComposerSubmit || isSubmitting || isUndoing || control?.enabled === false;
-                                    const isKnockdown = String(control.event_type).toUpperCase() === "KNOCKDOWN";
-                                    const isRoundWin = String(control.event_type).toUpperCase() === "ROUND_WIN";
-                                    return (
-                                      <button
-                                        key={`blue-${control.id || control.event_type}`}
-                                        type="button"
-                                        disabled={disabled}
-                                        onClick={() => handleModeActionSubmit(control, blue)}
-                                        className={`rounded-lg px-2.5 py-2 text-xs font-bold transition disabled:opacity-50 ${
-                                          isKnockdown
+                          {/* BLUE CORNER (Side 2) */}
+                          {(() => {
+                            const blue = participantRowsForResultMode[1];
+                            const blueStats = liveState?.team_stats?.[String(blue?.teamId)] || {};
+                            const blueKnockdowns = Number(blueStats?.KNOCKDOWN || 0);
+                            const blueWarnings = Number(blueStats?.WARNING || 0);
+                            return (
+                              <div className="rounded-xl border border-blue-300/80 bg-blue-50/40 p-3 dark:border-blue-800/50 dark:bg-blue-950/20">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="rounded-full bg-blue-600 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                                    Blue Corner
+                                  </span>
+                                  <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                                    <span>KD: <strong className="font-mono text-blue-600 dark:text-blue-400">{blueKnockdowns}</strong></span>
+                                    <span>Warn: <strong className="font-mono text-amber-600 dark:text-amber-400">{blueWarnings}</strong></span>
+                                  </div>
+                                </div>
+                                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-slate-100">{blue.label}</p>
+                                {Array.isArray(blue.activePlayers) && blue.activePlayers.length > 0 && (
+                                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    Athlete: {blue.activePlayers.map((p) => String(p?.name || `#${p?.id || "-"}`)).join(", ")}
+                                  </p>
+                                )}
+
+                                <div className="mt-3 grid grid-cols-2 gap-1.5">
+                                  {modeActionControls
+                                    .filter((c) => ["KNOCKDOWN", "WARNING", "ROUND_WARNING", "ROUND_WIN", "PUNCH"].includes(String(c.event_type || "").toUpperCase()))
+                                    .slice(0, 4)
+                                    .map((control) => {
+                                      const disabled = !canComposerSubmit || isSubmitting || isUndoing || control?.enabled === false;
+                                      const isKnockdown = String(control.event_type).toUpperCase() === "KNOCKDOWN";
+                                      const isRoundWin = String(control.event_type).toUpperCase() === "ROUND_WIN";
+                                      return (
+                                        <button
+                                          key={`blue-${control.id || control.event_type}`}
+                                          type="button"
+                                          disabled={disabled}
+                                          onClick={() => handleModeActionSubmit(control, blue)}
+                                          className={`rounded-lg px-2.5 py-2 text-xs font-bold transition disabled:opacity-50 ${isKnockdown
                                             ? "bg-blue-600 text-white hover:bg-blue-500 shadow-xs"
                                             : isRoundWin
-                                            ? "bg-emerald-600 text-white hover:bg-emerald-500"
-                                            : "border border-blue-200 bg-white text-blue-900 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-slate-900 dark:text-blue-200 dark:hover:bg-blue-950/40"
-                                        }`}
-                                      >
-                                        {getActionDisplayLabel(control)}
-                                      </button>
-                                    );
-                                  })}
+                                              ? "bg-emerald-600 text-white hover:bg-emerald-500"
+                                              : "border border-blue-200 bg-white text-blue-900 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-slate-900 dark:text-blue-200 dark:hover:bg-blue-950/40"
+                                            }`}
+                                        >
+                                          {getActionDisplayLabel(control)}
+                                        </button>
+                                      );
+                                    })}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Bout / Round Advancement & Stoppage Controls */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2.5 dark:border-slate-800">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {modeActionControls
+                              .filter((c) => ["ROUND_ADVANCE", "ROUND_END"].includes(String(c.event_type || "").toUpperCase()))
+                              .map((control) => (
+                                <button
+                                  key={control.id || control.event_type}
+                                  type="button"
+                                  disabled={!canComposerSubmit || isSubmitting || isUndoing}
+                                  onClick={() => handleModeActionSubmit(control, null)}
+                                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 shadow-xs hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                                >
+                                  Advance to Next Round →
+                                </button>
+                              ))}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            {modeActionControls
+                              .filter((c) => ["KO", "TKO", "DQ_WIN", "KNOCKOUT", "TECHNICAL_KNOCKOUT"].includes(String(c.event_type || "").toUpperCase()))
+                              .map((control) => (
+                                <button
+                                  key={control.id || control.event_type}
+                                  type="button"
+                                  disabled={!canComposerSubmit || isSubmitting || isUndoing}
+                                  onClick={() => handleSportActionRequest(control, participantRowsForResultMode[0])}
+                                  className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-50 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-900/40"
+                                >
+                                  End Bout ({getActionDisplayLabel(control)})
+                                </button>
+                              ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : participantRowsForResultMode.length > 0 ? (
+                      <div className="mt-3 space-y-2">
+                        {participantRowsForResultMode.map((row) => (
+                          <div key={row.key} className="rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-900/70">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{row.label}</p>
+                              <div className="flex items-center gap-2">
+                                {isBoardGameMode ? (
+                                  <span className="text-xl font-black tabular-nums text-slate-900 dark:text-white" aria-label={`${row.label} result points`}>
+                                    {Number(row.side) === 1 ? scoreboardPresentation.score.sideA : scoreboardPresentation.score.sideB}
+                                  </span>
+                                ) : null}
+                                <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                  {sportUiProfile?.participantModel === "LANE" ? `Lane ${row.side}` : `Side ${row.side}`}
+                                </span>
                               </div>
                             </div>
-                          );
-                        })()}
-                      </div>
-
-                      {/* Bout / Round Advancement & Stoppage Controls */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2.5 dark:border-slate-800">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {modeActionControls
-                            .filter((c) => ["ROUND_ADVANCE", "ROUND_END"].includes(String(c.event_type || "").toUpperCase()))
-                            .map((control) => (
-                              <button
-                                key={control.id || control.event_type}
-                                type="button"
-                                disabled={!canComposerSubmit || isSubmitting || isUndoing}
-                                onClick={() => handleModeActionSubmit(control, null)}
-                                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 shadow-xs hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                              >
-                                Advance to Next Round →
-                              </button>
-                            ))}
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          {modeActionControls
-                            .filter((c) => ["KO", "TKO", "DQ_WIN", "KNOCKOUT", "TECHNICAL_KNOCKOUT"].includes(String(c.event_type || "").toUpperCase()))
-                            .map((control) => (
-                              <button
-                                key={control.id || control.event_type}
-                                type="button"
-                                disabled={!canComposerSubmit || isSubmitting || isUndoing}
-                                onClick={() => handleSportActionRequest(control, participantRowsForResultMode[0])}
-                                className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-50 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-900/40"
-                              >
-                                End Bout ({getActionDisplayLabel(control)})
-                              </button>
-                            ))}
-                        </div>
-                      </div>
-                    </div>
-                  ) : participantRowsForResultMode.length > 0 ? (
-                    <div className="mt-3 space-y-2">
-                      {participantRowsForResultMode.map((row) => (
-                        <div key={row.key} className="rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-900/70">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{row.label}</p>
-                            <div className="flex items-center gap-2">
-                              {isBoardGameMode ? (
-                                <span className="text-xl font-black tabular-nums text-slate-900 dark:text-white" aria-label={`${row.label} result points`}>
-                                  {Number(row.side) === 1 ? scoreboardPresentation.score.sideA : scoreboardPresentation.score.sideB}
-                                </span>
-                              ) : null}
-                              <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                                {sportUiProfile?.participantModel === "LANE" ? `Lane ${row.side}` : `Side ${row.side}`}
-                              </span>
-                            </div>
+                            {Array.isArray(row.activePlayers) && row.activePlayers.length > 0 && (
+                              <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                                Active: {row.activePlayers.map((p) => String(p?.name || `#${p?.id || "-"}`)).join(", ")}
+                              </p>
+                            )}
                           </div>
-                          {Array.isArray(row.activePlayers) && row.activePlayers.length > 0 && (
-                            <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-                              Active: {row.activePlayers.map((p) => String(p?.name || `#${p?.id || "-"}`)).join(", ")}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-                      Result-entry layout is available, but this sport needs participant/heat data to enable full scoring.
-                    </div>
-                  )}
-
-                  {!isCombatMode && modeActionControls.length > 0 ? (
-                    <div className="mt-3">
-                      <p className="mb-1 text-xs font-semibold tracking-wide text-slate-600 dark:text-slate-400">Quick Actions</p>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {modeActionControls.slice(0, 8).flatMap((control) => {
-                          const disabled = !canComposerSubmit || isSubmitting || isUndoing || control?.enabled === false;
-                          const label = getActionDisplayLabel(control);
-                          const tooltip = getActionTooltip(control);
-                          const targets = isBoardGameMode && control?.requires_team
-                            ? participantRowsForResultMode
-                            : [participantRowsForResultMode[0]];
-                          return targets.map((target) => (
-                            <button
-                              key={`${String(control?.id || control?.event_type)}-${target?.teamId || "match"}`}
-                              type="button"
-                              disabled={disabled}
-                              title={tooltip}
-                              onClick={() => handleModeActionSubmit(control, target)}
-                              className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-left text-xs font-semibold text-slate-700 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-slate-500"
-                            >
-                              {label}{isBoardGameMode && control?.requires_team && target?.label ? `: ${target.label}` : ""}
-                            </button>
-                          ));
-                        })}
+                        ))}
                       </div>
-                    </div>
-                  ) : null}
-                </div>
-                {!isMultiParticipantResultMode && (
-                  <ComposerUI
-                    validatedConfig={validatedConfig}
-                    isLoading={isLoading}
-                    selectedControlId={selectedControlId}
-                    handleControlSelect={formActions.handleControlSelect}
-                    selectedControl={selectedControl}
-                    selectedEventDefinition={selectedEventDefinition}
-                    uiRules={uiRules}
-                    teamOptions={teamOptions}
-                    playerOptions={playerOptions}
-                    isRosterLoading={isRosterLoading}
-                    formState={formState}
-                    formActions={formActions}
-                    handleSubmitEvent={handleSubmitEvent}
-                    isSubmitting={isSubmitting}
-                    canWrite={canComposerSubmit}
-                    isRoleReadOnly={isRoleReadOnly || isConfigBlocked}
-                    quickControlDisabledReason={quickControlDisabledReason}
-                    configStatus={normalizedConfigStatus}
-                    safeModeResponse={safeModePayload}
-                    onRefreshConfig={handleRefreshConfig}
-                    onReloadState={handleRefreshLiveState}
-                    lineupUi={lineupUi}
-                    sportStateMode={sportStateMode}
-                    sportStateTeamId={sportStateTeamId}
-                    scoringMode={scoringMode}
-                    sportKey={sportKey}
-                    participantState={participantState}
-                    rosterByTeamId={rosterByTeamId}
-                    participantUnitType={participantUnitType}
-                    recentEventTypes={recentEventTypes}
-                    suggestedActionPreferenceKey={suggestedActionPreferenceKey}
-                    onStateOverrideApply={handleStateOverrideApply}
-                    pendingStateSuggestion={pendingStateSuggestion}
-                    onApplyPendingStateSuggestion={applyPendingStateSuggestion}
-                    onDismissPendingStateSuggestion={dismissPendingStateSuggestion}
-                    isApplyingStateOverride={isApplyingStateOverride}
-                    substitutionControl={substitutionControl}
-                    onPrepareSubstitution={handlePrepareSubstitution}
-                    handleUndoLastEvent={requestUndoLastEvent}
-                    canUndoEvents={canUndoEvents}
-                    isUndoing={isUndoing}
-                    eventCount={liveState?.event_count}
-                  />
-                )}
-              </>
-            )}
-
-            {(isHeadToHeadLike || isCombatMode) && (!specializedEngineType || statisticsPresentation.aggregate) && (
-              <section className="border-t border-[var(--border-soft)] pt-4" aria-labelledby="performance-title">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 id="performance-title" className="text-base font-semibold text-[var(--text-main)]">Performance</h2>
-                  <div className="inline-flex rounded-lg border border-slate-300 bg-slate-100/80 p-0.5 dark:border-slate-700 dark:bg-slate-900/70">
-                    {statisticsPresentation.aggregate ? <button
-                      type="button"
-                      onClick={() => setStatsViewMode("team")}
-                      className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
-                        statsViewMode === "team"
-                          ? "bg-cyan-500/20 text-cyan-800 dark:text-cyan-100"
-                          : "text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
-                      }`}
-                    >
-                      {statisticsPresentation.aggregate}
-                    </button> : null}
-                    {statisticsPresentation.individual && !specializedEngineType ? <button
-                      type="button"
-                      onClick={() => setStatsViewMode("player")}
-                      className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
-                        statsViewMode === "player"
-                          ? "bg-cyan-500/20 text-cyan-800 dark:text-cyan-100"
-                          : "text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
-                      }`}
-                    >
-                      {statisticsPresentation.individual}
-                    </button> : null}
-                  </div>
-                </div>
-
-                {statsViewMode === "team" || Boolean(specializedEngineType) ? (
-                  teamStatsTableRows.length > 0 ? (
-                    <div className="mt-2 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800/80">
-                      <table className="min-w-full text-sm text-slate-700 dark:text-slate-200">
-                        <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/80 dark:text-slate-400">
-                          <tr>
-                            <th className="px-3 py-2 text-left font-semibold">Metric</th>
-                            {teamOptions.map((teamOption) => (
-                              <th key={`team-stats-head-${teamOption.id}`} className="px-3 py-2 text-right font-semibold" title={teamOption.name}>
-                                {getShortTeamName(teamOption.name)}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {teamStatsTableRows.map((row) => (
-                            <tr key={`team-stats-row-${row.key}`} className="border-t border-slate-200 dark:border-slate-800/70">
-                              <td className="px-3 py-2 text-left text-slate-700 dark:text-slate-300">{row.label}</td>
-                              {teamOptions.map((teamOption) => (
-                                <td key={`team-stats-value-${row.key}-${teamOption.id}`} className="px-3 py-2 text-right font-mono">
-                                  {Number(row.values?.[String(teamOption.id)] || 0)}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">No team stats available yet.</p>
-                  )
-                ) : (
-                  <>
-                    {teamOptions.length > 1 && (
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        {teamOptions.map((teamOption) => {
-                          const isActive = Number(teamOption.id) === Number(activePlayerStatsTeamId || 0);
-                          return (
-                            <button
-                              key={`player-stats-team-toggle-${teamOption.id}`}
-                              type="button"
-                              title={teamOption.name}
-                              onClick={() => setPlayerStatsTeamFilterId(String(teamOption.id))}
-                              className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
-                                isActive
-                                  ? "border-cyan-500/70 bg-cyan-500/20 text-cyan-800 dark:text-cyan-100"
-                                  : "border-slate-300 bg-white text-slate-700 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-500"
-                              }`}
-                            >
-                              {getShortTeamName(teamOption.name)}
-                            </button>
-                          );
-                        })}
+                    ) : (
+                      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                        Result-entry layout is available, but this sport needs participant/heat data to enable full scoring.
                       </div>
                     )}
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <p className="text-xs text-slate-600 dark:text-slate-400">
-                        {showAllPlayerStatRows
-                          ? `Showing all players (${playerStatsRowsWithRoster.length})`
-                          : `Showing players with activity (${playerStatsRowsCollapsed.length})`}
-                      </p>
-                      {playerStatsRowsWithRoster.length > playerStatsRowsCollapsed.length && (
-                        <button
-                          type="button"
-                          onClick={() => setShowAllPlayerStatRows((current) => !current)}
-                          className="text-xs font-semibold text-cyan-700 underline underline-offset-2 hover:text-cyan-600 dark:text-cyan-300 dark:hover:text-cyan-200"
-                        >
-                          {showAllPlayerStatRows ? "Show less players" : "Show all players"}
-                        </button>
+
+                    {!isCombatMode && modeActionControls.length > 0 ? (
+                      <div className="mt-3">
+                        <p className="mb-1 text-xs font-semibold tracking-wide text-slate-600 dark:text-slate-400">Quick Actions</p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {modeActionControls.slice(0, 8).flatMap((control) => {
+                            const disabled = !canComposerSubmit || isSubmitting || isUndoing || control?.enabled === false;
+                            const label = getActionDisplayLabel(control);
+                            const tooltip = getActionTooltip(control);
+                            const targets = isBoardGameMode && control?.requires_team
+                              ? participantRowsForResultMode
+                              : [participantRowsForResultMode[0]];
+                            return targets.map((target) => (
+                              <button
+                                key={`${String(control?.id || control?.event_type)}-${target?.teamId || "match"}`}
+                                type="button"
+                                disabled={disabled}
+                                title={tooltip}
+                                onClick={() => handleModeActionSubmit(control, target)}
+                                className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-left text-xs font-semibold text-slate-700 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:border-slate-500"
+                              >
+                                {label}{isBoardGameMode && control?.requires_team && target?.label ? `: ${target.label}` : ""}
+                              </button>
+                            ));
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                  {!isMultiParticipantResultMode && (
+                    <ComposerUI
+                      validatedConfig={validatedConfig}
+                      isLoading={isLoading}
+                      selectedControlId={selectedControlId}
+                      handleControlSelect={formActions.handleControlSelect}
+                      selectedControl={selectedControl}
+                      selectedEventDefinition={selectedEventDefinition}
+                      uiRules={uiRules}
+                      teamOptions={teamOptions}
+                      playerOptions={playerOptions}
+                      isRosterLoading={isRosterLoading}
+                      formState={formState}
+                      formActions={formActions}
+                      handleSubmitEvent={handleSubmitEvent}
+                      isSubmitting={isSubmitting}
+                      canWrite={canComposerSubmit}
+                      isRoleReadOnly={isRoleReadOnly || isConfigBlocked}
+                      quickControlDisabledReason={quickControlDisabledReason}
+                      configStatus={normalizedConfigStatus}
+                      safeModeResponse={safeModePayload}
+                      onRefreshConfig={handleRefreshConfig}
+                      onReloadState={handleRefreshLiveState}
+                      lineupUi={lineupUi}
+                      sportStateMode={sportStateMode}
+                      sportStateTeamId={sportStateTeamId}
+                      scoringMode={scoringMode}
+                      sportKey={sportKey}
+                      participantState={participantState}
+                      rosterByTeamId={rosterByTeamId}
+                      participantUnitType={participantUnitType}
+                      recentEventTypes={recentEventTypes}
+                      suggestedActionPreferenceKey={suggestedActionPreferenceKey}
+                      onStateOverrideApply={handleStateOverrideApply}
+                      pendingStateSuggestion={pendingStateSuggestion}
+                      onApplyPendingStateSuggestion={applyPendingStateSuggestion}
+                      onDismissPendingStateSuggestion={dismissPendingStateSuggestion}
+                      isApplyingStateOverride={isApplyingStateOverride}
+                      substitutionControl={substitutionControl}
+                      onPrepareSubstitution={handlePrepareSubstitution}
+                      handleUndoLastEvent={requestUndoLastEvent}
+                      canUndoEvents={canUndoEvents}
+                      isUndoing={isUndoing}
+                      eventCount={liveState?.event_count}
+                    />
+                  )}
+                </>
+              )}
+
+              {(isHeadToHeadLike || isCombatMode) && (!specializedEngineType || statisticsPresentation.aggregate) && (
+                <section className="border-t border-[var(--border-soft)] pt-4" aria-labelledby="performance-title">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 id="performance-title" className="text-base font-semibold text-[var(--text-main)]">Performance</h2>
+                    <div className="inline-flex rounded-lg border border-slate-300 bg-slate-100/80 p-0.5 dark:border-slate-700 dark:bg-slate-900/70">
+                      {statisticsPresentation.aggregate ? <button
+                        type="button"
+                        onClick={() => setStatsViewMode("team")}
+                        className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${statsViewMode === "team"
+                          ? "bg-cyan-500/20 text-cyan-800 dark:text-cyan-100"
+                          : "text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
+                          }`}
+                      >
+                        {statisticsPresentation.aggregate}
+                      </button> : null}
+                      {statisticsPresentation.individual && !specializedEngineType ? <button
+                        type="button"
+                        onClick={() => setStatsViewMode("player")}
+                        className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${statsViewMode === "player"
+                          ? "bg-cyan-500/20 text-cyan-800 dark:text-cyan-100"
+                          : "text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
+                          }`}
+                      >
+                        {statisticsPresentation.individual}
+                      </button> : null}
+                    </div>
+                  </div>
+
+                  {statsViewMode === "team" || Boolean(specializedEngineType) ? (
+                    teamStatsTableRows.length > 0 ? (
+                      <div className="mt-2 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800/80">
+                        <table className="min-w-full text-sm text-slate-700 dark:text-slate-200">
+                          <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-900/80 dark:text-slate-400">
+                            <tr>
+                              <th className="px-3 py-2 text-left font-semibold">Metric</th>
+                              {teamOptions.map((teamOption) => (
+                                <th key={`team-stats-head-${teamOption.id}`} className="px-3 py-2 text-right font-semibold" title={teamOption.name}>
+                                  {getShortTeamName(teamOption.name)}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {teamStatsTableRows.map((row) => (
+                              <tr key={`team-stats-row-${row.key}`} className="border-t border-slate-200 dark:border-slate-800/70">
+                                <td className="px-3 py-2 text-left text-slate-700 dark:text-slate-300">{row.label}</td>
+                                {teamOptions.map((teamOption) => (
+                                  <td key={`team-stats-value-${row.key}-${teamOption.id}`} className="px-3 py-2 text-right font-mono">
+                                    {Number(row.values?.[String(teamOption.id)] || 0)}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">No team stats available yet.</p>
+                    )
+                  ) : (
+                    <>
+                      {teamOptions.length > 1 && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          {teamOptions.map((teamOption) => {
+                            const isActive = Number(teamOption.id) === Number(activePlayerStatsTeamId || 0);
+                            return (
+                              <button
+                                key={`player-stats-team-toggle-${teamOption.id}`}
+                                type="button"
+                                title={teamOption.name}
+                                onClick={() => setPlayerStatsTeamFilterId(String(teamOption.id))}
+                                className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition ${isActive
+                                  ? "border-cyan-500/70 bg-cyan-500/20 text-cyan-800 dark:text-cyan-100"
+                                  : "border-slate-300 bg-white text-slate-700 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-500"
+                                  }`}
+                              >
+                                {getShortTeamName(teamOption.name)}
+                              </button>
+                            );
+                          })}
+                        </div>
                       )}
-                    </div>
-                    <div className="mt-2">
-                      <PlayerPerformanceTable
-                        columns={playerStatsTable.columns}
-                        secondaryColumns={playerStatsTable.secondaryColumns}
-                        rows={visiblePlayerStatsRows}
-                        participantLabel={participantUnitType === "DUO" ? "Duo" : participantUnitType === "TEAM" ? "Team" : "Participant"}
-                        emptyMessage={selectedParticipant?.resolutionStatus !== "resolved"
-                          ? "Participant unavailable."
-                          : playerStatsRowsWithRoster.length > 0
-                            ? "No recorded player activity. Show all players to view the full roster."
-                            : "Player statistics unavailable for this scoring mode."}
-                      />
-                    </div>
-                  </>
-                )}
-              </section>
-            )}
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <p className="text-xs text-slate-600 dark:text-slate-400">
+                          {showAllPlayerStatRows
+                            ? `Showing all players (${playerStatsRowsWithRoster.length})`
+                            : `Showing players with activity (${playerStatsRowsCollapsed.length})`}
+                        </p>
+                        {playerStatsRowsWithRoster.length > playerStatsRowsCollapsed.length && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllPlayerStatRows((current) => !current)}
+                            className="text-xs font-semibold text-cyan-700 underline underline-offset-2 hover:text-cyan-600 dark:text-cyan-300 dark:hover:text-cyan-200"
+                          >
+                            {showAllPlayerStatRows ? "Show less players" : "Show all players"}
+                          </button>
+                        )}
+                      </div>
+                      <div className="mt-2">
+                        <PlayerPerformanceTable
+                          columns={playerStatsTable.columns}
+                          secondaryColumns={playerStatsTable.secondaryColumns}
+                          rows={visiblePlayerStatsRows}
+                          participantLabel={participantUnitType === "DUO" ? "Duo" : participantUnitType === "TEAM" ? "Team" : "Participant"}
+                          emptyMessage={selectedParticipant?.resolutionStatus !== "resolved"
+                            ? "Participant unavailable."
+                            : playerStatsRowsWithRoster.length > 0
+                              ? "No recorded player activity. Show all players to view the full roster."
+                              : "Player statistics unavailable for this scoring mode."}
+                        />
+                      </div>
+                    </>
+                  )}
+                </section>
+              )}
 
-          </main>
+            </main>
 
-          <aside className="space-y-3">
-            <details className="rounded-2xl bg-[var(--surface-soft)] p-3.5">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-900 dark:text-slate-100">Match Overview</summary>
-              <div className="mt-3">
-                <MatchSummaryPanel
-                  match={match}
-                  liveState={liveState}
-                  sportProfile={sportProfile}
-                  isRoleReadOnly={isRoleReadOnly || isConfigBlocked}
-                  canWrite={canComposerSubmit}
-                  latestViolation={latestViolation}
-                  sportDefinition={validatedConfig?.sport_definition}
-                />
-              </div>
-            </details>
-
-            {safeDisplay.allow_timeline && (
-              <section className="rounded-2xl bg-[var(--surface-soft)] p-3.5" aria-labelledby="recent-actions-title">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 id="recent-actions-title" className="text-base font-semibold text-slate-900 dark:text-slate-100">Recent actions</h3>
-                  {canUndoEvents ? (
-                    <button
-                      type="button"
-                      onClick={requestUndoLastEvent}
-                      disabled={isUndoing || Number(liveState?.event_count || 0) <= 0}
-                      className="min-h-9 rounded-lg border border-[var(--border-soft)] bg-[var(--surface)] px-2.5 text-xs font-semibold text-[var(--text-main)] transition hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {isUndoing ? "Undoing…" : "Undo last action"}
-                    </button>
-                  ) : null}
+            <aside className="space-y-3">
+              <details className="rounded-2xl bg-[var(--surface-soft)] p-3.5">
+                <summary className="cursor-pointer text-sm font-semibold text-slate-900 dark:text-slate-100">Match Overview</summary>
+                <div className="mt-3">
+                  <MatchSummaryPanel
+                    match={match}
+                    liveState={liveState}
+                    sportProfile={sportProfile}
+                    isRoleReadOnly={isRoleReadOnly || isConfigBlocked}
+                    canWrite={canComposerSubmit}
+                    latestViolation={latestViolation}
+                    sportDefinition={validatedConfig?.sport_definition}
+                  />
                 </div>
-                <LiveTimeline
-                  timelineWithEffects={timelineWithEffects}
-                  canDeleteEvents={false}
-                  isDeletingById={{}}
-                  handleDeleteEvent={() => {}}
-                />
-              </section>
-            )}
-            {systemStatusCard}
+              </details>
+
+              {safeDisplay.allow_timeline && (
+                <section className="rounded-2xl bg-[var(--surface-soft)] p-3.5" aria-labelledby="recent-actions-title">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <h3 id="recent-actions-title" className="text-base font-semibold text-slate-900 dark:text-slate-100">Recent actions</h3>
+                    {canUndoEvents ? (
+                      <button
+                        type="button"
+                        onClick={requestUndoLastEvent}
+                        disabled={isUndoing || Number(liveState?.event_count || 0) <= 0}
+                        className="min-h-9 rounded-lg border border-[var(--border-soft)] bg-[var(--surface)] px-2.5 text-xs font-semibold text-[var(--text-main)] transition hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isUndoing ? "Undoing…" : "Undo last action"}
+                      </button>
+                    ) : null}
+                  </div>
+                  <LiveTimeline
+                    timelineWithEffects={timelineWithEffects}
+                    canDeleteEvents={false}
+                    isDeletingById={{}}
+                    handleDeleteEvent={() => { }}
+                  />
+                </section>
+              )}
+              {/* {systemStatusCard}
             <RulesSummaryPanel
               snapshot={ruleSnapshotMeta}
               configStatus={normalizedConfigStatus}
@@ -2907,26 +3059,26 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
               sportName={sportDefinition?.sport || match?.sport_name || ""}
               liveState={liveState}
               serviceOwnerLabel={resolveTeamName(liveState?.service_state?.server_team_id)}
-            />
-
-            {debugMode && (
-              <AdvancedDebugPanel
-                isReplayLoading={isReplayLoading}
-                replayError={replayError}
-                replaySnapshot={replaySnapshot}
-                replayUntilSequence={replayUntilSequence}
-                setReplayUntilSequence={setReplayUntilSequence}
-                handleReplaySequenceSubmit={handleReplaySequenceSubmit}
-                handleReplayRebuild={handleReplayRebuild}
-                replayTimeline={replayTimeline}
-                resolveTeamName={resolveTeamName}
-                formatTimelineTime={formatTimelineTime}
-                summarizeScoreMap={summarizeScoreMap}
-                summarizeScoreDelta={summarizeScoreDelta}
-              />
-            )}
-          </aside>
-        </div>
+            /> */}
+              {/* 
+              {debugMode && (
+                <AdvancedDebugPanel
+                  isReplayLoading={isReplayLoading}
+                  replayError={replayError}
+                  replaySnapshot={replaySnapshot}
+                  replayUntilSequence={replayUntilSequence}
+                  setReplayUntilSequence={setReplayUntilSequence}
+                  handleReplaySequenceSubmit={handleReplaySequenceSubmit}
+                  handleReplayRebuild={handleReplayRebuild}
+                  replayTimeline={replayTimeline}
+                  resolveTeamName={resolveTeamName}
+                  formatTimelineTime={formatTimelineTime}
+                  summarizeScoreMap={summarizeScoreMap}
+                  summarizeScoreDelta={summarizeScoreDelta}
+                />
+              )} */}
+            </aside>
+          </div>
         )}
       </div>
 
@@ -3002,6 +3154,26 @@ const LiveScoringDashboard = ({ match, onExit, onLiveState }) => {
           </div>
         </div>
       </AppModal>
+
+      <ShortcutWinnerModal
+        isOpen={isShortcutWinnerOpen}
+        onClose={() => setIsShortcutWinnerOpen(false)}
+        match={match}
+        teamOptions={teamOptions}
+        currentScoreTeam1={team1LiveScore}
+        currentScoreTeam2={team2LiveScore}
+        onSuccess={(result, summary) => {
+          if (result?.live_state) {
+            pushLiveState(result.live_state);
+          }
+          pushToast({
+            kind: "score",
+            title: "Winner Declared",
+            detail: `${summary?.winnerName || "Winner"} recorded. Final score: ${summary?.score1 ?? ""} - ${summary?.score2 ?? ""}`,
+          });
+          handleSaveAndRefresh();
+        }}
+      />
     </div>
   );
 };

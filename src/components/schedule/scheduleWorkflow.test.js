@@ -400,3 +400,169 @@ test("Venue Settings presents capacity-aware canonical diagnostics", () => {
   assert.match(source, /simultaneous matches \/ .*playing areas/);
   assert.doesNotMatch(source, /already has a scheduled match in this time window/);
 });
+
+test("formatSeconds correctly formats solver and pipeline runtimes", async () => {
+  const { formatSeconds } = await import("./scheduleQualityUtils.js");
+  assert.equal(formatSeconds(0.07), "0.07 s");
+  assert.equal(formatSeconds(0.051), "0.05 s");
+  assert.equal(formatSeconds(0.003), "< 0.01 s");
+  assert.equal(formatSeconds(1.234), "1.23 s");
+  assert.equal(formatSeconds(null), null);
+  assert.equal(formatSeconds(undefined), null);
+  assert.equal(formatSeconds(-1), null);
+});
+
+test("resolveScheduleQualityData consumes authoritative backend metrics for 20/20 scheduled with 100% CSR", async () => {
+  const { resolveScheduleQualityData } = await import("./scheduleQualityUtils.js");
+
+  const generationResult = {
+    status: "SUCCESS",
+    scheduled_count: 20,
+    unscheduled_matches: [],
+    timing: {
+      solver_time_seconds: 0.05,
+      pipeline_time_seconds: 0.07,
+      solver_invocations: 1,
+    },
+    evaluation: {
+      status: "AVAILABLE",
+      scheduling_success_rate: 100.0,
+      constraint_satisfaction_rate: 100.0,
+      total_evaluated_constraints: 32,
+      satisfied_constraints: 32,
+      violated_constraints: 0,
+      hard_constraint_violations: 0,
+      violations_by_type: {},
+    },
+  };
+
+  const data = resolveScheduleQualityData({ generationResult });
+
+  assert.equal(data.evalStatus, "AVAILABLE");
+  assert.equal(data.isAvailable, true);
+  assert.equal(data.isUnavailable, false);
+  assert.equal(data.scheduledCount, 20);
+  assert.equal(data.totalRequired, 20);
+  assert.equal(data.successRate, 100.0);
+  assert.equal(data.totalConstraints, 32);
+  assert.equal(data.satisfiedConstraints, 32);
+  assert.equal(data.csr, 100.0);
+  assert.equal(data.hardViolations, 0);
+  assert.equal(data.solverSeconds, 0.05);
+  assert.equal(data.pipelineSeconds, 0.07);
+});
+
+test("resolveScheduleQualityData handles non-zero violations accurately without frontend math", async () => {
+  const { resolveScheduleQualityData } = await import("./scheduleQualityUtils.js");
+
+  const generationResult = {
+    status: "GENERATED_WITH_BLOCKING_ISSUES",
+    scheduled_count: 18,
+    unscheduled_matches: [{ match_id: 19 }, { match_id: 20 }],
+    timing: {
+      solver_time_seconds: 0.12,
+      pipeline_time_seconds: 0.25,
+      solver_invocations: 1,
+    },
+    evaluation: {
+      status: "AVAILABLE",
+      scheduling_success_rate: 90.0,
+      constraint_satisfaction_rate: 93.75,
+      total_evaluated_constraints: 32,
+      satisfied_constraints: 30,
+      violated_constraints: 2,
+      hard_constraint_violations: 2,
+      violations_by_type: { venue_conflict: 2 },
+    },
+  };
+
+  const data = resolveScheduleQualityData({ generationResult });
+
+  assert.equal(data.isAvailable, true);
+  assert.equal(data.scheduledCount, 18);
+  assert.equal(data.totalRequired, 20);
+  assert.equal(data.successRate, 90.0);
+  assert.equal(data.totalConstraints, 32);
+  assert.equal(data.satisfiedConstraints, 30);
+  assert.equal(data.csr, 93.75);
+  assert.equal(data.hardViolations, 2);
+});
+
+test("resolveScheduleQualityData handles UNAVAILABLE evaluation status without fabricating values", async () => {
+  const { resolveScheduleQualityData } = await import("./scheduleQualityUtils.js");
+
+  const generationResult = {
+    status: "SUCCESS",
+    scheduled_count: 15,
+    unscheduled_matches: [],
+    timing: {
+      solver_time_seconds: 0.04,
+      pipeline_time_seconds: 0.06,
+    },
+    evaluation: {
+      status: "UNAVAILABLE",
+      error: "Harness evaluation skipped due to internal error",
+    },
+  };
+
+  const validationResult = {
+    blocking_count: 0,
+    warning_count: 1,
+  };
+
+  const data = resolveScheduleQualityData({ generationResult, validationResult });
+
+  assert.equal(data.evalStatus, "UNAVAILABLE");
+  assert.equal(data.isAvailable, false);
+  assert.equal(data.isUnavailable, true);
+  // Ensure metrics are null, not fabricated 0 or 100
+  assert.equal(data.csr, null);
+  assert.equal(data.totalConstraints, null);
+  assert.equal(data.satisfiedConstraints, null);
+  assert.equal(data.successRate, null);
+  // Scheduled count and violations remain authoritative
+  assert.equal(data.scheduledCount, 15);
+  assert.equal(data.hardViolations, 0);
+  assert.equal(data.solverSeconds, 0.04);
+});
+
+test("resolveScheduleQualityData handles infeasible scenario cleanly", async () => {
+  const { resolveScheduleQualityData } = await import("./scheduleQualityUtils.js");
+
+  const generationResult = {
+    status: "FAILED",
+    scheduled_count: 0,
+    unscheduled_matches: [{ match_id: 1 }, { match_id: 2 }],
+    timing: {
+      solver_time_seconds: 0.01,
+      pipeline_time_seconds: 0.02,
+    },
+    evaluation: {
+      status: "AVAILABLE",
+      scheduling_success_rate: 0.0,
+      constraint_satisfaction_rate: 100.0,
+      total_evaluated_constraints: 0,
+      satisfied_constraints: 0,
+      violated_constraints: 0,
+      hard_constraint_violations: 0,
+      violations_by_type: {},
+    },
+  };
+
+  const data = resolveScheduleQualityData({ generationResult });
+
+  assert.equal(data.scheduledCount, 0);
+  assert.equal(data.totalRequired, 2);
+  assert.equal(data.successRate, 0.0);
+  assert.equal(data.csr, 100.0);
+});
+
+test("Schedules.jsx mounts ScheduleQualitySummary above calendar workspace", () => {
+  const source = readFileSync(new URL("../../pages/coordinator/Schedules.jsx", import.meta.url), "utf8");
+  assert.match(source, /import ScheduleQualitySummary from "\.\.\/\.\.\/components\/schedule\/ScheduleQualitySummary";/);
+  assert.match(source, /<ScheduleQualitySummary/);
+  assert.match(source, /generationResult=\{generationResult\}/);
+  assert.match(source, /validationResult=\{validationResult\}/);
+  assert.match(source, /handleOpenIssueDrawerSection\("calendar-conflicts"\)/);
+});
+

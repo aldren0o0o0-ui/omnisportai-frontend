@@ -1,6 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bell, ChevronRight, LogOut, Menu, Moon, Search, Settings, Sun, X } from "lucide-react";
+import {
+  Bell,
+  Calendar,
+  CheckCheck,
+  ChevronRight,
+  Clock,
+  ExternalLink,
+  FileText,
+  LogOut,
+  Megaphone,
+  Menu,
+  Moon,
+  Search,
+  Settings,
+  Sun,
+  Trophy,
+  Users,
+  X,
+} from "lucide-react";
+import AppModal from "../common/AppModal";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { searchGlobal } from "../../services/intelligenceService";
@@ -39,7 +58,23 @@ const toDisplayType = (value) =>
     .join(" ") || "Notification";
 
 const isReminderNotification = (item) =>
-  ["MATCH_REMINDER", "TRYOUT_REMINDER"].includes(String(item?.event_type || "").trim().toUpperCase());
+  ["MATCH_REMINDER", "TRYOUT_REMINDER", "MATCH_STARTING_NOW"].includes(String(item?.event_type || "").trim().toUpperCase());
+
+const showDesktopNotification = (title, body, tag = undefined) => {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (Notification.permission !== "granted") return;
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.ready.then((reg) => {
+        reg.showNotification(title, { body, icon: "/favicon.ico", tag });
+      });
+    } else {
+      new Notification(title, { body, icon: "/favicon.ico", tag });
+    }
+  } catch (err) {
+    console.warn("Could not display browser notification:", err);
+  }
+};
 
 const reminderLeadLabel = (item) => {
   const eventType = String(item?.event_type || "").trim().toUpperCase();
@@ -49,6 +84,78 @@ const reminderLeadLabel = (item) => {
   if (minutes === 60) return "Reminder: 1 hour before";
   if (minutes === 120) return "Reminder: 2 hours before";
   return `Reminder: ${minutes} minutes before`;
+};
+
+const getNotificationConfig = (eventType) => {
+  const type = String(eventType || "").trim().toUpperCase();
+
+  if (type.includes("ANNOUNCE")) {
+    return {
+      label: "Announcement",
+      icon: Megaphone,
+      badgeClass: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800",
+      iconWrapClass: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300",
+      badgeBg: "bg-indigo-600 text-white",
+    };
+  }
+  if (type.includes("RESULT")) {
+    return {
+      label: "Match Result",
+      icon: Trophy,
+      badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800",
+      iconWrapClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300",
+      badgeBg: "bg-emerald-600 text-white",
+    };
+  }
+  if (type.includes("REMINDER")) {
+    const isTryout = type.includes("TRYOUT");
+    return {
+      label: isTryout ? "Tryout Reminder" : "Match Reminder",
+      icon: Clock,
+      badgeClass: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800",
+      iconWrapClass: "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300",
+      badgeBg: "bg-amber-500 text-white",
+    };
+  }
+  if (type.includes("TRYOUT") || type.includes("SCHEDULE") || type.includes("VENUE") || type.includes("TOURNAMENT")) {
+    return {
+      label: toDisplayType(type),
+      icon: Calendar,
+      badgeClass: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800",
+      iconWrapClass: "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300",
+      badgeBg: "bg-blue-600 text-white",
+    };
+  }
+  if (type.includes("APPLICATION") || type.includes("PLAYER")) {
+    return {
+      label: toDisplayType(type),
+      icon: Users,
+      badgeClass: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800",
+      iconWrapClass: "bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300",
+      badgeBg: "bg-sky-600 text-white",
+    };
+  }
+  if (type.includes("MEDICAL")) {
+    const isAccepted = type.includes("ACCEPTED");
+    return {
+      label: isAccepted ? "Medical Accepted" : "Medical Rejected",
+      icon: FileText,
+      badgeClass: isAccepted
+        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+        : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800",
+      iconWrapClass: isAccepted
+        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+        : "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300",
+      badgeBg: isAccepted ? "bg-emerald-600 text-white" : "bg-rose-600 text-white",
+    };
+  }
+  return {
+    label: toDisplayType(type),
+    icon: Bell,
+    badgeClass: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-[var(--surface-soft)] dark:text-slate-300 dark:border-slate-700",
+    iconWrapClass: "bg-slate-100 text-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-300",
+    badgeBg: "bg-blue-600 text-white",
+  };
 };
 
 const formatRoleLabel = (roles = [], { hasPlayerProfile = false, routeRole = "" } = {}) => {
@@ -77,13 +184,29 @@ const timeAgo = (timestamp) => {
   if (Number.isNaN(created.getTime())) return "";
   const diffMs = Date.now() - created.getTime();
   const diffMin = Math.max(0, Math.floor(diffMs / 60000));
-  if (diffMin < 1) return "just now";
+  if (diffMin < 1) return "Just now";
   if (diffMin < 60) return `${diffMin}m ago`;
   const diffHr = Math.floor(diffMin / 60);
   if (diffHr < 24) return `${diffHr}h ago`;
   const diffDay = Math.floor(diffHr / 24);
+  if (diffDay === 1) {
+    return `Yesterday at ${created.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+  }
   if (diffDay < 7) return `${diffDay}d ago`;
-  return created.toLocaleDateString();
+  return created.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+};
+
+const formatDateTime = (value) => {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 };
 
 const AppTopHeader = ({ onOpenMobileSidebar = () => {} }) => {
@@ -103,6 +226,7 @@ const AppTopHeader = ({ onOpenMobileSidebar = () => {} }) => {
   const [openUserMenu, setOpenUserMenu] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationItems, setNotificationItems] = useState([]);
+  const [notificationFilter, setNotificationFilter] = useState("all");
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [notificationError, setNotificationError] = useState("");
   const [selectedNotification, setSelectedNotification] = useState(null);
@@ -111,6 +235,8 @@ const AppTopHeader = ({ onOpenMobileSidebar = () => {} }) => {
   const notificationsWrapRef = useRef(null);
   const userMenuWrapRef = useRef(null);
   const mobileSearchInputRef = useRef(null);
+  const previousUnreadCountRef = useRef(null);
+  const lastBrowserNotifiedIdRef = useRef(null);
   const { openProfile } = useProfileDrawer();
 
   const segments = useMemo(
@@ -118,6 +244,13 @@ const AppTopHeader = ({ onOpenMobileSidebar = () => {} }) => {
     [location.pathname]
   );
   const roleKey = segments[0] || "viewer";
+
+  const displayedNotifications = useMemo(() => {
+    if (notificationFilter === "unread") {
+      return notificationItems.filter((item) => !item.is_read);
+    }
+    return notificationItems;
+  }, [notificationItems, notificationFilter]);
   const userLabel = profileIdentity?.name || user?.full_name || user?.name || user?.username || "User";
   const userImage = resolveMediaUrl(profileIdentity?.profile_image_url || user?.profile_image_url || "");
   const hasPlayerProfile = (user?.assignment_contexts || []).some((row) => String(row?.type || "").toUpperCase() === "PLAYER");
@@ -218,17 +351,44 @@ const AppTopHeader = ({ onOpenMobileSidebar = () => {} }) => {
   const loadUnreadCount = useCallback(async () => {
     try {
       const payload = await getUnreadNotificationCount();
-      setUnreadCount(Number(payload?.unread_count || 0));
+      const currentCount = Number(payload?.unread_count || 0);
+      setUnreadCount(currentCount);
+
+      if (
+        previousUnreadCountRef.current !== null &&
+        currentCount > previousUnreadCountRef.current &&
+        getBrowserNotificationPermission() === "granted"
+      ) {
+        getNotifications({ limit: 3 })
+          .then((res) => {
+            const items = Array.isArray(res?.items) ? res.items : [];
+            const newest = items.find((i) => !i.is_read);
+            if (newest && newest.id !== lastBrowserNotifiedIdRef.current) {
+              lastBrowserNotifiedIdRef.current = newest.id;
+              showDesktopNotification(
+                newest.title || "Match Alert",
+                newest.message || "You have a new schedule notification.",
+                `notif-${newest.id}`
+              );
+            }
+          })
+          .catch(() => {});
+      }
+      previousUnreadCountRef.current = currentCount;
     } catch {
       setUnreadCount(0);
     }
   }, []);
 
-  const loadNotifications = useCallback(async () => {
+  const loadNotifications = useCallback(async (filterOverride) => {
     setNotificationLoading(true);
     setNotificationError("");
     try {
-      const payload = await getNotifications({ limit: 8 });
+      const activeFilter = filterOverride !== undefined ? filterOverride : notificationFilter;
+      const payload = await getNotifications({
+        unreadOnly: activeFilter === "unread",
+        limit: 50,
+      });
       setNotificationItems(Array.isArray(payload?.items) ? payload.items : []);
     } catch (apiError) {
       setNotificationItems([]);
@@ -236,10 +396,14 @@ const AppTopHeader = ({ onOpenMobileSidebar = () => {} }) => {
     } finally {
       setNotificationLoading(false);
     }
-  }, []);
+  }, [notificationFilter]);
 
   useEffect(() => {
     loadUnreadCount();
+    const interval = setInterval(() => {
+      loadUnreadCount();
+    }, 25000);
+    return () => clearInterval(interval);
   }, [loadUnreadCount]);
 
   useEffect(() => {
@@ -402,7 +566,7 @@ const AppTopHeader = ({ onOpenMobileSidebar = () => {} }) => {
       ) : (
         <>
           {/* Left Side: Mobile Menu Hamburger + Intramural Dropdown */}
-          <div className="os-header-left flex items-center gap-2 min-w-0 flex-1 md:flex-initial">
+          <div className="os-header-left flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 md:flex-initial">
             <button
               type="button"
               className="os-mobile-nav-toggle flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] text-[var(--text-main)] shadow-xs transition-all hover:bg-[var(--surface-soft)] active:scale-95 lg:hidden cursor-pointer"
@@ -479,7 +643,7 @@ const AppTopHeader = ({ onOpenMobileSidebar = () => {} }) => {
             </form>
           </div>
 
-          {/* Right Side: Search Icon Trigger (Mobile only) + User Avatar Profile Container */}
+          {/* Right Side: Search Icon Trigger (Mobile) + Facebook Notification Bell + User Profile */}
           <div className="os-header-right flex items-center gap-2 shrink-0 justify-self-end">
             {/* Mobile Search Icon Button */}
             <button
@@ -494,7 +658,219 @@ const AppTopHeader = ({ onOpenMobileSidebar = () => {} }) => {
               <Search size={18} aria-hidden="true" />
             </button>
 
-            {/* User Profile Container (with badge on avatar & menu) */}
+            {/* Facebook-style Notification Bell Icon Button & Popover */}
+            <div ref={notificationsWrapRef} className="relative">
+              <button
+                type="button"
+                className={`relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full transition active:scale-95 shrink-0 cursor-pointer ${
+                  openNotifications
+                    ? "bg-blue-100 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400"
+                    : "border border-[var(--border-soft)] bg-[var(--surface)] text-[var(--text-main)] hover:bg-[var(--surface-soft)]"
+                }`}
+                aria-label="Notifications"
+                aria-expanded={openNotifications}
+                onClick={() => {
+                  setOpenNotifications((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      void loadNotifications();
+                    }
+                    return next;
+                  });
+                  setOpenUserMenu(false);
+                }}
+              >
+                <Bell size={18} aria-hidden="true" />
+                {unreadCount > 0 ? (
+                  <span className="absolute -top-1 -right-1 grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-black leading-none text-white ring-2 ring-[var(--surface)]">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                ) : null}
+              </button>
+
+              {/* Facebook Notifications Flyout */}
+              {openNotifications ? (
+                <>
+                  <div
+                    className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[1px] sm:hidden"
+                    onClick={() => setOpenNotifications(false)}
+                    aria-hidden="true"
+                  />
+                  <div
+                    className="fixed top-14 left-2 right-2 z-50 sm:absolute sm:top-[calc(100%+8px)] sm:left-auto sm:right-0 sm:w-[420px] sm:max-w-[calc(100vw-20px)] rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[var(--surface)] shadow-2xl backdrop-blur-md p-3.5"
+                    role="region"
+                    aria-label="Notifications"
+                  >
+                    {/* Facebook Header: Title & Mark all read */}
+                    <div className="flex items-center justify-between px-1 pb-3">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                          Notifications
+                        </h2>
+                        {unreadCount > 0 ? (
+                          <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[11px] font-bold text-white leading-none">
+                            {unreadCount > 99 ? "99+" : unreadCount}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40 transition cursor-pointer disabled:opacity-40 disabled:hover:bg-transparent"
+                        disabled={unreadCount === 0}
+                        onClick={async () => {
+                          await markAllNotificationsRead();
+                          await loadUnreadCount();
+                          await loadNotifications();
+                        }}
+                      >
+                        <CheckCheck size={14} aria-hidden="true" />
+                        <span>Mark all read</span>
+                      </button>
+                    </div>
+
+                    {/* Facebook Filter Pills: All / Unread */}
+                    <div className="flex items-center gap-2 px-1 pb-3 border-b border-slate-100 dark:border-slate-800">
+                      <button
+                        type="button"
+                        className={`rounded-full px-3.5 py-1 text-xs font-bold transition cursor-pointer ${
+                          notificationFilter === "all"
+                            ? "bg-blue-600 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                        }`}
+                        onClick={() => {
+                          setNotificationFilter("all");
+                          void loadNotifications("all");
+                        }}
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded-full px-3.5 py-1 text-xs font-bold transition cursor-pointer ${
+                          notificationFilter === "unread"
+                            ? "bg-blue-600 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                        }`}
+                        onClick={() => {
+                          setNotificationFilter("unread");
+                          void loadNotifications("unread");
+                        }}
+                      >
+                        Unread{unreadCount > 0 ? ` (${unreadCount})` : ""}
+                      </button>
+                    </div>
+
+                    {/* Notification items list */}
+                    {notificationLoading ? (
+                      <div className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
+                        Loading notifications...
+                      </div>
+                    ) : notificationError ? (
+                      <div className="py-8 text-center text-xs text-rose-500 font-medium">
+                        {notificationError}
+                      </div>
+                    ) : displayedNotifications.length === 0 ? (
+                      <div className="py-12 text-center text-slate-500 dark:text-slate-400">
+                        <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400">
+                          <Bell size={22} />
+                        </div>
+                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                          {notificationFilter === "unread" ? "No unread notifications" : "No notifications yet"}
+                        </p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                          {notificationFilter === "unread" ? "You're all caught up!" : "You will receive updates here"}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mt-2 max-h-[400px] space-y-1 overflow-y-auto overscroll-contain pr-0.5">
+                        {displayedNotifications.map((item) => {
+                          const cfg = getNotificationConfig(item.event_type);
+                          const IconComp = cfg.icon;
+                          const isReminder = isReminderNotification(item);
+                          const isAnnouncement = String(item.event_type || "").toUpperCase().includes("ANNOUNCE");
+
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={async () => {
+                                if (!item.is_read) {
+                                  await markNotificationRead(item.id);
+                                  await loadUnreadCount();
+                                  await loadNotifications();
+                                }
+                                setSelectedNotification({
+                                  ...item,
+                                  displayType: toDisplayType(item.event_type),
+                                  timeLabel: timeAgo(item.created_at),
+                                  formattedDate: formatDateTime(item.created_at),
+                                });
+                                setOpenNotifications(false);
+                              }}
+                              className={`group relative flex w-full items-start gap-3 rounded-xl p-2.5 text-left transition hover:bg-slate-100/90 dark:hover:bg-slate-800/80 cursor-pointer ${
+                                item.is_read
+                                  ? "opacity-85"
+                                  : "bg-blue-50/70 dark:bg-blue-950/30"
+                              }`}
+                            >
+                              {/* Facebook-style circular avatar with category badge */}
+                              <div className="relative shrink-0">
+                                <div className="grid h-11 w-11 place-items-center rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-200 font-bold text-sm">
+                                  {isAnnouncement ? (
+                                    <Megaphone size={20} className="text-indigo-600 dark:text-indigo-400" />
+                                  ) : (
+                                    <IconComp size={20} />
+                                  )}
+                                </div>
+                                <span
+                                  className={`absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full text-[10px] ring-2 ring-white dark:ring-[var(--surface)] ${cfg.badgeBg || "bg-blue-600 text-white"}`}
+                                >
+                                  <IconComp size={10} />
+                                </span>
+                              </div>
+
+                              {/* Notification text details */}
+                              <div className="min-w-0 flex-1 pr-1">
+                                <div className="text-[13px] leading-snug text-slate-800 dark:text-slate-200">
+                                  <span className="font-bold text-slate-900 dark:text-white mr-1.5">
+                                    {item.title}
+                                  </span>
+                                  <span className="line-clamp-2 text-slate-600 dark:text-slate-300 font-normal">
+                                    {item.message?.replace(/<[^>]*>?/gm, "") || ""}
+                                  </span>
+                                </div>
+
+                                <div className="mt-1 flex items-center gap-2">
+                                  <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+                                    {timeAgo(item.created_at)}
+                                  </span>
+                                  {isReminder && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.2 text-[9px] font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                                      <Clock size={9} aria-hidden="true" />
+                                      <span>{reminderLeadLabel(item)}</span>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Facebook unread blue dot on right */}
+                              {!item.is_read ? (
+                                <div className="self-center pr-1 shrink-0">
+                                  <span className="block h-2.5 w-2.5 rounded-full bg-blue-600 ring-2 ring-blue-200 dark:ring-blue-900" />
+                                </div>
+                              ) : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </div>
+
+            {/* User Profile Container & Dropdown Menu */}
             <div ref={userMenuWrapRef} className="relative">
               <button
                 type="button"
@@ -522,11 +898,6 @@ const AppTopHeader = ({ onOpenMobileSidebar = () => {} }) => {
                   <span className="os-user-name text-xs font-bold leading-tight text-[var(--text-main)] truncate block">{userLabel}</span>
                   <span className="os-user-role text-[10px] font-semibold text-[var(--text-soft)] uppercase tracking-wider truncate block">{roleLabel}</span>
                 </div>
-                {unreadCount > 0 ? (
-                  <span className="absolute -top-1 -right-1 grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-black leading-none text-white ring-2 ring-[var(--surface)]">
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </span>
-                ) : null}
               </button>
 
               {openUserMenu ? (
@@ -554,27 +925,6 @@ const AppTopHeader = ({ onOpenMobileSidebar = () => {} }) => {
 
                     <div className="my-1.5 border-t border-[var(--border-soft)]" role="separator" />
 
-                    {/* Notifications item inside Profile Container */}
-                    <button
-                      type="button"
-                      className="!flex !h-9 !w-full !items-center !justify-between !px-3 !text-xs font-medium rounded-lg transition hover:bg-[var(--surface-soft)] text-[var(--text-main)] cursor-pointer"
-                      onClick={() => {
-                        setOpenUserMenu(false);
-                        setOpenNotifications(true);
-                        void loadNotifications();
-                      }}
-                    >
-                      <span className="flex items-center gap-3">
-                        <Bell size={16} aria-hidden="true" />
-                        <span>Notifications</span>
-                      </span>
-                      {unreadCount > 0 ? (
-                        <span className="grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1.5 text-[10px] font-black leading-none text-white">
-                          {unreadCount > 99 ? "99+" : unreadCount}
-                        </span>
-                      ) : null}
-                    </button>
-
                     <button
                       type="button"
                       className="!flex !h-9 !w-full !items-center !justify-start !gap-3 !px-3 !text-xs font-medium rounded-lg transition hover:bg-[var(--surface-soft)] text-[var(--text-main)]"
@@ -584,9 +934,10 @@ const AppTopHeader = ({ onOpenMobileSidebar = () => {} }) => {
                       <span>{isDark ? "Light mode" : "Dark mode"}</span>
                     </button>
                     <Link
-                      to={`/${roleKey}/notification-settings`}
+                      to={`/${roleKey}/settings`}
                       className="!flex !h-9 !w-full !items-center !justify-start !gap-3 !px-3 !text-xs font-medium rounded-lg transition hover:bg-[var(--surface-soft)] text-[var(--text-main)]"
                       onClick={() => setOpenUserMenu(false)}
+                      data-testid="user-menu-settings-link"
                     >
                       <Settings size={16} aria-hidden="true" />
                       <span>Settings</span>
@@ -603,139 +954,109 @@ const AppTopHeader = ({ onOpenMobileSidebar = () => {} }) => {
                   </div>
                 </>
               ) : null}
-
-              {/* Notifications Popover (rendered when opened from profile container) */}
-              {openNotifications ? (
-                <>
-                  <div
-                    className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[1px] sm:hidden"
-                    onClick={() => setOpenNotifications(false)}
-                    aria-hidden="true"
-                  />
-                  <div ref={notificationsWrapRef} className="os-popover fixed top-14 left-3 right-3 z-50 sm:absolute sm:top-[calc(100%+8px)] sm:left-auto sm:right-0 sm:w-[360px] sm:max-w-[calc(100vw-20px)] shadow-xl p-3">
-                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--border-soft)]">
-                      <p className="!m-0 font-bold text-sm text-[var(--text-main)]">Notifications</p>
-                      <button
-                        type="button"
-                        className="!mt-0 !h-auto !w-auto !border-0 !bg-transparent text-xs font-semibold text-[var(--primary)] hover:text-[var(--primary-hover)] cursor-pointer"
-                        onClick={async () => {
-                          await markAllNotificationsRead();
-                          await loadUnreadCount();
-                          await loadNotifications();
-                        }}
-                      >
-                        Mark all as read
-                      </button>
-                    </div>
-                    {notificationLoading ? (
-                      <small className="py-4 text-center block text-[var(--text-muted)]">Loading notifications...</small>
-                    ) : notificationError ? (
-                      <small className="py-4 text-center block text-red-500">{notificationError}</small>
-                    ) : notificationItems.length === 0 ? (
-                      <small className="py-4 text-center block text-[var(--text-muted)]">No notifications yet.</small>
-                    ) : (
-                      <div className="mt-1 space-y-1.5 max-h-[320px] overflow-y-auto overscroll-contain">
-                        {notificationItems.map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={async () => {
-                              if (!item.is_read) {
-                                await markNotificationRead(item.id);
-                                await loadUnreadCount();
-                                await loadNotifications();
-                              }
-                              const targetPath = getRelatedNotificationPath({ roleKey, notification: item });
-                              if (targetPath) {
-                                setOpenNotifications(false);
-                                navigate(targetPath);
-                              } else {
-                                setSelectedNotification({
-                                  ...item,
-                                  displayType: toDisplayType(item.event_type),
-                                  timeLabel: timeAgo(item.created_at)
-                                });
-                                setOpenNotifications(false);
-                              }
-                            }}
-                            className={`os-notification-item text-left p-2.5 rounded-xl transition hover:bg-[var(--surface-soft)] ${
-                              item.is_read
-                                ? "is-read opacity-75"
-                                : isReminderNotification(item)
-                                ? "is-reminder"
-                                : "is-unread"
-                            }`}
-                          >
-                            <div className="mb-1 flex items-center justify-between gap-2">
-                              <span className="os-inline-type text-[10px] font-bold uppercase tracking-wider text-[var(--primary)]">{toDisplayType(item.event_type)}</span>
-                              <span className="text-[10px] text-[var(--text-soft)]">{timeAgo(item.created_at)}</span>
-                            </div>
-                            {isReminderNotification(item) ? (
-                              <div className="mb-1 inline-flex rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--warning)]">
-                                {reminderLeadLabel(item)}
-                              </div>
-                            ) : null}
-                            <div className="font-semibold text-xs text-[var(--text-main)]">{item.title}</div>
-                            <div className="text-[11px] text-[var(--text-muted)] line-clamp-2 mt-0.5">{item.message}</div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <div className="mt-2 pt-2 border-t border-[var(--border-soft)] flex justify-end">
-                      <Link
-                        className="os-results-link text-xs font-semibold"
-                        to={`/${roleKey}/notifications`}
-                        onClick={() => setOpenNotifications(false)}
-                      >
-                        Open inbox
-                      </Link>
-                    </div>
-                  </div>
-                </>
-              ) : null}
             </div>
           </div>
         </>
       )}
 
       {selectedNotification && (
-        <div className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" role="presentation">
-          <div className="w-full max-w-sm rounded-[var(--radius-lg)] border border-[var(--border-soft)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)]" role="dialog" aria-modal="true" aria-labelledby="notification-detail-title">
-            <div className="mb-4 flex items-start justify-between">
-              <div>
-                <span className="mb-1 inline-block rounded-full bg-[var(--surface-muted)] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  {selectedNotification.displayType}
-                </span>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {selectedNotification.timeLabel}
-                </p>
-              </div>
+        <AppModal
+          open={Boolean(selectedNotification)}
+          onClose={() => setSelectedNotification(null)}
+          title="Notification Details"
+          subtitle={selectedNotification.displayType}
+          maxWidthClass="max-w-2xl sm:max-w-3xl"
+          bodyClassName="p-6 sm:p-8 min-h-[220px] max-h-[75vh] overflow-y-auto space-y-6"
+          footer={
+            <div className="flex w-full items-center justify-end gap-3">
               <button
                 type="button"
-                className="rounded-full p-1.5 text-[var(--text-soft)] transition-colors duration-150 hover:bg-[var(--surface-muted)] hover:text-[var(--text-main)] motion-reduce:transition-none"
-                onClick={() => setSelectedNotification(null)}
-                aria-label="Close notification details"
-              >
-                <X size={18} aria-hidden="true" />
-              </button>
-            </div>
-            <h3 id="notification-detail-title" className="mb-2 text-lg font-bold text-[var(--text-main)]">
-              {selectedNotification.title}
-            </h3>
-            <div className="mb-6 text-sm text-[var(--text-muted)]">
-              {selectedNotification.message}
-            </div>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className="rounded-xl bg-[var(--primary)] px-6 py-2 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+                className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-[var(--surface-soft)] dark:text-slate-200 dark:hover:bg-slate-800"
                 onClick={() => setSelectedNotification(null)}
               >
                 Close
               </button>
+              {getRelatedNotificationPath({ roleKey, notification: selectedNotification }) ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetPath = getRelatedNotificationPath({ roleKey, notification: selectedNotification });
+                    setSelectedNotification(null);
+                    if (targetPath) navigate(targetPath);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-semibold text-white shadow-xs transition hover:bg-blue-700"
+                >
+                  <span>
+                    {String(selectedNotification.event_type || "").toUpperCase().includes("ANNOUNCE")
+                      ? "View Full Announcement"
+                      : "Open Related Page"}
+                  </span>
+                  <ExternalLink size={14} aria-hidden="true" />
+                </button>
+              ) : null}
             </div>
-          </div>
-        </div>
+          }
+        >
+          {(() => {
+            const modalCfg = getNotificationConfig(selectedNotification.event_type);
+            const ModalIcon = modalCfg.icon;
+            const isReminder = isReminderNotification(selectedNotification);
+            const isAnnouncement = String(selectedNotification.event_type || "").toUpperCase().includes("ANNOUNCE");
+            const hasHtmlContent = Boolean(selectedNotification.message && /<[a-z][\s\S]*>/i.test(selectedNotification.message));
+
+            return (
+              <div className="space-y-6">
+                {/* Header info: Icon, Category Badge, Title, Timestamps */}
+                <div className="flex items-start gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                  <div className={`flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl shrink-0 ${modalCfg.iconWrapClass}`}>
+                    {isAnnouncement ? <Megaphone size={28} aria-hidden="true" /> : <ModalIcon size={28} aria-hidden="true" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                      <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${modalCfg.badgeClass}`}>
+                        {modalCfg.label}
+                      </span>
+                      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        {selectedNotification.timeLabel}
+                      </span>
+                      {selectedNotification.formattedDate && (
+                        <span className="text-xs text-slate-400 dark:text-slate-500">
+                          · {selectedNotification.formattedDate}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-snug">
+                      {selectedNotification.title}
+                    </h3>
+                  </div>
+                </div>
+
+                {/* Announcement / Message Body - min/max elastic height container */}
+                <div className="min-h-[100px] text-slate-800 dark:text-slate-100">
+                  {hasHtmlContent ? (
+                    <div
+                      className="rich-text-editor-content text-sm sm:text-base leading-relaxed break-words"
+                      dangerouslySetInnerHTML={{ __html: selectedNotification.message }}
+                    />
+                  ) : (
+                    <p className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-normal">
+                      {selectedNotification.message}
+                    </p>
+                  )}
+                </div>
+
+                {isReminder && (
+                  <div className="flex items-center gap-3 rounded-xl bg-amber-50/90 p-4 dark:bg-amber-950/25 text-sm text-amber-900 dark:text-amber-200 border border-amber-200/80 dark:border-amber-900/40">
+                    <Clock size={18} className="shrink-0 text-amber-600 dark:text-amber-400" />
+                    <div className="text-xs sm:text-sm">
+                      <span className="font-semibold">{reminderLeadLabel(selectedNotification)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </AppModal>
       )}
     </header>
   );

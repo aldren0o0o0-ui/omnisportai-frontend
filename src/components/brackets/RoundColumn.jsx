@@ -92,6 +92,7 @@ const RoundColumn = ({
               density={density}
               cardHeight={cardHeight}
               dataBracketRole={matchRole}
+              isChampionMatch={isLastRound && round.matches.length === 1}
             >
               {/* direct horizontal line across full column gap for 1:1 match progression */}
               {drawConnectors && !isPairConvergenceRound && (

@@ -20,7 +20,7 @@ export const getRelatedNotificationPath = ({ roleKey, notification }) => {
   if (eventType === "ANNOUNCEMENT" && Number.isFinite(announcementId) && announcementId > 0) {
     return `/${roleKey}/announcements/${Math.trunc(announcementId)}`;
   }
-  const isMatchReminder = eventType === "MATCH_REMINDER";
+  const isMatchReminder = eventType === "MATCH_REMINDER" || eventType === "MATCH_STARTING_NOW";
   const isMatchResultFinalized = eventType === "MATCH_RESULT_FINALIZED";
   const isTeamApplicationEvent = eventType.startsWith("TEAM_APPLICATION_");
   const isTeamRegistrationEvent = eventType.startsWith("TEAM_REGISTRATION_");
@@ -74,4 +74,4 @@ export const getRelatedNotificationPath = ({ roleKey, notification }) => {
   return null;
 };
 
-export const buildFallbackNotificationPath = (roleKey = "viewer") => `/${String(roleKey || "viewer")}/notifications`;
+export const buildFallbackNotificationPath = (roleKey = "viewer") => `/${String(roleKey || "viewer")}/dashboard`;

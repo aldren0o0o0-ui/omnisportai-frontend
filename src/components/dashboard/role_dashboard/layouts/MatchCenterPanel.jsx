@@ -102,55 +102,65 @@ export const MatchCenterPanel = ({
     matchId && scoreBasePath ? `${scoreBasePath}/${matchId}` : null;
 
   return (
-    <div className="w-full min-w-0 max-w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)] shadow-xs transition-shadow">
+    <div className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)] shadow-xs transition-shadow">
       <div className="grid grid-cols-1 items-stretch lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
         {/* ================= LEFT SIDE: LIVE / FEATURED MATCH CENTER ================= */}
-        <div className="flex flex-col justify-between p-5 sm:p-6 min-w-0">
+        <div className="flex flex-col justify-between p-3.5 sm:p-5 lg:p-6 min-w-0">
           <div>
             {/* Header */}
-            <div className="flex items-center justify-between gap-3 border-b border-[var(--border-soft)] pb-4">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition ${isLiveEvent(currentMatch) ? "bg-rose-500/15 text-rose-600 dark:text-rose-400" : "bg-[var(--primary-soft)] text-[var(--primary)]"}`}><Radio size={18} aria-hidden="true" /></span>
-                <h2 className="truncate text-sm font-extrabold uppercase tracking-wide text-[var(--text-main)] sm:text-base">{roleTitle || "Live Match Center"}</h2>
+            <div className="flex items-center justify-between gap-2 sm:gap-3 border-b border-[var(--border-soft)] pb-3 sm:pb-4">
+              <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
+                <span className={`flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl transition ${isLiveEvent(currentMatch) ? "bg-rose-500/15 text-rose-600 dark:text-rose-400" : "bg-[var(--primary-soft)] text-[var(--primary)]"}`}>
+                  <Radio size={16} className="sm:w-[18px] sm:h-[18px]" aria-hidden="true" />
+                </span>
+                <h2 className="truncate text-xs sm:text-sm md:text-base font-extrabold uppercase tracking-wide text-[var(--text-main)]">
+                  {roleTitle || "Live Match Center"}
+                </h2>
               </div>
               {currentMatch && liveScoringUrl && onOpenScore ? (
-                <button type="button" onClick={() => onOpenScore(currentMatch)} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--primary)]/30 px-3 text-xs font-semibold text-[var(--primary)] transition hover:bg-[var(--primary-soft)]">View Match <ExternalLink size={13} aria-hidden="true" /></button>
+                <button type="button" onClick={() => onOpenScore(currentMatch)} className="inline-flex min-h-8 sm:min-h-9 shrink-0 items-center gap-1 rounded-lg border border-[var(--primary)]/30 px-2.5 sm:px-3 text-[11px] sm:text-xs font-semibold text-[var(--primary)] transition hover:bg-[var(--primary-soft)]">
+                  <span>View Match</span>
+                  <ExternalLink size={12} className="sm:w-[13px] sm:h-[13px]" aria-hidden="true" />
+                </button>
               ) : currentMatch && liveScoringUrl ? (
-                <Link to={liveScoringUrl} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--primary)]/30 px-3 text-xs font-semibold text-[var(--primary)] transition hover:bg-[var(--primary-soft)]">View Match <ExternalLink size={13} aria-hidden="true" /></Link>
+                <Link to={liveScoringUrl} className="inline-flex min-h-8 sm:min-h-9 shrink-0 items-center gap-1 rounded-lg border border-[var(--primary)]/30 px-2.5 sm:px-3 text-[11px] sm:text-xs font-semibold text-[var(--primary)] transition hover:bg-[var(--primary-soft)]">
+                  <span>View Match</span>
+                  <ExternalLink size={12} className="sm:w-[13px] sm:h-[13px]" aria-hidden="true" />
+                </Link>
               ) : null}
             </div>
 
             {/* Content Body */}
             {currentMatch ? (
-              <div className="mt-5 space-y-5">
+              <div className="mt-4 sm:mt-5 space-y-4 sm:space-y-5">
                 {/* Meta details bar */}
-                <div className="flex flex-wrap items-center justify-between gap-2.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-md bg-[var(--primary-soft)] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-[var(--primary)]">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <span className="rounded-md bg-[var(--primary-soft)] px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[var(--primary)]">
                       {getSportLabel(currentMatch)}
                     </span>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--text-muted)]">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-[var(--text-muted)]">
                     <span className="inline-flex items-center gap-1">
-                      <CalendarDays size={13} className="text-[var(--text-soft)]" />
+                      <CalendarDays size={12} className="text-[var(--text-soft)]" />
                       {formatShortDate(currentMatch?.start)}
                     </span>
                     <span className="inline-flex items-center gap-1">
-                      <Clock3 size={13} className="text-[var(--text-soft)]" />
+                      <Clock3 size={12} className="text-[var(--text-soft)]" />
                       {formatTime(currentMatch?.start)}
                     </span>
-                    <span className="inline-flex items-center gap-1">
-                      <MapPin size={13} className="text-[var(--text-soft)]" />
-                      {String(currentMatch?.venue || "Venue TBD")}
+                    <span className="inline-flex items-center gap-1 max-w-[120px] sm:max-w-none truncate" title={String(currentMatch?.venue || "Venue TBD")}>
+                      <MapPin size={12} className="text-[var(--text-soft)] shrink-0" />
+                      <span className="truncate">{String(currentMatch?.venue || "Venue TBD")}</span>
                     </span>
                   </div>
                 </div>
 
                 {/* Matchup Duel View */}
-                <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-6 py-4 px-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 sm:gap-4 md:gap-6 py-2 sm:py-4 px-1 sm:px-2">
                   {/* Home Team */}
-                  <div className="flex min-w-0 flex-col items-center gap-2 text-center">
+                  <div className="flex min-w-0 flex-col items-center gap-1.5 sm:gap-2 text-center">
                     <div className="shrink-0">
                       <TeamLogo
                         imageUrl={
@@ -161,14 +171,13 @@ export const MatchCenterPanel = ({
                         }
                         label={matchup.left}
                         scale="xl"
-                        className="rounded-full"
+                        className="!h-12 !w-12 sm:!h-16 sm:!w-16 md:!h-20 md:!w-20 shrink-0 object-cover"
                       />
                     </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-xs sm:text-sm md:text-base font-extrabold text-[var(--text-main)]">
+                    <div className="min-w-0 w-full">
+                      <p className="truncate text-xs sm:text-sm md:text-base font-extrabold text-[var(--text-main)] max-w-[95px] sm:max-w-[150px] md:max-w-none mx-auto">
                         {matchup.left}
                       </p>
-                      
                     </div>
                   </div>
 
@@ -177,41 +186,41 @@ export const MatchCenterPanel = ({
                     {showScore && liveScoringUrl ? (
                       <Link
                         to={liveScoringUrl}
-                        className="group inline-flex flex-col items-center justify-center rounded-xl p-1 transition hover:scale-105"
+                        className="group inline-flex flex-col items-center justify-center rounded-xl p-0.5 sm:p-1 transition hover:scale-105"
                         title="Open live match score"
                       >
-                        <div className="text-4xl font-black tabular-nums tracking-tight sm:text-5xl text-[var(--text-main)] group-hover:text-[var(--primary)]">
+                        <div className="text-2xl sm:text-4xl md:text-5xl font-black tabular-nums tracking-tight text-[var(--text-main)] group-hover:text-[var(--primary)]">
                           <span>{score.left}</span>
-                          <span className="mx-3 inline-block text-6xl font-bold leading-none text-[var(--text-soft)] sm:text-7xl">/</span>
+                          <span className="mx-1.5 sm:mx-3 inline-block text-3xl sm:text-6xl md:text-7xl font-light leading-none text-[var(--text-soft)]">/</span>
                           <span>{score.right}</span>
                         </div>
                       </Link>
                     ) : showScore ? (
-                      <div className="text-4xl font-black tabular-nums tracking-tight sm:text-5xl text-[var(--text-main)]">
+                      <div className="text-2xl sm:text-4xl md:text-5xl font-black tabular-nums tracking-tight text-[var(--text-main)]">
                         <span>{score.left}</span>
-                        <span className="mx-3 inline-block text-6xl font-bold leading-none text-[var(--text-soft)] sm:text-7xl">/</span>
+                        <span className="mx-1.5 sm:mx-3 inline-block text-3xl sm:text-6xl md:text-7xl font-light leading-none text-[var(--text-soft)]">/</span>
                         <span>{score.right}</span>
                       </div>
                     ) : (
-                      <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-soft)] text-xs font-black uppercase tracking-widest text-[var(--text-soft)] border border-[var(--border-soft)]">
+                      <div className="inline-flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-[var(--surface-soft)] text-[10px] sm:text-xs font-black uppercase tracking-widest text-[var(--text-soft)] border border-[var(--border-soft)]">
                         VS
                       </div>
                     )}
 
                     {/* Clock / Phase */}
                     {(showPhase || showClock) && (
-                      <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
+                      <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center justify-center gap-1 sm:gap-1.5">
                         {showPhase && (
-                          <span className="rounded-md border border-[var(--border-soft)] bg-[var(--surface-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--text-main)]">
+                          <span className="rounded-md border border-[var(--border-soft)] bg-[var(--surface-soft)] px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-[var(--text-main)]">
                             {phaseLabel} {phaseNumber}
                           </span>
                         )}
                         {showClock && (
-                          <span className="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] font-black text-cyan-600 dark:text-cyan-300">
+                          <span className="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 font-mono text-[9px] sm:text-[10px] font-black text-cyan-600 dark:text-cyan-300">
                             {formatMatchClock(visibleClockSeconds)}{" "}
                             {currentMatch?.clock_running && visibleClockSeconds > 0
-                              ? "â€¢ LIVE"
-                              : "â€¢ STOPPED"}
+                              ? "• LIVE"
+                              : "• STOPPED"}
                           </span>
                         )}
                       </div>
@@ -219,7 +228,7 @@ export const MatchCenterPanel = ({
                   </div>
 
                   {/* Away Team */}
-                  <div className="flex min-w-0 flex-col items-center gap-2 text-center">
+                  <div className="flex min-w-0 flex-col items-center gap-1.5 sm:gap-2 text-center">
                     <div className="shrink-0">
                       <TeamLogo
                         imageUrl={
@@ -230,21 +239,20 @@ export const MatchCenterPanel = ({
                         }
                         label={matchup.right}
                         scale="xl"
-                        className="rounded-full"
+                        className="!h-12 !w-12 sm:!h-16 sm:!w-16 md:!h-20 md:!w-20 shrink-0 object-cover"
                       />
                     </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-xs sm:text-sm md:text-base font-extrabold text-[var(--text-main)]">
+                    <div className="min-w-0 w-full">
+                      <p className="truncate text-xs sm:text-sm md:text-base font-extrabold text-[var(--text-main)] max-w-[95px] sm:max-w-[150px] md:max-w-none mx-auto">
                         {matchup.right}
                       </p>
-                      
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="mt-8 flex flex-col items-center justify-center text-center p-6 rounded-xl border border-dashed border-[var(--border-soft)]">
-                <CalendarDays size={32} className="text-[var(--text-soft)] mb-2" />
+              <div className="mt-6 sm:mt-8 flex flex-col items-center justify-center text-center p-4 sm:p-6 rounded-xl border border-dashed border-[var(--border-soft)]">
+                <CalendarDays size={28} className="text-[var(--text-soft)] mb-2" />
                 <p className="text-sm font-bold text-[var(--text-main)]">{emptyTitle}</p>
                 <p className="mt-1 text-xs text-[var(--text-muted)] max-w-sm">
                   {emptyDescription}
@@ -252,25 +260,21 @@ export const MatchCenterPanel = ({
               </div>
             )}
           </div>
-
         </div>
 
         {/* ================= RIGHT SIDE: COMPACT MATCH SCHEDULE ================= */}
-        <div className="relative flex min-w-0 flex-col justify-between border-t border-[var(--border-soft)] bg-[var(--surface-soft)]/10 p-4 before:pointer-events-none before:absolute before:left-0 before:top-1/2 before:hidden before:h-16 before:w-px before:-translate-y-1/2 before:bg-[var(--border-soft)] sm:p-5 lg:border-t-0 lg:before:block">
+        <div className="relative flex min-w-0 flex-col justify-between border-t border-[var(--border-soft)] bg-[var(--surface-soft)]/10 p-3.5 sm:p-5 lg:border-t-0 lg:before:block">
           <div>
             {/* Header */}
-            <div className="flex items-center justify-between gap-3 border-b border-[var(--border-soft)] pb-3">
+            <div className="flex items-center justify-between gap-2 sm:gap-3 border-b border-[var(--border-soft)] pb-2.5 sm:pb-3">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
-                  <CalendarDays size={16} />
+                <span className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+                  <CalendarDays size={15} />
                 </span>
                 <div className="min-w-0">
                   <h3 className="text-xs sm:text-sm font-extrabold uppercase tracking-wide text-[var(--text-main)] truncate">
                     Match Schedule
                   </h3>
-                  <p className="text-[11px] text-[var(--text-muted)] truncate">
-                    "Select a match to preview"
-                  </p>
                 </div>
               </div>
 
@@ -286,10 +290,10 @@ export const MatchCenterPanel = ({
             </div>
 
             {/* Compact Match list (Max 4 items) */}
-            <div className="mt-2.5">
+            <div className="mt-2 sm:mt-2.5">
               {safeEvents.length === 0 ? (
-                <div className="py-8 text-center text-xs text-[var(--text-muted)]">
-                  <CalendarDays size={22} className="mx-auto text-[var(--text-soft)] mb-1.5" />
+                <div className="py-6 sm:py-8 text-center text-xs text-[var(--text-muted)]">
+                  <CalendarDays size={20} className="mx-auto text-[var(--text-soft)] mb-1.5" />
                   <p className="font-semibold text-[var(--text-main)]">No matches found</p>
                   <p className="mt-0.5 text-[11px]">Schedules will appear once generated.</p>
                 </div>
@@ -307,16 +311,16 @@ export const MatchCenterPanel = ({
                         key={eventKey}
                         type="button"
                         onClick={() => setSelectedMatchId(eventKey)}
-                        className={`group w-full text-left rounded-lg px-2.5 py-2 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${
+                        className={`group w-full text-left rounded-lg p-2 sm:px-2.5 sm:py-2 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${
                           isSelected
                             ? "bg-blue-500/10 ring-1 ring-blue-500/40 shadow-xs"
                             : "hover:bg-[var(--surface-soft)]"
                         }`}
                       >
                         {/* Compact Row: Team 1 Logo + Name  VS/Score  Team 2 Name + Logo */}
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center justify-between gap-1 sm:gap-2">
                           {/* Home side */}
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-1">
                             <TeamLogo
                               imageUrl={
                                 event?.participant1?.effective_logo_url ||
@@ -326,33 +330,34 @@ export const MatchCenterPanel = ({
                               }
                               label={eventMatchup.left}
                               scale="sm"
+                              className="!h-6 !w-6 sm:!h-8 sm:!w-8 shrink-0"
                             />
-                            <span className="truncate text-xs font-semibold text-[var(--text-main)]">
+                            <span className="truncate text-[11px] sm:text-xs font-semibold text-[var(--text-main)]">
                               {eventMatchup.left}
                             </span>
                           </div>
 
                           {/* Center: VS or Score */}
-                          <div className="shrink-0 px-1 text-center">
+                          <div className="shrink-0 px-0.5 sm:px-1 text-center">
                             {isLive ? (
-                              <span className="inline-flex items-center gap-1 rounded bg-rose-500/15 px-1 py-0.2 text-[9px] font-black uppercase text-rose-600 dark:text-rose-400 animate-pulse">
+                              <span className="inline-flex items-center gap-1 rounded bg-rose-500/15 px-1 py-0.5 text-[8px] sm:text-[9px] font-black uppercase text-rose-600 dark:text-rose-400 animate-pulse">
                                 <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                                 {eventScore.left}-{eventScore.right}
                               </span>
                             ) : eventScore.hasScore || isCompletedEvent(event) ? (
-                              <span className="font-mono text-xs font-bold text-[var(--text-main)]">
+                              <span className="font-mono text-[11px] sm:text-xs font-bold text-[var(--text-main)] whitespace-nowrap">
                                 {eventScore.left} - {eventScore.right}
                               </span>
                             ) : (
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-soft)]">
+                              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-[var(--text-soft)]">
                                 vs
                               </span>
                             )}
                           </div>
 
                           {/* Away side */}
-                          <div className="flex items-center justify-end gap-1.5 min-w-0 flex-1 text-right">
-                            <span className="truncate text-xs font-semibold text-[var(--text-main)]">
+                          <div className="flex items-center justify-end gap-1 sm:gap-1.5 min-w-0 flex-1 text-right">
+                            <span className="truncate text-[11px] sm:text-xs font-semibold text-[var(--text-main)]">
                               {eventMatchup.right}
                             </span>
                             <TeamLogo
@@ -364,6 +369,7 @@ export const MatchCenterPanel = ({
                               }
                               label={eventMatchup.right}
                               scale="sm"
+                              className="!h-6 !w-6 sm:!h-8 sm:!w-8 shrink-0"
                             />
                           </div>
                         </div>

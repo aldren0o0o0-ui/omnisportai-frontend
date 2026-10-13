@@ -5,13 +5,18 @@ import useTournamentAccess from "../../hooks/useTournamentAccess";
 import { getSportById } from "../../services/sportService";
 import { getTeamRoster, getViewerApplicationTeams } from "../../services/teamService";
 import { getTournaments } from "../../services/tournamentService";
-import { cancelEntryPoolApplication, getVisibleEntryPools } from "../../services/entryPoolService";
+import {
+  attachEntryPoolMedicalCertificate,
+  cancelEntryPoolApplication,
+  getVisibleEntryPools,
+} from "../../services/entryPoolService";
 import {
   attachMedicalCertificate,
   cancelApplication,
   getMyApplications,
   uploadMedicalCertificate,
 } from "../../services/teamApplicationService";
+import { getMedicalCertificateStatus } from "../coach/recruitment/recruitmentWorkflow";
 import AppModal from "../../components/common/AppModal";
 import PageHeaderCard from "../../components/common/PageHeaderCard";
 import DashboardCard from "../../components/common/DashboardCard";
@@ -103,6 +108,12 @@ const ViewerTeams = () => {
     open: false,
     applicationId: null,
     error: "",
+  });
+  const [medCertConfirm, setMedCertConfirm] = useState({
+    open: false,
+    applicationId: null,
+    file: null,
+    sourceType: "TEAM",
   });
 
   const departmentLabel =
@@ -288,7 +299,7 @@ const ViewerTeams = () => {
     if (!location?.state?.applicationSubmitted) return;
     setPageMessage(
       location.state.message ||
-        "Your application has been submitted. The coach will review your information and notify you about the next step."
+      "Your application has been submitted. The coach will review your information and notify you about the next step."
     );
     navigate(`${location.pathname}${location.search || ""}`, { replace: true, state: null });
   }, [location, navigate]);
@@ -317,7 +328,7 @@ const ViewerTeams = () => {
     }
   };
 
-  const handleUploadCertificate = async (applicationId, file) => {
+  const handleUploadCertificate = async (applicationId, file, sourceType = "TEAM") => {
     if (!file) return;
     setUploadingCertAppId(applicationId);
     setPageMessage("");
@@ -327,14 +338,18 @@ const ViewerTeams = () => {
       if (!fileUrl) {
         throw new Error("Medical certificate upload failed.");
       }
-      await attachMedicalCertificate(applicationId, fileUrl);
+      if (sourceType === "POOL") {
+        await attachEntryPoolMedicalCertificate(applicationId, fileUrl);
+      } else {
+        await attachMedicalCertificate(applicationId, fileUrl);
+      }
       setPageMessage("Medical certificate uploaded successfully.");
       await loadData();
     } catch (error) {
       setPageMessage(
         error?.response?.data?.detail ||
-          error?.message ||
-          "Failed to upload medical certificate. Please upload a valid file (PDF/JPG/PNG/WEBP)."
+        error?.message ||
+        "Failed to upload medical certificate. Please upload a valid file (PDF/JPG/PNG/WEBP)."
       );
     } finally {
       setUploadingCertAppId(null);
@@ -412,18 +427,6 @@ const ViewerTeams = () => {
         breadcrumbs={pageBreadcrumbs}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={selectedTournamentId}
-              onChange={(event) => handleTournamentChange(event.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-            >
-              <option value="">Select Tournament</option>
-              {tournaments.map((row) => (
-                <option key={`viewer-team-tournament-${row.id}`} value={row.id}>
-                  {row.tournament_name || "Unnamed tournament"}
-                </option>
-              ))}
-            </select>
             <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50">
               Department: <span className="font-bold text-slate-700 dark:text-slate-200">{departmentLabel}</span>
             </div>
@@ -437,13 +440,13 @@ const ViewerTeams = () => {
         </div>
       ) : null}
 
-      <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {/* <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <MetricCard title="For Tryout" value={summary.forTryout} icon={Users} color="blue" />
         <MetricCard title="Accepted" value={summary.accepted} icon={CheckCircle} color="green" />
         <MetricCard title="Closed" value={summary.closed} icon={XCircle} color="slate" />
-      </section>
+      </section> */}
 
-      {selectedTournamentId ? (
+      {/* {selectedTournamentId ? (
         <div className="mb-6">
           <ApplicationQuotaBanner
             approvedCount={activeSlotCount}
@@ -451,171 +454,171 @@ const ViewerTeams = () => {
             totalApplications={scopedApplications.length + poolApplications.length}
           />
         </div>
-      ) : null}
+      ) : null} */}
 
-      <DashboardCard className="mb-6">
+      {/* <DashboardCard className="mb-6"> */}
 
-        <div className="mb-4">
+      {/* <div className="mb-4">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Available Teams</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Teams are shown for the selected tournament and your department only.
           </p>
-        </div>
-        {!selectedTournamentId ? (
-          <EmptyState message="Select a tournament to view teams you can apply to." />
-        ) : null}
-        {selectedTournamentId && isLoading ? (
-          <LoadingState message="Loading available teams..." />
-        ) : selectedTournamentId && teams.length === 0 ? (
-          <EmptyState message="No visible team registration slots are currently available for your department." />
-        ) : selectedTournamentId ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {teams.map((team) => {
-              const status = toUpper(team.latest_application_canonical_status || team.latest_application_status);
-              const info = statusInfo(status);
-              const currentPlayers = rosterCountsByTeamId[team.id];
-              const maxPlayers = sportCapsBySportId[team.sport_id];
-              const statusRow = applicationsByTeamId[team.id];
+        </div> */}
+      {!selectedTournamentId ? (
+        <EmptyState message="Select a tournament to view teams you can apply to." />
+      ) : null}
+      {selectedTournamentId && isLoading ? (
+        <LoadingState message="Loading available teams..." />
+      ) : selectedTournamentId && teams.length === 0 ? (
+        <EmptyState message="No visible team registration slots are currently available for your department." />
+      ) : selectedTournamentId ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {teams.map((team) => {
+            const status = toUpper(team.latest_application_canonical_status || team.latest_application_status);
+            const info = statusInfo(status);
+            const currentPlayers = rosterCountsByTeamId[team.id];
+            const maxPlayers = sportCapsBySportId[team.sport_id];
+            const statusRow = applicationsByTeamId[team.id];
 
-              return (
-                <div key={team.id} className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-5 transition hover:border-blue-300 dark:border-slate-800 dark:bg-slate-800/50 dark:hover:border-blue-700">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <TeamLogo imageUrl={team.logo_url} label={team.team_name} scale="lg" className="shrink-0" />
-                      <h3 className="min-w-0 break-words text-base font-bold text-slate-900 dark:text-white">{team.team_name}</h3>
-                    </div>
-                    {status ? <StatusBadge status={status} /> : null}
+            return (
+              <div key={team.id} className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-5 transition hover:border-blue-300 dark:border-slate-800 dark:bg-slate-800/50 dark:hover:border-blue-700">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <TeamLogo imageUrl={team.logo_url} label={team.team_name} scale="lg" className="shrink-0" />
+                    <h3 className="min-w-0 break-words text-base font-bold text-slate-900 dark:text-white">{team.team_name}</h3>
                   </div>
-                  
-                  <div className="mt-4 flex-1 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                    <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
-                      <span className="text-slate-500">Sport</span>
-                      <span className="font-medium">{getSportDisplayName(team, "-")}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
-                      <span className="text-slate-500">Coach</span>
-                      <span className="font-medium">{team.coach_name || team.coach_email || "Not assigned"}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
-                      <span className="text-slate-500">Roster</span>
-                      <span className="font-medium">{currentPlayers ?? "-"} / {maxPlayers ?? "-"}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
-                      <span className="text-slate-500">Applications</span>
-                      <span className="font-medium">{team.applications_open ? "Open" : "Closed"}</span>
-                    </div>
+                  {status ? <StatusBadge status={status} /> : null}
+                </div>
+
+                <div className="mt-4 flex-1 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                  <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
+                    <span className="text-slate-500">Sport</span>
+                    <span className="font-medium">{getSportDisplayName(team, "-")}</span>
                   </div>
-                  
-                  <div className="mt-4">
-                    {status ? (
-                      <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">{info.hint}</p>
-                    ) : !team.applications_open ? (
-                      <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">Coach has not opened applications yet.</p>
-                    ) : !team.coach_id ? (
-                      <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">Coach assignment is still pending.</p>
-                    ) : (
-                      <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">No application submitted yet.</p>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={!team.can_apply || !selectedTournamentId || participationLimitReached}
-                        onClick={() => handleApply(team)}
-                        className="flex-1 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {participationLimitReached && !status ? "Participation Limit Reached" : team.can_apply ? "Apply for This Tournament" : status ? "Applied" : "Applications Closed"}
-                      </button>
-                      {statusRow && CANCELLABLE_STATUSES.has(toUpper(statusRow.application_status)) ? (
-                        <button
-                          type="button"
-                          onClick={() => setCancelModal({ open: true, applicationId: statusRow.id, error: "" })}
-                          disabled={cancelingApplicationId === statusRow.id}
-                          className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                        >
-                          {cancelingApplicationId === statusRow.id ? "..." : "Cancel"}
-                        </button>
-                      ) : null}
-                    </div>
+                  <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
+                    <span className="text-slate-500">Coach</span>
+                    <span className="font-medium">{team.coach_name || team.coach_email || "Not assigned"}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
+                    <span className="text-slate-500">Roster</span>
+                    <span className="font-medium">{currentPlayers ?? "-"} / {maxPlayers ?? "-"}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
+                    <span className="text-slate-500">Applications</span>
+                    <span className="font-medium">{team.applications_open ? "Open" : "Closed"}</span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        ) : null}
-      </DashboardCard>
 
-      <DashboardCard className="mb-6">
-        <div className="mb-4">
+                <div className="mt-4">
+                  {status ? (
+                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">{info.hint}</p>
+                  ) : !team.applications_open ? (
+                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">Coach has not opened applications yet.</p>
+                  ) : !team.coach_id ? (
+                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">Coach assignment is still pending.</p>
+                  ) : (
+                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">No application submitted yet.</p>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={!team.can_apply || !selectedTournamentId || participationLimitReached}
+                      onClick={() => handleApply(team)}
+                      className="flex-1 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {participationLimitReached && !status ? "Participation Limit Reached" : team.can_apply ? "Apply for This Tournament" : status ? "Applied" : "Applications Closed"}
+                    </button>
+                    {statusRow && CANCELLABLE_STATUSES.has(toUpper(statusRow.application_status)) ? (
+                      <button
+                        type="button"
+                        onClick={() => setCancelModal({ open: true, applicationId: statusRow.id, error: "" })}
+                        disabled={cancelingApplicationId === statusRow.id}
+                        className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                      >
+                        {cancelingApplicationId === statusRow.id ? "..." : "Cancel"}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+      {/* </DashboardCard> */}
+
+      {/* <DashboardCard className="mb-6"> */}
+      {/* <div className="mb-4">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Individual / Pair Entry Pools</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Apply to SOLO and DUO recruitment pools in your department before the coach finalizes actual entries.
           </p>
-        </div>
-        {!selectedTournamentId ? (
-          <EmptyState message="Select a tournament to view entry pools you can apply to." />
-        ) : selectedTournamentId && isLoading ? (
-          <LoadingState message="Loading entry pools..." />
-        ) : selectedTournamentId && entryPools.length === 0 ? (
-          <EmptyState message="No visible SOLO or DUO entry pools are currently available for your department." />
-        ) : selectedTournamentId ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {entryPools.map((pool) => {
-              const status = toUpper(pool.my_application_status);
-              const info = statusInfo(status);
-              const canApply = Boolean(pool.applications_open) && !status && !participationLimitReached;
-              return (
-                <div key={`entry-pool-${pool.id}`} className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-5 transition hover:border-blue-300 dark:border-slate-800 dark:bg-slate-800/50 dark:hover:border-blue-700">
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">{pool.pool_name}</h3>
-                    {status ? <StatusBadge status={status} /> : <StatusBadge status={pool.status} />}
+        </div> */}
+      {!selectedTournamentId ? (
+        <EmptyState message="Select a tournament to view entry pools you can apply to." />
+      ) : selectedTournamentId && isLoading ? (
+        <LoadingState message="Loading entry pools..." />
+      ) : selectedTournamentId && entryPools.length === 0 ? (
+        <EmptyState message="No visible SOLO or DUO entry pools are currently available for your department." />
+      ) : selectedTournamentId ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {entryPools.map((pool) => {
+            const status = toUpper(pool.my_application_status);
+            const info = statusInfo(status);
+            const canApply = Boolean(pool.applications_open) && !status && !participationLimitReached;
+            return (
+              <div key={`entry-pool-${pool.id}`} className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-5 transition hover:border-blue-300 dark:border-slate-800 dark:bg-slate-800/50 dark:hover:border-blue-700">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">{pool.pool_name}</h3>
+                  {status ? <StatusBadge status={status} /> : <StatusBadge status={pool.status} />}
+                </div>
+                <div className="mt-4 flex-1 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                  <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
+                    <span className="text-slate-500">Sport</span>
+                    <span className="font-medium">{getSportDisplayName(pool, "-")}</span>
                   </div>
-                  <div className="mt-4 flex-1 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                    <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
-                      <span className="text-slate-500">Sport</span>
-                      <span className="font-medium">{getSportDisplayName(pool, "-")}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
-                      <span className="text-slate-500">Shape</span>
-                      <span className="font-medium">{pool.participant_shape}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
-                      <span className="text-slate-500">Coach</span>
-                      <span className="font-medium">{pool.coach_name || "Not assigned"}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
-                      <span className="text-slate-500">Applications</span>
-                      <span className="font-medium">{pool.applications_open ? "Open" : "Closed"}</span>
-                    </div>
+                  <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
+                    <span className="text-slate-500">Shape</span>
+                    <span className="font-medium">{pool.participant_shape}</span>
                   </div>
-                  <div className="mt-4">
-                    {status ? (
-                      <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">{info.hint}</p>
-                    ) : !pool.applications_open ? (
-                      <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">Coach has not opened applications yet.</p>
-                    ) : !pool.coach_user_id ? (
-                      <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">Coach assignment is still pending.</p>
-                    ) : (
-                      <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">No application submitted yet.</p>
-                    )}
-                    <button
-                      type="button"
-                      disabled={!canApply}
-                      onClick={() => handleApplyToPool(pool.id)}
-                      className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {canApply
-                        ? "Apply to Entry Pool"
-                        : status
-                            ? "Applied"
-                            : participationLimitReached ? "Participation Limit Reached" : "Applications Closed"}
-                    </button>
+                  <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
+                    <span className="text-slate-500">Coach</span>
+                    <span className="font-medium">{pool.coach_name || "Not assigned"}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-200 pb-2 dark:border-slate-700/50">
+                    <span className="text-slate-500">Applications</span>
+                    <span className="font-medium">{pool.applications_open ? "Open" : "Closed"}</span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        ) : null}
-      </DashboardCard>
+                <div className="mt-4">
+                  {status ? (
+                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">{info.hint}</p>
+                  ) : !pool.applications_open ? (
+                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">Coach has not opened applications yet.</p>
+                  ) : !pool.coach_user_id ? (
+                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">Coach assignment is still pending.</p>
+                  ) : (
+                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">No application submitted yet.</p>
+                  )}
+                  <button
+                    type="button"
+                    disabled={!canApply}
+                    onClick={() => handleApplyToPool(pool.id)}
+                    className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {canApply
+                      ? "Apply to Entry Pool"
+                      : status
+                        ? "Applied"
+                        : participationLimitReached ? "Participation Limit Reached" : "Applications Closed"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+      {/* </DashboardCard> */}
 
       <DashboardCard>
         <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">My Applications</h2>
@@ -639,19 +642,19 @@ const ViewerTeams = () => {
                 return <span className="flex min-w-0 items-center gap-2"><TeamLogo imageUrl={team?.logo_url} label={name} scale="sm" className="shrink-0" /><span className="break-words">{name}</span></span>;
               },
             },
-            { 
-              header: "Sport", 
-              accessor: "sport", 
+            {
+              header: "Sport",
+              accessor: "sport",
               render: (row) => teamById[row.team_id]?.sport_name || "Unassigned sport"
             },
-            { 
-              header: "Status", 
-              accessor: "status", 
+            {
+              header: "Status",
+              accessor: "status",
               render: (row) => <StatusBadge status={row.application_status} />
             },
-            { 
-              header: "Applied", 
-              accessor: "created_at", 
+            {
+              header: "Applied",
+              accessor: "created_at",
               render: (row) => formatDateTime(row.created_at)
             },
             { header: "Decision Note", accessor: "decision_note", render: (row) => row.decision_note || "-" },
@@ -676,17 +679,28 @@ const ViewerTeams = () => {
                   );
                 }
                 if (status === "ACCEPTED_AS_PLAYER") {
-                  const hasCertificate = Boolean(String(row.health_notes || "").trim());
-                  if (hasCertificate) {
+                  const medStatus = getMedicalCertificateStatus(row);
+                  if (medStatus === "RECEIVED") {
                     return (
                       <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                        Certificate uploaded
+                        Certificate approved
+                      </span>
+                    );
+                  }
+                  if (medStatus === "PENDING") {
+                    return (
+                      <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                        Certificate pending review
                       </span>
                     );
                   }
                   return (
                     <label className="inline-flex cursor-pointer items-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500">
-                      {uploadingCertAppId === row.id ? "Uploading..." : "Upload Medical Certificate"}
+                      {uploadingCertAppId === row.id
+                        ? "Uploading..."
+                        : medStatus === "REJECTED"
+                          ? "Resubmit Medical Certificate"
+                          : "Upload Medical Certificate"}
                       <input
                         type="file"
                         accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
@@ -694,7 +708,7 @@ const ViewerTeams = () => {
                         onChange={(event) => {
                           const file = event.target.files?.[0] || null;
                           event.target.value = "";
-                          handleUploadCertificate(row.id, file);
+                          if (file) setMedCertConfirm({ open: true, applicationId: row.id, file, sourceType: "TEAM" });
                         }}
                         className="hidden"
                       />
@@ -725,7 +739,48 @@ const ViewerTeams = () => {
                 className: "text-right",
                 cellClassName: "text-right",
                 render: (row) => {
-                  if (!CANCELLABLE_STATUSES.has(toUpper(row.my_application_status))) {
+                  const status = toUpper(row.my_application_status);
+                  if (status === "ACCEPTED_AS_PLAYER") {
+                    const medStatus = getMedicalCertificateStatus({
+                      medical_certificate_status: row.my_application_medical_certificate_status,
+                      health_notes: row.my_application_health_notes || row.health_notes,
+                    });
+                    if (medStatus === "RECEIVED") {
+                      return (
+                        <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                          Certificate approved
+                        </span>
+                      );
+                    }
+                    if (medStatus === "PENDING") {
+                      return (
+                        <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                          Certificate pending review
+                        </span>
+                      );
+                    }
+                    return (
+                      <label className="inline-flex cursor-pointer items-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500">
+                        {uploadingCertAppId === row.my_application_id
+                          ? "Uploading..."
+                          : medStatus === "REJECTED"
+                            ? "Resubmit Medical Certificate"
+                            : "Upload Medical Certificate"}
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                          disabled={uploadingCertAppId === row.my_application_id}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] || null;
+                            event.target.value = "";
+                            if (file) setMedCertConfirm({ open: true, applicationId: row.my_application_id, file, sourceType: "POOL" });
+                          }}
+                          className="hidden"
+                        />
+                      </label>
+                    );
+                  }
+                  if (!CANCELLABLE_STATUSES.has(status)) {
                     return <span className="text-xs text-slate-400">No actions</span>;
                   }
                   return (
@@ -781,6 +836,61 @@ const ViewerTeams = () => {
               className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-60"
             >
               {cancelingApplicationId ? "Cancelling..." : "Confirm Cancel"}
+            </button>
+          </div>
+        </div>
+      </AppModal>
+
+      {/* Medical certificate submission confirmation — Teams page */}
+      <AppModal
+        open={medCertConfirm.open}
+        onClose={() => {
+          if (uploadingCertAppId === medCertConfirm.applicationId) return;
+          setMedCertConfirm({ open: false, applicationId: null, file: null });
+        }}
+        title="Submit medical certificate?"
+        subtitle="Please confirm this is the correct file before sending it to your coach."
+        maxWidthClass="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-700 dark:text-slate-300">
+            You are about to submit:
+          </p>
+          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800">
+            <CheckCircle size={15} className="shrink-0 text-blue-500" />
+            <span className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+              {medCertConfirm.file?.name || "—"}
+            </span>
+            <span className="ml-auto shrink-0 text-xs text-slate-500 dark:text-slate-400">
+              {medCertConfirm.file ? `${(medCertConfirm.file.size / 1024).toFixed(0)} KB` : ""}
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Once submitted, your coach will review the certificate. If it is rejected you can re-upload.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              disabled={uploadingCertAppId === medCertConfirm.applicationId}
+              onClick={() => setMedCertConfirm({ open: false, applicationId: null, file: null })}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={uploadingCertAppId === medCertConfirm.applicationId}
+              onClick={async () => {
+                const { applicationId, file, sourceType } = medCertConfirm;
+                setMedCertConfirm({ open: false, applicationId: null, file: null, sourceType: "TEAM" });
+                if (applicationId && file) {
+                  await handleUploadCertificate(applicationId, file, sourceType || "TEAM");
+                }
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
+            >
+              <CheckCircle size={14} />
+              {uploadingCertAppId === medCertConfirm.applicationId ? "Uploading..." : "Yes, submit"}
             </button>
           </div>
         </div>

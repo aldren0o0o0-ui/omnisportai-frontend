@@ -6,19 +6,25 @@ import { useAuth } from './AuthContext';
 const WorkspaceContext = createContext(null);
 const SELECTED_INTRAMURAL_STORAGE_KEY = 'omnisport:selected-intramural-id';
 
-const readStoredSelectedIntramuralId = () => {
+export const readStoredSelectedIntramuralId = () => {
   if (typeof window === 'undefined') return null;
-  const value = Number(window.localStorage.getItem(SELECTED_INTRAMURAL_STORAGE_KEY) || 0);
+  const raw = window.localStorage.getItem(SELECTED_INTRAMURAL_STORAGE_KEY);
+  if (raw === 'none') return 'none';
+  const value = Number(raw || 0);
   return Number.isFinite(value) && value > 0 ? value : null;
 };
 
 const writeStoredSelectedIntramuralId = (workspaceId) => {
   if (typeof window === 'undefined') return;
+  if (workspaceId === 'none' || workspaceId === null) {
+    window.localStorage.setItem(SELECTED_INTRAMURAL_STORAGE_KEY, 'none');
+    return;
+  }
   const value = Number(workspaceId || 0);
   if (Number.isFinite(value) && value > 0) {
     window.localStorage.setItem(SELECTED_INTRAMURAL_STORAGE_KEY, String(value));
   } else {
-    window.localStorage.removeItem(SELECTED_INTRAMURAL_STORAGE_KEY);
+    window.localStorage.setItem(SELECTED_INTRAMURAL_STORAGE_KEY, 'none');
   }
 };
 
@@ -126,6 +132,11 @@ export const WorkspaceProvider = ({ children }) => {
     if (authLoading || !isAuthenticated || loading || restoredSelectionRef.current) return undefined;
     restoredSelectionRef.current = true;
     const storedId = readStoredSelectedIntramuralId();
+    if (storedId === 'none') {
+      userPickedRef.current = true;
+      setSelectedIntramural(null);
+      return undefined;
+    }
     if (!storedId) {
       if (workspace) {
         if (!userPickedRef.current) setSelectedIntramural(workspace);
@@ -185,14 +196,18 @@ export const WorkspaceProvider = ({ children }) => {
   }, [authLoading, isAuthenticated, loading, workspace]);
 
   // Change the viewing context (any authenticated role). Frontend-only: does
-  // NOT activate a workspace in the backend. Passing null (or the active
-  // intramural) resets to following the active season again.
+  // NOT activate a workspace in the backend. Passing null clears the selection.
   const selectIntramural = useCallback((intramural) => {
-    const isActiveOne = intramural && workspace && intramural.id === workspace.id;
-    userPickedRef.current = Boolean(intramural) && !isActiveOne;
-    const next = intramural || workspace || null;
-    writeStoredSelectedIntramuralId(next?.id || null);
-    setSelectedIntramural(next);
+    if (!intramural) {
+      userPickedRef.current = true;
+      writeStoredSelectedIntramuralId('none');
+      setSelectedIntramural(null);
+      return;
+    }
+    const isActiveOne = workspace && intramural.id === workspace.id;
+    userPickedRef.current = !isActiveOne;
+    writeStoredSelectedIntramuralId(intramural.id);
+    setSelectedIntramural(intramural);
   }, [workspace]);
 
   const isActive = workspace?.is_active === true;

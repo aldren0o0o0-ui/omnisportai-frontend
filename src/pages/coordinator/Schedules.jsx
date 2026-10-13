@@ -1,5 +1,6 @@
 import ScheduleCheckDialog from "../../components/schedule/ScheduleCheckDialog";
 import ScheduleEmptyState from "../../components/schedule/ScheduleEmptyState";
+import ScheduleQualitySummary from "../../components/schedule/ScheduleQualitySummary";
 import MatchDetailModal from "../../components/schedule/modals/MatchDetailModal";
 import ScheduleIssueModal from "../../components/schedule/modals/ScheduleIssueModal";
 import VenueProfilesModal from "../../components/schedule/modals/VenueProfilesModal";
@@ -157,6 +158,7 @@ const Schedules = () => {
   const [venueDrawerOpen, setVenueDrawerOpen] = useState(false);
   // eslint-disable-next-line no-unused-vars
   const [eventDetailOpen, setEventDetailOpen] = useState(false);
+  const [detailItem, setDetailItem] = useState(null);
   const [focusedScheduleTarget, setFocusedScheduleTarget] = useState(null);
   const [hoverPopover, setHoverPopover] = useState(null);
   const [pinnedPopover, setPinnedPopover] = useState(null);
@@ -3050,36 +3052,36 @@ const Schedules = () => {
   }
 
   return <div className="os-schedule-page-enter os-themed-page flex min-h-full min-w-0 flex-col gap-6 overflow-x-hidden pb-2">
-      {isViewingHistorical && <HistoricalBanner />}
+    {isViewingHistorical && <HistoricalBanner />}
 
-      {showLiveWarningBanner ? <section className={`rounded-xl border px-4 py-3 text-sm ${compactStatusClass}`}>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p>{status.message || "Live scheduling updates are healthy."}</p>
-            {!healthyLive ? <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-900/30 dark:text-amber-300">
-                <AlertTriangle size={11} />
-                Monitor conflicts
-              </span> : null}
-          </div>
-          {status.suggestions.length > 0 ? <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {status.suggestions.map((suggestion, index) => <article key={`suggestion-${index}`} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-xs text-slate-700 dark:border-slate-700 dark:bg-[var(--surface)] dark:text-slate-200">
-                  <p className="font-semibold">Suggested Action</p>
-                  <p className="mt-1">
-                    {suggestion.label || `${new Date(suggestion.start).toLocaleString()} - ${suggestion.venue_name}`}
-                  </p>
-                </article>)}
-            </div> : null}
-        </section> : null}
-      <VenueScheduleHeader
-        selectedTournament={selectedTournament}
-        title="Schedule"
-        subtitle="View match dates, venues, and times."
-        primaryAction={commandCenterPrimaryAction}
-        secondaryActions={headerDirectActions}
-        actionsMenu={headerSecondaryActions}
-        statusBadges={headerStatusBadges}
-      />
+    {showLiveWarningBanner ? <section className={`rounded-xl border px-4 py-3 text-sm ${compactStatusClass}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p>{status.message || "Live scheduling updates are healthy."}</p>
+        {!healthyLive ? <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-900/30 dark:text-amber-300">
+          <AlertTriangle size={11} />
+          Monitor conflicts
+        </span> : null}
+      </div>
+      {status.suggestions.length > 0 ? <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {status.suggestions.map((suggestion, index) => <article key={`suggestion-${index}`} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-xs text-slate-700 dark:border-slate-700 dark:bg-[var(--surface)] dark:text-slate-200">
+          <p className="font-semibold">Suggested Action</p>
+          <p className="mt-1">
+            {suggestion.label || `${new Date(suggestion.start).toLocaleString()} - ${suggestion.venue_name}`}
+          </p>
+        </article>)}
+      </div> : null}
+    </section> : null}
+    <VenueScheduleHeader
+      selectedTournament={selectedTournament}
+      title="Schedule"
+      subtitle="View match dates, venues, and times."
+      primaryAction={commandCenterPrimaryAction}
+      secondaryActions={headerDirectActions}
+      actionsMenu={headerSecondaryActions}
+      statusBadges={headerStatusBadges}
+    />
 
-      {hasScheduleRows ? <VenueScheduleFilterBar tournaments={tournaments} 
+    {/* {hasScheduleRows ? <VenueScheduleFilterBar tournaments={tournaments} 
                                                  selectedTournamentId={selectedTournamentId} 
                                                  onSelectTournament={setSelectedTournamentId} 
                                                  minRestMinutes={minRestMinutes} 
@@ -3100,30 +3102,30 @@ const Schedules = () => {
                                                  refreshing={loading} 
                                                  refreshDisabled={!hasTournamentSelected || loading} 
                                                  refreshDisabledReason={refreshDisabledReason} hasActiveFilters={hasActiveFilters} 
-                                                 onClearFilters={handleClearFilters} /> : null}
+                                                 onClearFilters={handleClearFilters} /> : null} */}
 
-	      {hasScheduleRows && showLegacyVenueFallbackNotice ? <section className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
-          <p className="font-semibold">
-            No tournament venues are assigned. The scheduler may use global active compatible venues for backward compatibility.
-          </p>
-          <p className="mt-1">
-            Assign tournament-specific venues to tighten scheduling control and reduce cross-tournament venue risk.
-          </p>
-          <button type="button" onClick={() => {
-            const destination = resolveScheduleDestination("venues");
-            if (destination) navigate(destination);
-          }} className="mt-2 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 dark:border-amber-500/40 dark:bg-[var(--surface)] dark:text-amber-300 dark:hover:bg-amber-500/10">
-            Manage Venues
-          </button>
-	        </section> : null}
+    {hasScheduleRows && showLegacyVenueFallbackNotice ? <section className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+      <p className="font-semibold">
+        No tournament venues are assigned. The scheduler may use global active compatible venues for backward compatibility.
+      </p>
+      <p className="mt-1">
+        Assign tournament-specific venues to tighten scheduling control and reduce cross-tournament venue risk.
+      </p>
+      <button type="button" onClick={() => {
+        const destination = resolveScheduleDestination("venues");
+        if (destination) navigate(destination);
+      }} className="mt-2 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 dark:border-amber-500/40 dark:bg-[var(--surface)] dark:text-amber-300 dark:hover:bg-amber-500/10">
+        Manage Venues
+      </button>
+    </section> : null}
 
-	      <section className="grid min-w-0 max-w-full items-stretch gap-4 overflow-x-hidden">
-	        <div
-            ref={schedulePanelRef}
-            tabIndex={-1}
-            className="relative flex min-h-0 min-w-0 max-w-full flex-col gap-3 overflow-x-hidden outline-none"
-          >
-          {/* {hasTournamentSelected ? (
+    <section className="grid min-w-0 max-w-full items-stretch gap-4 overflow-x-hidden">
+      <div
+        ref={schedulePanelRef}
+        tabIndex={-1}
+        className="relative flex min-h-0 min-w-0 max-w-full flex-col gap-3 overflow-x-hidden outline-none"
+      >
+        {/* {hasTournamentSelected ? (
             <section className="rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-[var(--surface)]/95">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
@@ -3140,66 +3142,92 @@ const Schedules = () => {
               </div>
             </section>
            ) : null} */}
-          {hasTournamentSelected && !scheduleEmptyState && calendarUnscheduledReal.length > 0 ? <section className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
-              <p className="font-semibold">
-                {calendarUnscheduledReal.length} match{calendarUnscheduledReal.length === 1 ? "" : "es"} are not on the calendar
-              </p>
-              <p className="mt-1 text-rose-700/90 dark:text-rose-300/90">
-                These matches could not be assigned a valid time and venue. They are not shown in the calendar because they have no schedule yet.
-              </p>
-              <button type="button" onClick={() => handleOpenIssueDrawerSection("unscheduled-matches")} className="mt-2 rounded-md border border-rose-300 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 dark:border-rose-500/40 dark:bg-[var(--surface)] dark:text-rose-300 dark:hover:bg-rose-500/10">
-                Review Unscheduled Matches
-              </button>
-            </section> : null}
-          {scheduleEmptyState ? <ScheduleEmptyState
-              title={scheduleEmptyState.title}
-              description={scheduleEmptyState.description}
-              actionLabel={scheduleEmptyState.actionLabel || (scheduleEmptyState.canGenerate ? "Generate Schedule" : "")}
-              onAction={scheduleEmptyState.key === "blocked"
-                ? () => {
-                    const issues = Array.isArray(preflightResult?.blocking_issues)
-                      ? preflightResult.blocking_issues.map(presentScheduleIssue)
-                      : [];
-                    setScheduleCheckMode("blocked");
-                    setScheduleCheckIssues(issues);
-                    setPreflightModalOpen(true);
-                  }
-                : scheduleEmptyState.canGenerate
-                  ? runCommandCenterGenerate
-                  : null}
-              actionDisabled={guidedGenerationBusy || tournamentAccessLoading}
-              loadingLabel={guidedGenerationBusy ? guidedGenerationBusyLabel : ""}
-            /> : <ScheduleCalendarWorkspace events={visibleEventsWithIssues} selectedEventId={selectedEvent?.match_id || selectedEvent?.id || null} blockedWindows={visibleTournamentBlocks} focusedIssueTarget={focusedScheduleTarget} editable={!generating && !preflightRunning} minHour={calendarStartHour} maxHour={calendarEndHour} onEventDrop={handleEventDrop} onEventResize={handleEventResize} onSelectEvent={handleCalendarItemSelect} onSelectEmpty={closePinnedPopover} onCalendarItemHover={handleCalendarItemHover} onCalendarItemLeave={handleCalendarItemHoverEnd} onCalendarItemSelect={handleCalendarItemSelect} viewMode={viewMode} onViewModeChange={handleViewModeChange} currentDate={calendarDate} onCurrentDateChange={setCalendarDate} tournamentStartDate={tournamentStartDate} tournamentEndDate={tournamentEndDate} />}
+        {hasTournamentSelected && !scheduleEmptyState && calendarUnscheduledReal.length > 0 ? <section className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+          <p className="font-semibold">
+            {calendarUnscheduledReal.length} match{calendarUnscheduledReal.length === 1 ? "" : "es"} are not on the calendar
+          </p>
+          <p className="mt-1 text-rose-700/90 dark:text-rose-300/90">
+            These matches could not be assigned a valid time and venue. They are not shown in the calendar because they have no schedule yet.
+          </p>
+          <button type="button" onClick={() => handleOpenIssueDrawerSection("unscheduled-matches")} className="mt-2 rounded-md border border-rose-300 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 dark:border-rose-500/40 dark:bg-[var(--surface)] dark:text-rose-300 dark:hover:bg-rose-500/10">
+            Review Unscheduled Matches
+          </button>
+        </section> : null}
 
-          {activePopoverItem ? <div className="pointer-events-none absolute inset-0 z-30">
-              <article className="pointer-events-auto absolute w-full max-w-xs rounded-xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-700 dark:bg-[var(--surface)]" style={popoverDisplayStyle}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {activePopover?.type === "MATCH" ? `${String(activePopoverItem?.team1_label || "Team 1")} vs ${String(activePopoverItem?.team2_label || "Team 2")}` : activePopover?.title || "Schedule item"}
-                    </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                      <span>{activePopoverItem?.sportDisplayLabel || activePopoverItem?.sport || "Sport"}</span>
-                      <span>·</span>
-                      <span>{formatTimeRangeLabel(activePopoverItem?.start, activePopoverItem?.end)}</span>
-                    </div>
+        {hasTournamentSelected && !scheduleEmptyState && (hasScheduleRows || generationResult) ? (
+          <ScheduleQualitySummary
+            generationResult={generationResult}
+            validationResult={validationResult}
+            eventsCount={normalizedEventsWithIssues.length}
+            onOpenValidationDetails={() => handleOpenIssueDrawerSection("calendar-conflicts")}
+          />
+        ) : null}
+
+        {scheduleEmptyState ? <ScheduleEmptyState
+          title={scheduleEmptyState.title}
+          description={scheduleEmptyState.description}
+          actionLabel={scheduleEmptyState.actionLabel || (scheduleEmptyState.canGenerate ? "Generate Schedule" : "")}
+          onAction={scheduleEmptyState.key === "blocked"
+            ? () => {
+              const issues = Array.isArray(preflightResult?.blocking_issues)
+                ? preflightResult.blocking_issues.map(presentScheduleIssue)
+                : [];
+              setScheduleCheckMode("blocked");
+              setScheduleCheckIssues(issues);
+              setPreflightModalOpen(true);
+            }
+            : scheduleEmptyState.canGenerate
+              ? runCommandCenterGenerate
+              : null}
+          actionDisabled={guidedGenerationBusy || tournamentAccessLoading}
+          loadingLabel={guidedGenerationBusy ? guidedGenerationBusyLabel : ""}
+        /> : <ScheduleCalendarWorkspace events={visibleEventsWithIssues} selectedEventId={selectedEvent?.match_id || selectedEvent?.id || null} blockedWindows={visibleTournamentBlocks} focusedIssueTarget={focusedScheduleTarget} editable={!generating && !preflightRunning} minHour={calendarStartHour} maxHour={calendarEndHour} onEventDrop={handleEventDrop} onEventResize={handleEventResize} onSelectEvent={handleCalendarItemSelect} onSelectEmpty={closePinnedPopover} onCalendarItemHover={handleCalendarItemHover} onCalendarItemLeave={handleCalendarItemHoverEnd} onCalendarItemSelect={handleCalendarItemSelect} viewMode={viewMode} onViewModeChange={handleViewModeChange} currentDate={calendarDate} onCurrentDateChange={setCalendarDate} tournamentStartDate={tournamentStartDate} tournamentEndDate={tournamentEndDate} />}
+
+        {activePopoverItem ? <div className="pointer-events-none absolute inset-0 z-30">
+          <article className="pointer-events-auto absolute w-full max-w-sm rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-[var(--surface)]" style={popoverDisplayStyle}>
+            {/* Header */}
+            <div className="flex items-start justify-between gap-2 border-b border-slate-100 p-3 dark:border-slate-700/60">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  {activePopover?.type === "MATCH" ? `${String(activePopoverItem?.team1_label || "Team 1")} vs ${String(activePopoverItem?.team2_label || "Team 2")}` : activePopover?.title || "Schedule item"}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  {activePopoverItem?.sportDisplayLabel || activePopoverItem?.sport || "Sport"}
+                </p>
+              </div>
+              {activePopover?.pinned ? <button type="button" onClick={closePinnedPopover} className="shrink-0 rounded-md border border-slate-300 px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">Close</button> : null}
+            </div>
+            {/* Body */}
+            {activePopover?.type === "MATCH" ? (
+              <div className="p-3 space-y-3">
+                <dl className="space-y-1.5 text-xs text-slate-700 dark:text-slate-200">
+                  <div className="flex justify-between gap-3"><dt className="text-slate-500 dark:text-slate-400">Time</dt><dd className="text-right font-medium">{formatTimeRangeLabel(activePopoverItem?.start, activePopoverItem?.end)}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-slate-500 dark:text-slate-400">Venue</dt><dd className="text-right font-medium">{activePopoverItem?.venue || "Venue TBA"}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-slate-500 dark:text-slate-400">Sport</dt><dd className="text-right font-medium">{activePopoverItem?.sportName || activePopoverItem?.sport || "Sport"}</dd></div>
+                  {isMeaningfulEventName(activePopoverItem?.eventName, activePopoverItem?.sportName) ? <div className="flex justify-between gap-3"><dt className="text-slate-500 dark:text-slate-400">Event Category</dt><dd className="text-right font-medium">{activePopoverItem?.eventName}</dd></div> : null}
+                  {activePopoverItem?.competitionTypeLabel ? <div className="flex items-center justify-between gap-3"><dt className="text-slate-500 dark:text-slate-400">Competition Type</dt><dd><span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${participantShapeBadgeClass(activePopoverItem?.participantShape || activePopoverItem?.participant_shape || "TEAM")}`}>{activePopoverItem.competitionTypeLabel}</span></dd></div> : null}
+                </dl>
+                {activePopoverIssueSeverity !== "NONE" ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 dark:border-amber-500/30 dark:bg-amber-500/10">
+                    <p className="flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300"><AlertTriangle size={11} /> {buildIssueTitle(activePopoverPrimaryIssue)}</p>
+                    {activePopoverPrimaryIssue?.reason ? <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-200/90">{activePopoverPrimaryIssue.reason}</p> : null}
                   </div>
-                  {activePopover?.pinned ? <button type="button" onClick={closePinnedPopover} className="shrink-0 rounded-md border border-slate-300 px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
-                      Close
-                    </button> : null}
+                ) : null}
+                <div className="flex flex-wrap gap-1.5 border-t border-slate-100 pt-2.5 dark:border-slate-700/60">
+                  <button type="button" onClick={() => handleEditSelectedMatch(activePopoverItem)} disabled={activePopoverMatchLocked} className="min-h-8 rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-[var(--surface)] dark:text-slate-200 dark:hover:bg-slate-800">Edit</button>
+                  <button type="button" onClick={() => handleStartSelectedMatch(activePopoverItem)} disabled={Boolean(matchStartDisabledReason)} title={matchStartDisabledReason || "Start match"} className="min-h-8 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300">Start</button>
+                  <button type="button" onClick={() => handleOpenLiveScoring(activePopoverItem)} disabled={Boolean(liveScoringDisabledReason)} title={liveScoringDisabledReason || "Open live scoring"} className="min-h-8 rounded-lg border border-blue-300 bg-blue-50 px-2.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-300">Live Scoring</button>
+                  {activePopoverFirstApplicableOption ? <button type="button" onClick={() => handleApplyRecommendationOption({ matchId: activePopoverMatchId, option: activePopoverFirstApplicableOption })} disabled={actionLoading} className="min-h-8 rounded-lg border border-cyan-300 bg-cyan-50 px-2.5 text-xs font-semibold text-cyan-700 hover:bg-cyan-100 disabled:opacity-50 dark:border-cyan-500/40 dark:bg-cyan-500/10 dark:text-cyan-300">{actionLoading ? "Applying..." : getRecommendationActionLabel(activePopoverFirstApplicableOption)}</button> : null}
                 </div>
-                {activePopoverIssueSeverity !== "NONE" ? <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-                    <AlertTriangle size={11} />
-                    {buildIssueTitle(activePopoverPrimaryIssue)}
-                  </p> : null}
-                {activePopover?.type === "MATCH" ? <button type="button" onClick={() => setEventDetailOpen(true)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-blue-300 bg-blue-50 px-2 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20">
-                    View Details
-                  </button> : null}
-              </article>
-            </div> : null}
-        </div>
+              </div>
+            ) : (
+              <div className="p-3 text-[11px] text-slate-500 dark:text-slate-400">{formatTimeRangeLabel(activePopoverItem?.start, activePopoverItem?.end)}</div>
+            )}
+          </article>
+        </div> : null}
+      </div>
 
-			        {/* {hasTournamentSelected ? (
+      {/* {hasTournamentSelected ? (
              <AiPreflightResultsPanel
              hasTournamentSelected={hasTournamentSelected}
              hasPreflightResult={Boolean(preflightResult)}
@@ -3241,9 +3269,9 @@ const Schedules = () => {
              />
              </AiPreflightResultsPanel>
             ) : null} */}
-	      </section>
+    </section>
 
-{/* 
+    {/* 
                <AiRecommendationCenter
                  items={recommendationCenterItems}
                  actionLoading={actionLoading}
@@ -3269,44 +3297,68 @@ const Schedules = () => {
                  />
 	               ) : null} */}
 
-      <ScheduleIssueModal actionLoading={actionLoading} drawerSections={drawerSections} handleApplyRecommendationOption={handleApplyRecommendationOption} handleFocusIssueMatch={handleFocusIssueMatch} handlePreflightQuickAction={handlePreflightQuickAction} issueDrawerFooterActions={issueDrawerFooterActions} issueDrawerOpen={issueDrawerOpen} schedulePanelRef={schedulePanelRef} setIssueDrawerOpen={setIssueDrawerOpen} />
+    <ScheduleIssueModal actionLoading={actionLoading} drawerSections={drawerSections} handleApplyRecommendationOption={handleApplyRecommendationOption} handleFocusIssueMatch={handleFocusIssueMatch} handlePreflightQuickAction={handlePreflightQuickAction} issueDrawerFooterActions={issueDrawerFooterActions} issueDrawerOpen={issueDrawerOpen} schedulePanelRef={schedulePanelRef} setIssueDrawerOpen={setIssueDrawerOpen} />
 
-      <VenueProfilesModal availabilityByVenueId={availabilityByVenueId} navigate={navigate} schedulePanelRef={schedulePanelRef} setVenueDrawerOpen={setVenueDrawerOpen} venueDrawerOpen={venueDrawerOpen} venuePreview={venuePreview} venueUsageCountByVenueId={venueUsageCountByVenueId} />
+    <VenueProfilesModal availabilityByVenueId={availabilityByVenueId} navigate={navigate} schedulePanelRef={schedulePanelRef} setVenueDrawerOpen={setVenueDrawerOpen} venueDrawerOpen={venueDrawerOpen} venuePreview={venuePreview} venueUsageCountByVenueId={venueUsageCountByVenueId} />
 
-      <MatchDetailModal actionLoading={actionLoading} activePopoverMatchLocked={activePopoverMatchLocked} formatTimeRangeLabel={formatTimeRangeLabel} getRecommendationActionLabel={getRecommendationActionLabel} handleApplyRecommendationOption={handleApplyRecommendationOption} handleEditSelectedMatch={handleEditSelectedMatch} handleOpenLiveScoring={handleOpenLiveScoring} handleStartSelectedMatch={handleStartSelectedMatch} schedulePanelRef={schedulePanelRef} setEventDetailOpen={setEventDetailOpen} />
+    <MatchDetailModal
+      actionLoading={actionLoading}
+      activePopover={detailItem}
+      activePopoverFirstApplicableOption={activePopoverFirstApplicableOption}
+      activePopoverIssueSeverity={activePopoverIssueSeverity}
+      activePopoverItem={detailItem?.item || null}
+      activePopoverMatchId={detailItem?.item?.match_id || detailItem?.item?.id || null}
+      activePopoverMatchLocked={String(detailItem?.item?.status || "").toUpperCase().includes("COMPLETED") || String(detailItem?.item?.status || "").toUpperCase().includes("FINAL")}
+      activePopoverPrimaryIssue={activePopoverPrimaryIssue}
+      activePopoverRecommendedActions={activePopoverRecommendedActions}
+      buildIssueTitle={buildIssueTitle}
+      eventDetailOpen={eventDetailOpen}
+      formatTimeRangeLabel={formatTimeRangeLabel}
+      getRecommendationActionLabel={getRecommendationActionLabel}
+      handleApplyRecommendationOption={handleApplyRecommendationOption}
+      handleEditSelectedMatch={handleEditSelectedMatch}
+      handleOpenLiveScoring={handleOpenLiveScoring}
+      handleStartSelectedMatch={handleStartSelectedMatch}
+      isMeaningfulEventName={isMeaningfulEventName}
+      liveScoringDisabledReason={isLiveScoringDisabled(detailItem?.item || null)}
+      matchStartDisabledReason={isMatchStartDisabled(detailItem?.item || null)}
+      participantShapeBadgeClass={participantShapeBadgeClass}
+      schedulePanelRef={schedulePanelRef}
+      setEventDetailOpen={(val) => { setEventDetailOpen(val); if (!val) setDetailItem(null); }}
+    />
 
-      <GenerationHelpModal generationHelpOpen={generationHelpOpen} setGenerationHelpOpen={setGenerationHelpOpen} />
+    <GenerationHelpModal generationHelpOpen={generationHelpOpen} setGenerationHelpOpen={setGenerationHelpOpen} />
 
-      <RegenerateConfirmModal
-        analytics={analytics}
-        guidedGenerationBusy={guidedGenerationBusy}
-        guidedGenerationBusyLabel={guidedGenerationBusyLabel}
-        handleGuidedScheduleGeneration={handleGuidedScheduleGeneration}
-        normalizedEvents={normalizedEvents}
-        regenerateConfirmOpen={regenerateConfirmOpen}
-        schedulingMode={schedulingMode}
-        setRegenerateConfirmOpen={setRegenerateConfirmOpen}
-        validationResult={validationResult}
-      />
+    <RegenerateConfirmModal
+      analytics={analytics}
+      guidedGenerationBusy={guidedGenerationBusy}
+      guidedGenerationBusyLabel={guidedGenerationBusyLabel}
+      handleGuidedScheduleGeneration={handleGuidedScheduleGeneration}
+      normalizedEvents={normalizedEvents}
+      regenerateConfirmOpen={regenerateConfirmOpen}
+      schedulingMode={schedulingMode}
+      setRegenerateConfirmOpen={setRegenerateConfirmOpen}
+      validationResult={validationResult}
+    />
 
-      <ScheduleCheckDialog
-        open={preflightModalOpen}
-        mode={scheduleCheckMode}
-        issues={scheduleCheckIssues}
-        busy={generating || preflightRunning}
-        onClose={() => {
-          if (generating || preflightRunning) return;
-          setPreflightModalOpen(false);
-          setPendingCheckedGeneration(null);
-        }}
-        onContinue={handleContinueAfterWarnings}
-        onResolution={handleScheduleResolution}
-        continueLabel={pendingCheckedGeneration?.continueToProgramSetup ? "Continue" : undefined}
-      />
+    <ScheduleCheckDialog
+      open={preflightModalOpen}
+      mode={scheduleCheckMode}
+      issues={scheduleCheckIssues}
+      busy={generating || preflightRunning}
+      onClose={() => {
+        if (generating || preflightRunning) return;
+        setPreflightModalOpen(false);
+        setPendingCheckedGeneration(null);
+      }}
+      onContinue={handleContinueAfterWarnings}
+      onResolution={handleScheduleResolution}
+      continueLabel={pendingCheckedGeneration?.continueToProgramSetup ? "Continue" : undefined}
+    />
 
-      <EditScheduleModal editError={editError} editForm={editForm} editModalOpen={editModalOpen} editSubmitting={editSubmitting} handleCloseEditModal={handleCloseEditModal} handleEditDateChange={handleEditDateChange} handleEditEndChange={handleEditEndChange} handleEditStartChange={handleEditStartChange} handleEditVenueChange={handleEditVenueChange} handleSubmitEditModal={handleSubmitEditModal} />
+    <EditScheduleModal editError={editError} editForm={editForm} editModalOpen={editModalOpen} editSubmitting={editSubmitting} handleCloseEditModal={handleCloseEditModal} handleEditDateChange={handleEditDateChange} handleEditEndChange={handleEditEndChange} handleEditStartChange={handleEditStartChange} handleEditVenueChange={handleEditVenueChange} handleSubmitEditModal={handleSubmitEditModal} />
 
-      <ProgramBlockModal editingProgramBlockId={editingProgramBlockId} formatProgramBlockTypeLabel={formatProgramBlockTypeLabel} getProgramBlockTypeTone={getProgramBlockTypeTone} handleCloseProgramBlockManager={handleCloseProgramBlockManager} handleDeleteProgramBlock={handleDeleteProgramBlock} handleEditProgramBlock={handleEditProgramBlock} handleSaveProgramBlockEdit={handleSaveProgramBlockEdit} isProgramBlockModalOpen={isProgramBlockModalOpen} isSportsCoordinator={Boolean(isSportsCoordinator && !isViewingHistorical && !selectedTournament?.is_started && !selectedTournament?.is_archived && !normalizedEvents.some(event => String(event?.schedule_state || "").toUpperCase() === "PUBLISHED"))} navigate={navigate} programBlockDraft={programBlockDraft} programBlockSubmitting={programBlockSubmitting} programBlocks={programBlocks} resetProgramBlockDraft={resetProgramBlockDraft} setProgramBlockDraft={setProgramBlockDraft} setupMode={programSetupMode} setupRows={programSetupRows} setupErrors={programSetupErrors} setupLocked={Boolean(isViewingHistorical || selectedTournament?.is_started || selectedTournament?.is_archived || normalizedEvents.some(event => String(event?.schedule_state || "").toUpperCase() === "PUBLISHED"))} onSetupRowChange={handleProgramSetupRowChange} onSetupBack={handleCloseProgramBlockManager} onSetupContinue={handleProgramSetupContinue} />
-    </div>;
+    <ProgramBlockModal editingProgramBlockId={editingProgramBlockId} formatProgramBlockTypeLabel={formatProgramBlockTypeLabel} getProgramBlockTypeTone={getProgramBlockTypeTone} handleCloseProgramBlockManager={handleCloseProgramBlockManager} handleDeleteProgramBlock={handleDeleteProgramBlock} handleEditProgramBlock={handleEditProgramBlock} handleSaveProgramBlockEdit={handleSaveProgramBlockEdit} isProgramBlockModalOpen={isProgramBlockModalOpen} isSportsCoordinator={Boolean(isSportsCoordinator && !isViewingHistorical && !selectedTournament?.is_started && !selectedTournament?.is_archived && !normalizedEvents.some(event => String(event?.schedule_state || "").toUpperCase() === "PUBLISHED"))} navigate={navigate} programBlockDraft={programBlockDraft} programBlockSubmitting={programBlockSubmitting} programBlocks={programBlocks} resetProgramBlockDraft={resetProgramBlockDraft} setProgramBlockDraft={setProgramBlockDraft} setupMode={programSetupMode} setupRows={programSetupRows} setupErrors={programSetupErrors} setupLocked={Boolean(isViewingHistorical || selectedTournament?.is_started || selectedTournament?.is_archived || normalizedEvents.some(event => String(event?.schedule_state || "").toUpperCase() === "PUBLISHED"))} onSetupRowChange={handleProgramSetupRowChange} onSetupBack={handleCloseProgramBlockManager} onSetupContinue={handleProgramSetupContinue} />
+  </div>;
 };
 export default Schedules;
